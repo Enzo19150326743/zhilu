@@ -27,10 +27,15 @@ class CudaRuntimeTests(unittest.TestCase):
             cublas_bin.mkdir(parents=True)
             cudnn_bin.mkdir(parents=True)
             nvrtc_bin.mkdir(parents=True)
+            expected_directories = [
+                cublas_bin.resolve(),
+                cudnn_bin.resolve(),
+                nvrtc_bin.resolve(),
+            ]
 
             directories = cuda_runtime.discover_cuda_dll_directories([site_packages])
 
-        self.assertEqual(directories, [cublas_bin, cudnn_bin, nvrtc_bin])
+        self.assertEqual(directories, expected_directories)
 
     @unittest.skipUnless(os.name == "nt", "Windows DLL search behavior")
     def test_activate_cuda_dll_directories_registers_each_directory_once(self) -> None:
@@ -40,6 +45,8 @@ class CudaRuntimeTests(unittest.TestCase):
             cudnn_bin = site_packages / "nvidia" / "cudnn" / "bin"
             cublas_bin.mkdir(parents=True)
             cudnn_bin.mkdir(parents=True)
+            resolved_cublas_bin = cublas_bin.resolve()
+            resolved_cudnn_bin = cudnn_bin.resolve()
 
             with patch.dict(os.environ, {"PATH": "existing-path"}, clear=False):
                 with patch(
@@ -49,14 +56,16 @@ class CudaRuntimeTests(unittest.TestCase):
                     second = cuda_runtime.activate_cuda_dll_directories([site_packages])
                     process_path = os.environ["PATH"]
 
-        self.assertEqual(first, [cublas_bin, cudnn_bin])
-        self.assertEqual(second, [cublas_bin, cudnn_bin])
+        self.assertEqual(first, [resolved_cublas_bin, resolved_cudnn_bin])
+        self.assertEqual(second, [resolved_cublas_bin, resolved_cudnn_bin])
         self.assertEqual(add_dll_directory.call_count, 2)
-        add_dll_directory.assert_any_call(str(cublas_bin))
-        add_dll_directory.assert_any_call(str(cudnn_bin))
+        add_dll_directory.assert_any_call(str(resolved_cublas_bin))
+        add_dll_directory.assert_any_call(str(resolved_cudnn_bin))
         self.assertEqual(
             process_path,
-            os.pathsep.join([str(cublas_bin), str(cudnn_bin), "existing-path"]),
+            os.pathsep.join(
+                [str(resolved_cublas_bin), str(resolved_cudnn_bin), "existing-path"]
+            ),
         )
 
     @unittest.skipUnless(os.name == "nt", "Windows DLL search behavior")
