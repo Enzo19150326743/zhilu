@@ -1,0 +1,105 @@
+# 配置指南
+
+所有本地配置都放在 `backend/.env`。该文件已经被 Git 忽略，不要把真实值复制到 README、Issue、截图或提交记录。
+
+## 创建配置文件
+
+推荐直接双击根目录的 `配置 AI.bat`。也可以手动复制：
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+修改 `.env` 后必须重启后端。
+
+## AI 接口
+
+知录支持 DeepSeek 和其他 OpenAI-compatible Chat Completions 服务。
+
+```dotenv
+AI_PROVIDER=deepseek
+AI_API_KEY=your-api-key
+AI_BASE_URL=https://api.deepseek.com
+AI_MODEL=your-model-name
+AI_FAST_MODEL=your-fast-model-name
+AI_MAX_TOKENS=4096
+AI_THINKING_TYPE=disabled
+```
+
+- `AI_API_KEY` 是秘密，只能保存在本机。
+- Base URL 和模型名是公开配置，不是密钥，但仍应以服务商当前文档为准。
+- 未配置 Key 时，解析、本地历史和 Markdown 工作流仍可使用；AI 总结、问答与校对会使用本地降级结果。
+
+## B 站登录态与 yt-dlp Cookie
+
+默认匿名解析。只有在你确认需要读取当前账号有权访问的公开内容时，才显式开启本地 Cookie 选项：
+
+```dotenv
+BILIBILI_ENABLE_COOKIE_OPTIONS=1
+BILIBILI_COOKIE_FILE=D:\path\to\cookies.txt
+
+YTDLP_ENABLE_COOKIE_OPTIONS=1
+YTDLP_COOKIE_FILE=D:\path\to\cookies.txt
+# 或：YTDLP_COOKIES_FROM_BROWSER=edge
+```
+
+Cookie 是登录凭据：
+
+- 不要提交 Cookie 文件。
+- 不要粘贴到 Issue 或聊天记录。
+- 浏览器 Cookie 数据库可能被正在运行的浏览器锁定。
+- 登录态不保证固定清晰度，最终仍以平台和账号实际权限为准。
+
+## 本地下载
+
+```dotenv
+YTDLP_DOWNLOAD_DIR=D:\path\to\downloads
+YTDLP_MERGE_OUTPUT_FORMAT=mp4
+FFMPEG_LOCATION=D:\path\to\ffmpeg\bin
+```
+
+默认下载目录是 `backend/data/downloads`。选择仅视频格式时，后端会尝试用 ffmpeg 合并音频。
+
+## 小宇宙
+
+```dotenv
+XIAOYUZHOU_RSSHUB_BASE_URL=https://rsshub.app
+```
+
+只支持公开单集页面。系统优先读取公开 RSS，失败时回退公开网页结构化数据，不处理付费或私密节目。
+
+## 本地 ASR
+
+```dotenv
+ASR_WHISPER_MODEL=large-v3-turbo
+ASR_FALLBACK_WHISPER_MODEL=base
+ASR_DEVICE=auto
+ASR_COMPUTE_TYPE=int8
+ASR_LANGUAGE=zh
+ASR_BEAM_SIZE=5
+ASR_AUTO_FALLBACK=1
+```
+
+更大的模型通常更慢、更占内存。`ASR_DEVICE=auto` 会优先尝试可用 GPU，失败后按配置回退 CPU。
+
+## AI 转写校对
+
+```dotenv
+ASR_CORRECTION_ENABLED=1
+AI_CORRECTION_MODEL=your-fast-model-name
+ASR_CORRECTION_MAX_TOKENS=8192
+ASR_CORRECTION_CHUNK_CHARS=3500
+ASR_CORRECTION_TIMEOUT_SECONDS=120
+```
+
+节目结构、内容标签、说话人信息和术语表只用于后续 AI 校对整理，不直接注入 Whisper 声学解码。未配置 AI Key 或校对失败时，系统保留原始 Whisper 稿。
+
+## Obsidian
+
+```dotenv
+OBSIDIAN_ENABLE_VAULT_WRITE=0
+OBSIDIAN_VAULT_DIR=
+OBSIDIAN_EXPORT_SUBDIR=知录知识稿
+```
+
+默认只下载 `.md`。直接写入 Vault 需要显式开启，并填写本机目录。详见 [Obsidian 导出说明](./obsidian-export.md)。

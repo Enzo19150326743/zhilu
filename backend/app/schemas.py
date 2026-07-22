@@ -1,0 +1,423 @@
+from pydantic import BaseModel, Field
+
+
+class HealthResponse(BaseModel):
+    """本地健康检查响应。"""
+
+    status: str
+    mode: str
+    version: str
+
+
+class RateLimitItem(BaseModel):
+    """单个本地动作的频控状态。"""
+
+    action: str
+    limit: int
+    used: int
+    remaining: int
+    reset_at: str
+
+
+class RateLimitStatusResponse(BaseModel):
+    """本地频控状态响应。"""
+
+    success: bool = True
+    items: list[RateLimitItem]
+
+
+class BilibiliAuthStatusResponse(BaseModel):
+    """B 站本地 Cookie 登录态诊断响应。"""
+
+    success: bool = True
+    cookie_options_enabled: bool
+    cookie_file_configured: bool
+    cookie_loaded: bool
+    cookie_source: str | None = None
+    is_login: bool = False
+    mid: int | None = None
+    username: str | None = None
+    is_vip: bool | None = None
+    message: str
+
+
+class ApiError(BaseModel):
+    """统一错误响应，避免把内部异常直接暴露给前端。"""
+
+    success: bool = False
+    error_code: str
+    message: str
+
+
+class ParseRequest(BaseModel):
+    """媒体解析请求。"""
+
+    url: str = Field(min_length=1, max_length=2048)
+    force_refresh: bool = False
+
+
+class TranscriptSegment(BaseModel):
+    """带时间戳的字幕片段。"""
+
+    start: float
+    end: float
+    text: str
+    speaker: str | None = None
+
+
+class TranscribeSpeakerProfile(BaseModel):
+    """转写前用户提供的说话人辅助信息。"""
+
+    name: str | None = Field(default=None, max_length=80)
+    role: str | None = Field(default=None, max_length=80)
+    description: str | None = Field(default=None, max_length=300)
+
+
+class TranscribeContextSettings(BaseModel):
+    """转写上下文设置，用于改善校对和访谈稿整理。"""
+
+    program_structure: str = Field(default="auto", max_length=40)
+    content_tags: list[str] = Field(default_factory=list, max_length=12)
+    speakers: list[TranscribeSpeakerProfile] = Field(default_factory=list, max_length=6)
+
+
+class TranscriptAsrMeta(BaseModel):
+    """本地 ASR 转写元信息。"""
+
+    engine: str = "faster-whisper"
+    model: str
+    device: str
+    compute_type: str
+    language: str | None = None
+    correction_status: str
+    correction_model: str | None = None
+    glossary_term_count: int = 0
+    program_structure: str | None = None
+    content_tags: list[str] = Field(default_factory=list)
+    speaker_profiles: list[TranscribeSpeakerProfile] = Field(default_factory=list)
+    speaker_label_status: str | None = None
+
+
+class TranscriptPayload(BaseModel):
+    """内容文本数据。"""
+
+    segments: list[TranscriptSegment]
+    plain_text: str
+    raw_segments: list[TranscriptSegment] | None = None
+    raw_plain_text: str | None = None
+    asr_meta: TranscriptAsrMeta | None = None
+
+
+class SummarizeRequest(BaseModel):
+    """媒体内容总结请求。"""
+
+    transcript_plain_text: str = Field(min_length=1, max_length=120000)
+    transcript_segments: list[TranscriptSegment] = Field(default_factory=list)
+    source_url: str | None = Field(default=None, max_length=2048)
+    video_title: str | None = Field(default=None, max_length=300)
+    video_author: str | None = Field(default=None, max_length=200)
+    media_type: str | None = Field(default=None, max_length=40)
+    text_source_type: str | None = Field(default=None, max_length=40)
+
+
+class DownloadRequest(BaseModel):
+    """视频下载请求。"""
+
+    url: str = Field(min_length=1, max_length=2048)
+    format_id: str = Field(min_length=1, max_length=160)
+    merge_with_audio: bool = False
+
+
+class TranscribeRequest(BaseModel):
+    """本地 ASR 转写请求。"""
+
+    url: str = Field(min_length=1, max_length=2048)
+    video_id: str | None = Field(default=None, max_length=200)
+    context_settings: TranscribeContextSettings | None = None
+
+
+class DemoItem(BaseModel):
+    """Demo 列表项。"""
+
+    demo_id: str
+    title: str
+    description: str
+    thumbnail: str
+
+
+class DemoListResponse(BaseModel):
+    """Demo 列表响应。"""
+
+    success: bool = True
+    demos: list[DemoItem]
+
+
+class VideoInfo(BaseModel):
+    """媒体元数据。"""
+
+    video_id: str
+    platform: str
+    url: str
+    title: str
+    author: str
+    duration: int
+    thumbnail: str
+    has_transcript: bool
+    media_type: str | None = None
+    text_source_type: str | None = None
+
+
+class VideoFormat(BaseModel):
+    """可用格式信息。"""
+
+    format_id: str
+    ext: str
+    resolution: str
+    vcodec: str
+    acodec: str
+    filesize: int | None
+    label: str
+
+
+class FormatDiagnostics(BaseModel):
+    """媒体格式解析诊断信息。"""
+
+    raw_format_count: int = 0
+    max_height: int | None = None
+    has_cookie_config: bool = False
+    is_bilibili: bool = False
+
+
+class TimelineItem(BaseModel):
+    """摘要时间轴条目。"""
+
+    time: str
+    content: str
+
+
+class SummaryHighlight(BaseModel):
+    """可加入知识稿的摘录。"""
+
+    id: str = Field(min_length=1, max_length=120)
+    text: str = Field(min_length=1, max_length=5000)
+    start: float | None = None
+    end: float | None = None
+    reason: str | None = Field(default=None, max_length=1000)
+    tags: list[str] = Field(default_factory=list)
+    source: str = Field(default="ai", max_length=40)
+    source_type: str | None = Field(default=None, max_length=40)
+    created_at: str | None = Field(default=None, max_length=80)
+
+
+class NoteDraft(BaseModel):
+    """当前媒体的摘录草稿。"""
+
+    highlights: list[SummaryHighlight] = Field(default_factory=list)
+    updated_at: str | None = Field(default=None, max_length=80)
+
+
+class NoteDraftUpdateRequest(BaseModel):
+    """保存摘录草稿请求。"""
+
+    source_url: str = Field(min_length=1, max_length=2048)
+    highlights: list[SummaryHighlight] = Field(default_factory=list)
+
+
+class NoteDraftUpdateResponse(BaseModel):
+    """保存摘录草稿响应。"""
+
+    success: bool = True
+    note_draft: NoteDraft
+
+
+class ObsidianNoteExportRequest(BaseModel):
+    """Obsidian Markdown 导出请求。"""
+
+    source_url: str = Field(min_length=1, max_length=2048)
+    include_full_text: bool = False
+
+
+class ObsidianNoteExportResponse(BaseModel):
+    """Obsidian Markdown 导出响应。"""
+
+    success: bool = True
+    filename: str
+    written_to_vault: bool
+    file_path: str | None = None
+    markdown: str
+    message: str
+
+
+class QaRequest(BaseModel):
+    """媒体内容问答请求。"""
+
+    question: str = Field(min_length=1, max_length=800)
+    transcript_plain_text: str = Field(min_length=1, max_length=120000)
+    source_url: str | None = Field(default=None, max_length=2048)
+    video_title: str | None = Field(default=None, max_length=300)
+    video_author: str | None = Field(default=None, max_length=200)
+    media_type: str | None = Field(default=None, max_length=40)
+    text_source_type: str | None = Field(default=None, max_length=40)
+    mode: str | None = Field(default="fast", max_length=40)
+    summary_tldr: str | None = Field(default=None, max_length=1000)
+    timeline: list[TimelineItem] = Field(default_factory=list)
+
+
+class VideoSummary(BaseModel):
+    """AI 结构化总结。"""
+
+    draft_version: str = Field(default="legacy", max_length=40)
+    content_type: str | None = Field(default=None, max_length=40)
+    topics: list[str] = Field(default_factory=list)
+    tldr: str
+    key_points: list[str]
+    timeline: list[TimelineItem]
+    structured_analysis_markdown: str
+    takeaways: list[str]
+    highlights: list[SummaryHighlight] = Field(default_factory=list)
+    content_keywords: list[str] = Field(default_factory=list)
+    application_clues: list[str] = Field(default_factory=list)
+    content_boundaries: list[str] = Field(default_factory=list)
+    # NOTE: 以下字段只用于兼容旧数字分身草稿记录，新版通用总结不再生成或消费。
+    reason_for_saving: str | None = Field(default=None, max_length=1200)
+    personal_relevance: list[str] = Field(default_factory=list)
+    transformation_ideas: list[str] = Field(default_factory=list)
+    search_keywords: list[str] = Field(default_factory=list)
+    related_wikilinks: list[str] = Field(default_factory=list)
+    to_confirm: list[str] = Field(default_factory=list)
+
+
+class MindmapMeta(BaseModel):
+    """智能导图渲染元数据。"""
+
+    layout: str = "tree"
+    content_category: str = "general"
+    template_id: str = "general_tree"
+    media_type: str | None = None
+    text_source_type: str | None = None
+
+
+class DemoDetailResponse(BaseModel):
+    """完整 Demo 响应。"""
+
+    success: bool = True
+    video: VideoInfo
+    formats: list[VideoFormat]
+    format_diagnostics: FormatDiagnostics | None = None
+    transcript: TranscriptPayload
+    summary: VideoSummary
+    mindmap_markdown: str
+    mindmap_meta: MindmapMeta | None = None
+    note_draft: NoteDraft | None = None
+    transcription_source_url: str | None = None
+
+
+class ParseResponse(DemoDetailResponse):
+    """真实解析骨架响应。"""
+
+    source_url: str
+    is_placeholder: bool = True
+    is_from_cache: bool = False
+    library_summary_status: str | None = None
+    library_summary_model: str | None = None
+
+
+class SummarizeResponse(BaseModel):
+    """媒体内容总结响应。"""
+
+    success: bool = True
+    summary: VideoSummary
+    mindmap_markdown: str
+    mindmap_meta: MindmapMeta | None = None
+    is_ai_generated: bool
+    model: str
+    fallback_reason: str | None = None
+    is_cached: bool = False
+
+
+class QaReference(BaseModel):
+    """媒体问答引用片段。"""
+
+    time: str | None = None
+    text: str
+
+
+class QaResponse(BaseModel):
+    """媒体内容问答响应。"""
+
+    success: bool = True
+    answer: str
+    references: list[QaReference]
+    is_ai_generated: bool
+    model: str
+
+
+class DownloadResponse(BaseModel):
+    """本地下载完成响应。"""
+
+    success: bool = True
+    filename: str
+    file_path: str
+    format_selector: str
+    message: str
+
+
+class TranscribeResponse(BaseModel):
+    """本地 ASR 转写响应。"""
+
+    success: bool = True
+    source_url: str
+    video_id: str | None = None
+    transcript: TranscriptPayload
+    message: str
+
+
+class LibraryItem(BaseModel):
+    """本地内容库列表项。"""
+
+    video_id: str
+    source_url: str
+    title: str
+    author: str
+    platform: str
+    thumbnail: str
+    duration: int
+    has_transcript: bool
+    summary_status: str
+    summary_model: str | None
+    media_type: str | None = None
+    text_source_type: str | None = None
+    updated_at: str
+
+
+class LibraryListResponse(BaseModel):
+    """本地内容库最近记录响应。"""
+
+    success: bool = True
+    items: list[LibraryItem]
+
+
+class LibraryStatsResponse(BaseModel):
+    """本地内容库统计响应。"""
+
+    success: bool = True
+    total_items: int
+    with_transcript_count: int
+    no_transcript_count: int
+    summarized_count: int
+    ai_summary_count: int
+    fallback_summary_count: int
+
+
+class LibraryDeleteResponse(BaseModel):
+    """本地内容库删除响应。"""
+
+    success: bool = True
+    deleted_video_id: str
+
+
+class LibraryClearResponse(BaseModel):
+    """本地内容库清空响应。"""
+
+    success: bool = True
+    deleted_count: int

@@ -1,0 +1,877 @@
+import logging
+import os
+import re
+import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
+
+from app.demo_data import get_demo_by_id, load_demo_seed
+from app.schemas import (
+    ApiError,
+    BilibiliAuthStatusResponse,
+    DemoDetailResponse,
+    DemoItem,
+    DemoListResponse,
+    DownloadRequest,
+    DownloadResponse,
+    HealthResponse,
+    LibraryClearResponse,
+    LibraryDeleteResponse,
+    LibraryListResponse,
+    LibraryStatsResponse,
+    NoteDraft,
+    NoteDraftUpdateRequest,
+    NoteDraftUpdateResponse,
+    ObsidianNoteExportRequest,
+    ObsidianNoteExportResponse,
+    ParseRequest,
+    ParseResponse,
+    QaRequest,
+    QaResponse,
+    RateLimitStatusResponse,
+    SummarizeRequest,
+    SummarizeResponse,
+    TranscribeRequest,
+    TranscribeResponse,
+)
+from app.services.asr_service import transcribe_media_audio
+from app.services import http_fetch_service
+from app.services.bilibili_service import (
+    download_bilibili_video_format,
+    get_bilibili_auth_status,
+    is_bilibili_url,
+    resolve_bilibili_transcription_source,
+)
+from app.services.douyin_service import (
+    download_douyin_video,
+    is_douyin_url,
+)
+from app.services.demo_cover_service import resolve_demo_cover_url
+from app.services.library_service import (
+    clear_library_items,
+    delete_library_item,
+    get_library_detail,
+    get_library_detail_by_source_url,
+    get_library_stats,
+    list_recent_library_items,
+    update_note_draft_for_source_url,
+    update_summary_for_source_url,
+    update_transcript_for_source_url,
+    upsert_library_item,
+)
+from app.services.media_source_service import parse_media_source
+from app.services.obsidian_export_service import (
+    ObsidianExportError,
+    export_obsidian_note,
+)
+from app.services.qa_service import answer_question
+from app.services.rate_limit_service import (
+    get_rate_limit_items,
+)
+from app.services.summarize_service import (
+    UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
+    summarize_transcript,
+)
+from app.services.ytdlp_service import download_video_format
+
+
+def read_int_env(name: str, default_value: int) -> int:
+    """
+    读取整数环境变量，格式错误时使用默认值。
+    """
+    try:
+        return int(os.getenv(name, str(default_value)))
+    except ValueError:
+        return default_value
+
+
+APP_VERSION = "0.1.0"
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+PARSE_RATE_LIMIT_PER_HOUR = read_int_env("PARSE_RATE_LIMIT_PER_HOUR", 20)
+SUMMARY_RATE_LIMIT_PER_HOUR = read_int_env("SUMMARY_RATE_LIMIT_PER_HOUR", 10)
+QA_RATE_LIMIT_PER_HOUR = read_int_env("QA_RATE_LIMIT_PER_HOUR", 10)
+TRANSCRIBE_RATE_LIMIT_PER_HOUR = read_int_env("TRANSCRIBE_RATE_LIMIT_PER_HOUR", 3)
+IMAGE_PROXY_TIMEOUT_SECONDS = 15
+IMAGE_PROXY_MAX_BYTES = 8 * 1024 * 1024
+SUMMARY_CACHE_STATUSES = {"ai_generated"}
+IMAGE_PROXY_ACCEPT_HEADER = (
+    "image/avif,image/webp,image/apng,image/png,image/jpeg,"
+    "image/*;q=0.8,*/*;q=0.5"
+)
+PUBLIC_URL_PATTERN = re.compile(r"https?://[^\s，。；;、]+")
+BILIBILI_VIDEO_PATH_PATTERN = re.compile(r"^/video/(BV[a-zA-Z0-9]+)")
+BILIBILI_ALLOWED_QUERY_KEYS = {"p", "t"}
+logger = logging.getLogger(__name__)
+FRONTEND_ORIGINS = {
+    FRONTEND_ORIGIN,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+
+app = FastAPI(
+    title="AI Media Insight Workspace API",
+    version=APP_VERSION,
+    description="本地优先的 AI 媒体内容解析总结工作台后端服务。",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(FRONTEND_ORIGINS),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def build_api_error_response(
+    status_code: int, error_code: str, message: str
+) -> JSONResponse:
+    """
+    构造统一错误响应。
+    """
+    return JSONResponse(
+        status_code=status_code,
+        content=ApiError(error_code=error_code, message=message).model_dump(),
+    )
+
+
+@app.exception_handler(HTTPException)
+def handle_http_exception(_: Request, exc: HTTPException) -> JSONResponse:
+    """
+    将业务异常统一转换为前端可直接读取的错误结构。
+    """
+    detail = exc.detail
+    if isinstance(detail, dict):
+        return build_api_error_response(
+            status_code=exc.status_code,
+            error_code=str(detail.get("error_code", "HTTP_ERROR")),
+            message=str(detail.get("message", "请求失败，请稍后重试。")),
+        )
+
+    return build_api_error_response(
+        status_code=exc.status_code,
+        error_code="HTTP_ERROR",
+        message="请求失败，请稍后重试。",
+    )
+
+
+@app.exception_handler(RequestValidationError)
+def handle_request_validation_error(
+    _: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """
+    隐藏 Pydantic 内部校验细节，只给前端稳定错误结构。
+    """
+    return build_api_error_response(
+        status_code=422,
+        error_code="VALIDATION_ERROR",
+        message="请求参数不完整或格式不正确。",
+    )
+
+
+def normalize_public_video_url(raw_url: str) -> str:
+    """
+    从用户输入中提取并规范化媒体 URL。
+    """
+    video_url = extract_public_url(raw_url)
+    parsed_url = urlparse(video_url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "INVALID_URL",
+                "message": "请输入以 http:// 或 https:// 开头的公开媒体链接。",
+            },
+        )
+
+    return normalize_bilibili_video_url(video_url)
+
+
+def normalize_bilibili_video_url(video_url: str) -> str:
+    """
+    清理 B 站分享链接里的跟踪参数，降低公开解析被平台快速拒绝的概率。
+    """
+    parsed_url = urlparse(video_url)
+    hostname = parsed_url.hostname or ""
+    if not (
+        hostname.endswith("bilibili.com") or hostname.endswith("b23.tv")
+    ):
+        return video_url
+
+    match = BILIBILI_VIDEO_PATH_PATTERN.search(parsed_url.path)
+    if not match:
+        return video_url
+
+    safe_query = [
+        (key, value)
+        for key, value in parse_qsl(parsed_url.query, keep_blank_values=True)
+        if key in BILIBILI_ALLOWED_QUERY_KEYS and value
+    ]
+    return urlunparse(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            f"/video/{match.group(1)}",
+            "",
+            urlencode(safe_query),
+            "",
+        )
+    )
+
+
+def extract_public_url(raw_text: str) -> str:
+    """
+    支持抖音分享口令这类整段文案输入，优先提取其中第一个公开链接。
+    """
+    stripped_text = raw_text.strip()
+    match = PUBLIC_URL_PATTERN.search(stripped_text)
+    if not match:
+        return stripped_text
+
+    return match.group(0).rstrip(").,，。；;、")
+
+
+def get_client_key(request: Request) -> str:
+    """
+    获取本地频控使用的客户端标识。
+    """
+    return request.client.host if request.client else "local"
+
+
+def get_rate_limit_config() -> dict[str, int]:
+    """
+    返回当前本地频控配置。
+    """
+    return {
+        "parse": PARSE_RATE_LIMIT_PER_HOUR,
+        "summarize": SUMMARY_RATE_LIMIT_PER_HOUR,
+        "qa": QA_RATE_LIMIT_PER_HOUR,
+        "transcribe": TRANSCRIBE_RATE_LIMIT_PER_HOUR,
+    }
+
+
+def enforce_rate_limit(request: Request, action: str, limit: int) -> None:
+    """
+    个人本地使用阶段不限制高成本动作。
+    """
+    _ = (request, action, limit)
+    return
+
+
+def build_placeholder_parse_result(video_url: str) -> ParseResponse:
+    """
+    构造解析失败时的可解释返回。
+    """
+    return ParseResponse(
+        source_url=video_url,
+        is_placeholder=True,
+        video={
+            "video_id": "placeholder_parse_result",
+            "platform": "placeholder",
+            "url": video_url,
+            "title": "媒体解析暂未完成",
+            "author": "知录本地解析",
+            "duration": 0,
+            "thumbnail": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
+            "has_transcript": False,
+            "media_type": "media",
+            "text_source_type": "content",
+        },
+        formats=[
+            {
+                "format_id": "placeholder-format",
+                "ext": "mp4",
+                "resolution": "待解析",
+                "vcodec": "待接入",
+                "acodec": "待接入",
+                "filesize": None,
+                "label": "真实格式待接入",
+            }
+        ],
+        transcript={
+            "segments": [
+                {
+                    "start": 0,
+                    "end": 0,
+                    "text": "当前链接已通过基础校验，但暂时没有取得可用媒体内容。",
+                }
+            ],
+            "plain_text": "当前链接已通过基础校验，但暂时没有取得可用媒体内容。",
+        },
+        summary={
+            "tldr": "当前链接暂时没有解析出可用媒体内容，请稍后重试或换一个公开链接。",
+            "key_points": [
+                "链接格式已通过基础校验。",
+                "当前没有取得可用于总结的标题、内容文本或下载格式。",
+                "拿到内容文本后，再生成结构化总结、摘录和导图。",
+            ],
+            "timeline": [],
+            "structured_analysis_markdown": "## 当前状态\n### 链接已接收\n系统已完成基础校验。\n### 暂未取得内容\n请确认链接公开可访问，或稍后重新解析。",
+            "takeaways": [
+                "优先使用公开可访问、带标题和内容文本的媒体链接。",
+                "平台临时限制访问时，可以稍后重试。",
+            ],
+        },
+        mindmap_markdown="# 媒体解析\n## 当前状态\n### 链接已接收\n## 下一步\n### 重新解析公开可访问链接",
+    )
+
+
+@app.get("/api/health", response_model=HealthResponse)
+def get_health() -> HealthResponse:
+    """
+    返回本地服务状态。
+    """
+    return HealthResponse(status="ok", mode="local", version=APP_VERSION)
+
+
+@app.get("/api/image-proxy")
+def proxy_public_image(
+    url: str = Query(min_length=8, max_length=2048),
+) -> Response:
+    """
+    代理公开封面图，避免浏览器直连远端 CDN 时被防盗链或本机 TLS 链路拦截。
+    """
+    try:
+        image_body, content_type = http_fetch_service.fetch_public_bytes(
+            url,
+            accept_header=IMAGE_PROXY_ACCEPT_HEADER,
+            timeout_seconds=IMAGE_PROXY_TIMEOUT_SECONDS,
+            max_bytes=IMAGE_PROXY_MAX_BYTES,
+        )
+    except OSError as error:
+        logger.warning("image proxy fetch failed: %s", error.__class__.__name__)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "IMAGE_PROXY_FAILED",
+                "message": "封面图片读取失败，请稍后重试。",
+            },
+        ) from error
+
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    if not media_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "IMAGE_PROXY_INVALID_TYPE",
+                "message": "该链接返回的不是图片内容。",
+            },
+        )
+
+    return Response(
+        content=image_body,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/api/rate-limit/status", response_model=RateLimitStatusResponse)
+def get_rate_limit_status(request: Request) -> RateLimitStatusResponse:
+    """
+    返回当前客户端的本地频控状态。
+    """
+    return RateLimitStatusResponse(
+        items=get_rate_limit_items(
+            client_key=get_client_key(request),
+            action_limits=get_rate_limit_config(),
+        )
+    )
+
+
+@app.get("/api/bilibili/auth/status", response_model=BilibiliAuthStatusResponse)
+def get_bilibili_local_auth_status() -> BilibiliAuthStatusResponse:
+    """
+    返回本地显式 B 站 Cookie 配置是否可被 nav 接口识别。
+    """
+    return get_bilibili_auth_status()
+
+
+@app.get("/api/demo", response_model=DemoListResponse)
+def list_demos() -> DemoListResponse:
+    """
+    返回内置的推荐内容列表。
+    """
+    demos = [
+        DemoItem(
+            demo_id=demo["demo_id"],
+            title=demo["title"],
+            description=demo["description"],
+            thumbnail=f"/api/demo/{demo['demo_id']}/cover",
+        )
+        for demo in load_demo_seed()
+    ]
+    return DemoListResponse(demos=demos)
+
+
+@app.get("/api/demo/{demo_id}/cover")
+def get_demo_cover(demo_id: str) -> Response:
+    """返回推荐内容当前可用的媒体源封面。"""
+    demo = get_demo_by_id(demo_id)
+    if demo is None:
+        raise HTTPException(status_code=404, detail="未找到该推荐内容。")
+
+    cover_url = resolve_demo_cover_url(demo)
+    if not cover_url:
+        raise HTTPException(status_code=404, detail="该推荐内容暂时没有可用封面。")
+
+    return proxy_public_image(url=cover_url)
+
+
+@app.get("/api/demo/{demo_id}", response_model=DemoDetailResponse)
+def get_demo_detail(demo_id: str) -> dict[str, Any]:
+    """
+    返回推荐内容的精简公开数据。
+    """
+    demo = get_demo_by_id(demo_id)
+    if demo is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error_code": "DEMO_NOT_FOUND",
+                "message": "未找到该推荐内容。",
+            },
+        )
+
+    video = dict(demo["video"])
+    video["thumbnail"] = f"/api/demo/{demo_id}/cover"
+
+    return {
+        "success": True,
+        "video": video,
+        "formats": demo["formats"],
+        "transcript": demo["transcript"],
+        "summary": demo["summary"],
+        "mindmap_markdown": demo["mindmap_markdown"],
+    }
+
+
+@app.get("/api/library/recent", response_model=LibraryListResponse)
+def list_recent_library(
+    limit: int = Query(default=8, ge=1, le=50),
+) -> LibraryListResponse:
+    """
+    返回最近解析过的媒体记录。
+    """
+    return LibraryListResponse(items=list_recent_library_items(limit=limit))
+
+
+@app.get("/api/library/stats", response_model=LibraryStatsResponse)
+def get_local_library_stats() -> LibraryStatsResponse:
+    """
+    返回本地内容库统计概览。
+    """
+    return get_library_stats()
+
+
+@app.put("/api/library/note-draft", response_model=NoteDraftUpdateResponse)
+def update_library_note_draft(
+    note_draft_request: NoteDraftUpdateRequest,
+) -> NoteDraftUpdateResponse:
+    """
+    保存当前媒体的摘录草稿到本地历史记录。
+    """
+    source_url = normalize_public_video_url(note_draft_request.source_url)
+    note_draft = NoteDraft(
+        highlights=note_draft_request.highlights,
+        updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+    try:
+        updated_note_draft = update_note_draft_for_source_url(source_url, note_draft)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "library note draft update failed: %s",
+            error.__class__.__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error_code": "NOTE_DRAFT_SAVE_FAILED",
+                "message": "摘录草稿保存失败，请稍后重试。",
+            },
+        ) from error
+
+    if updated_note_draft is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error_code": "LIBRARY_ITEM_NOT_FOUND",
+                "message": "没有找到可保存摘录的本地历史记录。",
+            },
+        )
+
+    return NoteDraftUpdateResponse(note_draft=updated_note_draft)
+
+
+@app.post("/api/exports/obsidian-note", response_model=ObsidianNoteExportResponse)
+def export_library_obsidian_note(
+    export_request: ObsidianNoteExportRequest,
+) -> ObsidianNoteExportResponse:
+    """
+    生成或写入 Obsidian Markdown 笔记。
+    """
+    source_url = normalize_public_video_url(export_request.source_url)
+    try:
+        return export_obsidian_note(
+            source_url=source_url,
+            include_full_text=export_request.include_full_text,
+        )
+    except ObsidianExportError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "success": False,
+                "error_code": error.error_code,
+                "message": error.message,
+            },
+        ) from error
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "obsidian note export failed: %s",
+            error.__class__.__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error_code": "OBSIDIAN_EXPORT_FAILED",
+                "message": "Obsidian Markdown 导出失败，请稍后重试。",
+            },
+        ) from error
+
+
+@app.delete("/api/library", response_model=LibraryClearResponse)
+def clear_local_library() -> LibraryClearResponse:
+    """
+    清空本地内容库历史记录。
+    """
+    return LibraryClearResponse(deleted_count=clear_library_items())
+
+
+@app.get("/api/library/{video_id}", response_model=ParseResponse)
+def get_library_item(video_id: str) -> ParseResponse:
+    """
+    返回本地内容库中的完整工作台数据。
+    """
+    detail = get_library_detail(video_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error_code": "LIBRARY_ITEM_NOT_FOUND",
+                "message": "未找到该历史记录。",
+            },
+        )
+
+    return detail
+
+
+@app.delete("/api/library/{video_id}", response_model=LibraryDeleteResponse)
+def delete_library_history_item(video_id: str) -> LibraryDeleteResponse:
+    """
+    删除本地内容库中的单条历史记录。
+    """
+    deleted = delete_library_item(video_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error_code": "LIBRARY_ITEM_NOT_FOUND",
+                "message": "未找到该历史记录。",
+            },
+        )
+
+    return LibraryDeleteResponse(deleted_video_id=video_id)
+
+
+@app.post("/api/parse", response_model=ParseResponse)
+def parse_video(request: Request, parse_request: ParseRequest) -> ParseResponse:
+    """
+    校验真实解析入口，并返回媒体元数据解析结果。
+    """
+    video_url = normalize_public_video_url(parse_request.url)
+    cached_detail = None
+    if not parse_request.force_refresh:
+        try:
+            cached_detail = get_library_detail_by_source_url(video_url)
+        except (sqlite3.Error, OSError, ValueError) as error:
+            logger.warning("library cache lookup failed: %s", error.__class__.__name__)
+
+    if cached_detail is not None:
+        return cached_detail
+
+    enforce_rate_limit(request, "parse", PARSE_RATE_LIMIT_PER_HOUR)
+    parse_response = parse_media_source(video_url)
+    try:
+        upsert_library_item(parse_response)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning("library upsert failed: %s", error.__class__.__name__)
+
+    return parse_response
+
+
+@app.post("/api/summarize", response_model=SummarizeResponse)
+def summarize_video(
+    request: Request,
+    summarize_request: SummarizeRequest,
+) -> SummarizeResponse:
+    """
+    基于现有内容文本生成结构化总结。
+    """
+    if not summarize_request.transcript_plain_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "TRANSCRIPT_EMPTY",
+                "message": "没有可用于总结的内容文本。",
+            },
+        )
+
+    if (summarize_request.text_source_type or "").strip().lower() == "shownotes":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "FULL_TRANSCRIPT_REQUIRED",
+                "message": "当前只有 shownotes 原文，请先生成完整逐字稿，再生成总结和导图。",
+            },
+        )
+
+    cached_summary_response = get_cached_summary_response(summarize_request)
+    if cached_summary_response is not None:
+        return cached_summary_response
+
+    enforce_rate_limit(request, "summarize", SUMMARY_RATE_LIMIT_PER_HOUR)
+    summarize_response = summarize_transcript(summarize_request)
+    if not summarize_response.is_ai_generated:
+        cached_summary_response = get_cached_summary_response(summarize_request)
+        if cached_summary_response is not None:
+            return cached_summary_response
+
+    try:
+        update_summary_for_source_url(
+            summarize_request.source_url,
+            summarize_response,
+        )
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "library summary update failed: %s",
+            error.__class__.__name__,
+        )
+
+    return summarize_response
+
+
+def get_cached_summary_response(
+    summarize_request: SummarizeRequest,
+) -> SummarizeResponse | None:
+    """
+    同一媒体源已有总结时直接复用历史结果，避免重复消耗模型 token 和本地频控额度。
+    """
+    source_url = summarize_request.source_url
+    if not source_url:
+        return None
+
+    try:
+        cached_detail = get_library_detail_by_source_url(source_url)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "library summary cache lookup failed: %s",
+            error.__class__.__name__,
+        )
+        return None
+
+    if (
+        cached_detail is None
+        or cached_detail.library_summary_status not in SUMMARY_CACHE_STATUSES
+    ):
+        return None
+
+    # NOTE: 旧总结仍可打开，但重新生成时必须升级到通用知识草稿，不能继续复用个人化缓存。
+    if (
+        cached_detail.summary.draft_version
+        != UNIVERSAL_KNOWLEDGE_DRAFT_VERSION
+    ):
+        return None
+
+    if not cached_detail.summary.highlights:
+        return None
+
+    if all(
+        highlight.source == "local_fallback"
+        for highlight in cached_detail.summary.highlights
+    ):
+        return None
+
+    return SummarizeResponse(
+        summary=cached_detail.summary,
+        mindmap_markdown=cached_detail.mindmap_markdown,
+        mindmap_meta=cached_detail.mindmap_meta,
+        is_ai_generated=cached_detail.library_summary_status == "ai_generated",
+        model=cached_detail.library_summary_model or "历史记录",
+        fallback_reason=None,
+        is_cached=True,
+    )
+
+
+@app.post("/api/qa", response_model=QaResponse)
+def answer_media_question(request: Request, qa_request: QaRequest) -> QaResponse:
+    """
+    基于当前内容文本回答用户问题。
+    """
+    if not qa_request.question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "QUESTION_EMPTY",
+                "message": "请输入要询问的问题。",
+            },
+        )
+
+    if not qa_request.transcript_plain_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "TRANSCRIPT_EMPTY",
+                "message": "没有可用于问答的内容文本。",
+            },
+        )
+
+    if (qa_request.text_source_type or "").strip().lower() == "shownotes":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "FULL_TRANSCRIPT_REQUIRED",
+                "message": "当前只有 shownotes 原文，请先生成完整逐字稿，再进行内容问答。",
+            },
+        )
+
+    enforce_rate_limit(request, "qa", QA_RATE_LIMIT_PER_HOUR)
+    return answer_question(qa_request)
+
+
+@app.post("/api/transcribe", response_model=TranscribeResponse)
+def transcribe_video(
+    request: Request,
+    transcribe_request: TranscribeRequest,
+) -> TranscribeResponse:
+    """
+    当平台没有现成字幕时，使用本地 Whisper 从音频生成 AI 转写稿。
+    """
+    video_url = normalize_public_video_url(transcribe_request.url)
+    transcribe_context = _get_transcribe_prompt_context(video_url)
+    transcribe_source_url, transcribe_http_headers = _resolve_transcription_source(
+        video_url
+    )
+    enforce_rate_limit(request, "transcribe", TRANSCRIBE_RATE_LIMIT_PER_HOUR)
+    transcribe_response = transcribe_media_audio(
+        video_url=transcribe_source_url,
+        video_id=transcribe_request.video_id,
+        http_headers=transcribe_http_headers,
+        response_source_url=video_url,
+        media_title=transcribe_context.get("title"),
+        media_author=transcribe_context.get("author"),
+        media_platform=transcribe_context.get("platform"),
+        media_type=transcribe_context.get("media_type"),
+        context_settings=transcribe_request.context_settings,
+    )
+    try:
+        update_transcript_for_source_url(video_url, transcribe_response.transcript)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "library transcript update failed: %s",
+            error.__class__.__name__,
+        )
+
+    return transcribe_response
+
+
+def _get_transcribe_prompt_context(source_url: str) -> dict[str, str | None]:
+    """
+    从本地历史读取媒体上下文，用于 ASR hotwords / prompt；读取失败不阻断转写。
+    """
+    try:
+        detail = get_library_detail_by_source_url(source_url)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "library context lookup failed for transcription: %s",
+            error.__class__.__name__,
+        )
+        return {}
+
+    if detail is None:
+        return {}
+
+    return {
+        "title": detail.video.title,
+        "author": detail.video.author,
+        "platform": detail.video.platform,
+        "media_type": detail.video.media_type,
+    }
+
+
+def _resolve_transcription_source(
+    source_url: str,
+) -> tuple[str, dict[str, str] | None]:
+    """
+    页面 URL 通常不是可直接转写的媒体文件，先通过专用适配器取公开媒体直链。
+    """
+    if is_bilibili_url(source_url):
+        bilibili_source = resolve_bilibili_transcription_source(source_url)
+        return bilibili_source.audio_url, bilibili_source.http_headers
+
+    hostname = urlparse(source_url).hostname or ""
+    if not hostname.endswith("xiaoyuzhoufm.com") and not is_douyin_url(source_url):
+        return source_url, None
+
+    try:
+        parse_response = parse_media_source(source_url)
+    except HTTPException:
+        return source_url, None
+
+    return parse_response.transcription_source_url or source_url, None
+
+
+@app.post("/api/download", response_model=DownloadResponse)
+def download_video(download_request: DownloadRequest) -> DownloadResponse:
+    """
+    下载用户选择的公开视频格式到本地受控目录。
+    """
+    video_url = normalize_public_video_url(download_request.url)
+    if is_bilibili_url(video_url):
+        return download_bilibili_video_format(
+            source_url=video_url,
+            format_id=download_request.format_id,
+            merge_with_audio=download_request.merge_with_audio,
+        )
+
+    if is_douyin_url(video_url):
+        return download_douyin_video(video_url)
+
+    return download_video_format(
+        video_url=video_url,
+        format_id=download_request.format_id,
+        merge_with_audio=download_request.merge_with_audio,
+    )

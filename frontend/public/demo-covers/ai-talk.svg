@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-labelledby="title desc">
+  <title id="title">从 LLM 到 Agent Skill 推荐内容封面</title>
+  <desc id="desc">暖白与朱红构成的模型、工具与文档抽象图形</desc>
+  <rect width="900" height="600" fill="#f1eadc"/>
+  <path d="M0 82h900M0 518h900" stroke="#24211c" stroke-opacity=".18"/>
+  <circle cx="302" cy="300" r="154" fill="#24211c"/>
+  <circle cx="598" cy="300" r="154" fill="#c94f35"/>
+  <path d="M350 220h200v160H350z" fill="#fffdf8"/>
+  <path d="M404 266h92M404 302h70M404 338h110" stroke="#24211c" stroke-width="12" stroke-linecap="round"/>
+  <text x="54" y="64" fill="#24211c" font-family="Georgia,serif" font-size="26" letter-spacing="7">ZHILU / 01</text>
+  <text x="846" y="564" text-anchor="end" fill="#24211c" font-family="Georgia,serif" font-size="22" letter-spacing="5">AGENT SKILL</text>
+</svg>

@@ -1,0 +1,181 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Clock3, MonitorPlay, Radio, UserRound } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { getDisplayThumbnailUrl } from "@/lib/media-image";
+import { isPodcastMedia } from "@/lib/media";
+import type { VideoInfo } from "@/lib/types";
+
+interface VideoPreviewCardProps {
+  video: VideoInfo | null;
+}
+
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function getCoverFrameClass(video: VideoInfo): string {
+  return isPodcastMedia(video)
+    ? "relative aspect-square overflow-hidden rounded-[16px] bg-[var(--ink)]"
+    : "overflow-hidden rounded-[16px] bg-[var(--paper-deep)]";
+}
+
+function getCoverImageClass(video: VideoInfo): string {
+  return isPodcastMedia(video)
+    ? "relative z-10 h-full w-full object-contain p-3 outline outline-1 -outline-offset-1 outline-white/10"
+    : "block h-auto w-full object-contain outline outline-1 -outline-offset-1 outline-black/10";
+}
+
+function getCoverFallbackClass(video: VideoInfo): string {
+  return isPodcastMedia(video)
+    ? "flex h-full w-full flex-col items-center justify-center gap-2 bg-[var(--paper-deep)] px-4 text-center text-sm text-[var(--muted)]"
+    : "flex aspect-video w-full flex-col items-center justify-center gap-2 bg-[var(--paper-deep)] px-4 text-center text-sm text-[var(--muted)]";
+}
+
+function getPlatformLabel(platform: string): string {
+  const normalizedPlatform = platform.toLowerCase();
+  if (normalizedPlatform === "bilibili") {
+    return "B 站";
+  }
+  if (normalizedPlatform === "xiaoyuzhou") {
+    return "小宇宙";
+  }
+  if (normalizedPlatform === "douyin") {
+    return "抖音";
+  }
+  if (normalizedPlatform === "demo") {
+    return "推荐";
+  }
+
+  return platform || "未知来源";
+}
+
+function getInfoRows(video: VideoInfo): Array<{
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}> {
+  const isPodcast = isPodcastMedia(video);
+  const normalizedPlatform = video.platform.toLowerCase();
+
+  return [
+    {
+      icon: UserRound,
+      label: isPodcast
+        ? "主播"
+        : normalizedPlatform === "bilibili"
+          ? "UP主"
+          : "作者",
+      value: video.author || "未知"
+    },
+    {
+      icon: Clock3,
+      label: isPodcast ? "节目时长" : "视频时长",
+      value: formatDuration(video.duration)
+    },
+    {
+      icon: isPodcast ? Radio : MonitorPlay,
+      label: isPodcast ? "播客来源" : "平台",
+      value: getPlatformLabel(video.platform)
+    },
+    {
+      icon: MonitorPlay,
+      label: "内容类型",
+      value: isPodcast ? "播客单集" : "视频"
+    }
+  ];
+}
+
+export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [video?.thumbnail, video?.video_id]);
+
+  if (!video) {
+    return (
+      <section className="min-w-0 rounded-[24px] border border-dashed border-[var(--line-strong)] bg-[var(--paper-raised)] p-5">
+        <div className="flex aspect-video items-center justify-center rounded-[16px] bg-[var(--paper-deep)] text-sm text-[var(--muted)]">
+          粘贴链接或打开推荐内容后，这里会显示媒体预览。
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="h-4 w-3/4 rounded bg-zinc-100" />
+          <div className="h-3 w-1/2 rounded bg-zinc-100" />
+        </div>
+      </section>
+    );
+  }
+
+  const thumbnailUrl = getDisplayThumbnailUrl(video.thumbnail);
+  const infoRows = getInfoRows(video);
+
+  return (
+    <section className="min-w-0 rounded-[24px] bg-[var(--paper-raised)] p-4 shadow-[var(--shadow-paper)]">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent)]">
+          Source file
+        </span>
+        <span className="h-px flex-1 bg-[var(--line-strong)]" />
+      </div>
+      <div className={getCoverFrameClass(video)}>
+        {thumbnailUrl && !imageFailed ? (
+          <>
+            {isPodcastMedia(video) ? (
+              <img
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-xl"
+                referrerPolicy="no-referrer"
+                src={thumbnailUrl}
+              />
+            ) : null}
+            <img
+              alt={`${video.title} 封面`}
+              className={getCoverImageClass(video)}
+              referrerPolicy="no-referrer"
+              src={thumbnailUrl}
+              onError={() => setImageFailed(true)}
+            />
+          </>
+        ) : (
+          <div className={getCoverFallbackClass(video)}>
+            <MonitorPlay className="h-8 w-8 text-zinc-400" aria-hidden="true" />
+            <span>封面暂不可用</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-4">
+        <p className="font-editorial text-lg font-semibold leading-7 text-[var(--ink)]">
+          {video.title}
+        </p>
+        <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted-strong)]">
+          {infoRows.map((row) => {
+            const Icon = row.icon;
+
+            return (
+              <div
+                className="grid grid-cols-[18px_74px_1fr] items-center gap-2"
+                key={row.label}
+              >
+                <Icon className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
+                <span className="text-xs font-medium text-[var(--muted)]">
+                  {row.label}
+                </span>
+                <span
+                  className="min-w-0 truncate text-[var(--ink-soft)]"
+                  title={row.value}
+                >
+                  {row.value}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}

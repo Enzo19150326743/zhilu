@@ -1,0 +1,64 @@
+# 本地密钥与账号凭据
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/cookies*.txt
+**/*cookie*.json
+
+# Python / Node 依赖与构建产物
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+dist/
+build/
+coverage/
+.coverage
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+**/.playwright-cli/
+**/output/playwright/
+
+# 本地数据、下载、模型与二进制缓存
+backend/data/*
+!backend/data/demo_seed.json
+backend/.cuda-wheel-cache/
+*.sqlite
+*.sqlite3
+*.db
+*.bin
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.whl
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 内部评测、计划与会话交接
+evaluation/
+docs/plans/
+docs/handoffs/
+docs/project-context.md
+
+# 日志、编辑器与操作系统文件
+*.log
+*.tsbuildinfo
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

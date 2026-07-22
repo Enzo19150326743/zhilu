@@ -1,0 +1,103 @@
+import type { LibraryFilter, LibraryItem } from "./types";
+
+export function isShownotesLibraryItem(item: LibraryItem): boolean {
+  return item.text_source_type === "shownotes";
+}
+
+export function isLibraryItemSummarized(item: LibraryItem): boolean {
+  if (isShownotesLibraryItem(item)) {
+    return false;
+  }
+
+  return (
+    item.summary_status === "ai_generated" ||
+    item.summary_status === "local_fallback"
+  );
+}
+
+export function getLibraryStatusLabel(item: LibraryItem): string {
+  if (isShownotesLibraryItem(item)) {
+    return "需转写";
+  }
+
+  if (item.summary_status === "ai_generated") {
+    return "智能总结";
+  }
+
+  if (item.summary_status === "local_fallback") {
+    return "基础摘要";
+  }
+
+  return item.has_transcript ? "可总结" : "无文本";
+}
+
+export function getPlatformLabel(platform: string): string {
+  const normalizedPlatform = platform.toLowerCase();
+  if (normalizedPlatform === "bilibili") {
+    return "B 站";
+  }
+  if (normalizedPlatform === "xiaoyuzhou") {
+    return "小宇宙";
+  }
+  if (normalizedPlatform === "douyin") {
+    return "抖音";
+  }
+  if (normalizedPlatform === "demo") {
+    return "推荐";
+  }
+
+  return platform || "未知来源";
+}
+
+function getUpdatedTimestamp(item: LibraryItem): number {
+  const timestamp = new Date(item.updated_at).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+export function getFeaturedLibraryItems(
+  items: LibraryItem[],
+  limit = 3
+): LibraryItem[] {
+  return [...items]
+    .sort((leftItem, rightItem) =>
+      getUpdatedTimestamp(rightItem) - getUpdatedTimestamp(leftItem)
+    )
+    .slice(0, limit);
+}
+
+export function formatLibraryUpdatedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "刚刚更新";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit"
+  }).format(date);
+}
+
+export function matchesLibraryFilter(
+  item: LibraryItem,
+  filter: LibraryFilter
+): boolean {
+  if (filter === "ready") {
+    return (
+      item.has_transcript &&
+      !isShownotesLibraryItem(item) &&
+      !isLibraryItemSummarized(item)
+    );
+  }
+
+  if (filter === "summarized") {
+    return isLibraryItemSummarized(item);
+  }
+
+  if (filter === "noTranscript") {
+    return !item.has_transcript || isShownotesLibraryItem(item);
+  }
+
+  return true;
+}
