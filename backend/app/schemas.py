@@ -1,4 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+MAX_SUMMARY_VIDEO_TITLE_LENGTH = 300
 
 
 class HealthResponse(BaseModel):
@@ -114,10 +117,28 @@ class SummarizeRequest(BaseModel):
     transcript_plain_text: str = Field(min_length=1, max_length=120000)
     transcript_segments: list[TranscriptSegment] = Field(default_factory=list)
     source_url: str | None = Field(default=None, max_length=2048)
-    video_title: str | None = Field(default=None, max_length=300)
+    video_title: str | None = Field(
+        default=None,
+        max_length=MAX_SUMMARY_VIDEO_TITLE_LENGTH,
+    )
     video_author: str | None = Field(default=None, max_length=200)
     media_type: str | None = Field(default=None, max_length=40)
     text_source_type: str | None = Field(default=None, max_length=40)
+
+    @field_validator("video_title", mode="before")
+    @classmethod
+    def normalize_video_title(cls, value: object) -> object:
+        """
+        平台可能把整段发布文案作为标题；标题只是总结上下文，不能阻断正文处理。
+        """
+        if not isinstance(value, str):
+            return value
+
+        normalized_title = value.strip()
+        if not normalized_title:
+            return None
+
+        return normalized_title[:MAX_SUMMARY_VIDEO_TITLE_LENGTH]
 
 
 class DownloadRequest(BaseModel):
