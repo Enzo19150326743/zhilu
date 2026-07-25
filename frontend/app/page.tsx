@@ -17,6 +17,7 @@ import {
   getDefaultTranscribeSettings,
   normalizeTranscribeSettings
 } from "@/lib/transcribe-settings";
+import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
 import type {
   AppStatus,
   DemoDetail,
@@ -41,8 +42,8 @@ type TabKey = "summary" | "mindmap" | "qa" | "transcript";
 const INITIAL_LIBRARY_LIMIT = 8;
 const LIBRARY_LIMIT_STEP = 8;
 const MAX_LIBRARY_LIMIT = 50;
-const TRANSCRIBE_RECOVERY_ATTEMPTS = 36;
 const TRANSCRIBE_RECOVERY_INTERVAL_MS = 5000;
+const TRANSCRIBE_RECOVERY_TIMEOUT_MS = 30 * 60 * 1000;
 
 function isParseResponse(
   detail: DemoDetail | ParseResponse
@@ -129,12 +130,6 @@ function isRecoverableTranscribeError(error: unknown): boolean {
     error instanceof ApiClientError &&
     (error.errorCode === "REQUEST_INTERRUPTED" || error.errorCode === "TIMEOUT")
   );
-}
-
-function wait(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, milliseconds);
-  });
 }
 
 function getSummaryTaskMessage(response: SummarizeResponse): string {
@@ -690,27 +685,18 @@ export default function HomePage() {
   const waitForRecoveredTranscribeDetail = async (
     videoId: string,
     sourceUrl: string
-  ): Promise<ParseResponse | null> => {
-    for (let attempt = 0; attempt < TRANSCRIBE_RECOVERY_ATTEMPTS; attempt += 1) {
-      try {
-        const detail = await apiClient.getLibraryDetail(videoId);
-        const hasRecoveredTranscript = Boolean(
+  ): Promise<ParseResponse | null> =>
+    pollForRecoveredValue({
+      fetchValue: () => apiClient.getLibraryDetail(videoId),
+      intervalMs: TRANSCRIBE_RECOVERY_INTERVAL_MS,
+      isRecovered: (detail) =>
+        Boolean(
           detail.source_url === sourceUrl &&
             getTextSourceType(detail.video) === "asr_transcript" &&
             detail.transcript?.plain_text.trim()
-        );
-        if (hasRecoveredTranscript) {
-          return detail;
-        }
-      } catch {
-        // NOTE: 转写请求可能刚写库或后端刚重载；恢复轮询只用于兜底，不打断最终错误处理。
-      }
-
-      await wait(TRANSCRIBE_RECOVERY_INTERVAL_MS);
-    }
-
-    return null;
-  };
+        ),
+      timeoutMs: TRANSCRIBE_RECOVERY_TIMEOUT_MS
+    });
 
   const applyTranscribeSuccess = (
     taskId: string,
@@ -838,7 +824,11 @@ export default function HomePage() {
             task.id === taskId
               ? {
                   ...task,
-                  message: "连接中断，正在检查后台转写结果。",
+                  message:
+                    error instanceof ApiClientError &&
+                    error.errorCode === "TIMEOUT"
+                      ? "请求等待超时，后台仍在处理，正在同步结果。"
+                      : "连接中断，后台可能仍在处理，正在同步结果。",
                   status: "running"
                 }
               : task
