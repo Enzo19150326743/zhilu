@@ -102,6 +102,39 @@ class AsrServiceTests(unittest.TestCase):
         self.assertEqual(response.transcript.asr_meta.correction_status, "skipped")
         self.assertEqual(response.transcript.raw_plain_text, "第一句内容。 第二句内容。")
 
+    def test_transcribe_media_audio_logs_stage_timings(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            audio_path = Path(temporary_directory) / "sample.m4a"
+            audio_path.write_text("fake audio", encoding="utf-8")
+
+            def fake_download(_: str) -> Path:
+                return audio_path
+
+            def fake_transcribe(_: Path) -> TranscriptPayload:
+                return TranscriptPayload(
+                    segments=[TranscriptSegment(start=0, end=1, text="敏感正文")],
+                    plain_text="敏感正文",
+                )
+
+            with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+                with self.assertLogs(
+                    "app.services.asr_service",
+                    level="INFO",
+                ) as captured_logs:
+                    transcribe_media_audio(
+                        "https://example.com/private-video",
+                        audio_downloader=fake_download,
+                        transcriber=fake_transcribe,
+                    )
+
+        log_output = "\n".join(captured_logs.output)
+        self.assertIn("stage=audio_download", log_output)
+        self.assertIn("stage=whisper", log_output)
+        self.assertIn("stage=correction", log_output)
+        self.assertIn("stage=total", log_output)
+        self.assertNotIn("https://example.com/private-video", log_output)
+        self.assertNotIn("敏感正文", log_output)
+
     def test_transcribe_media_audio_removes_temporary_audio(self) -> None:
         """
         ASR 使用临时音频文件，完成后应清理，避免本地数据目录持续膨胀。

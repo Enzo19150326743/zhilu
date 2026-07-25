@@ -4,6 +4,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from fastapi import HTTPException
@@ -120,6 +121,7 @@ def transcribe_media_audio(
 
     NOTE: yt-dlp 只负责拿到公开音频资源，真正的 AI 转写稿生成由本地 ASR 完成。
     """
+    total_started_at = monotonic()
     asr_config = get_asr_config()
     glossary_terms = load_asr_glossary_terms()
     normalized_context_settings = normalize_transcribe_context_settings(
@@ -144,8 +146,14 @@ def transcribe_media_audio(
                 http_headers=http_headers,
             )
         )
+        download_started_at = monotonic()
         audio_path = active_downloader(video_url)
+        logger.info(
+            "asr timing: stage=audio_download elapsed_seconds=%.2f",
+            monotonic() - download_started_at,
+        )
         try:
+            whisper_started_at = monotonic()
             if transcriber is None:
                 transcription_result = _transcribe_audio_with_whisper(
                     audio_path,
@@ -161,13 +169,46 @@ def transcribe_media_audio(
                     compute_type=asr_config.compute_type,
                     language=asr_config.language,
                 )
+            logger.info(
+                (
+                    "asr timing: stage=whisper elapsed_seconds=%.2f "
+                    "model=%s device=%s segment_count=%s"
+                ),
+                monotonic() - whisper_started_at,
+                transcription_result.model,
+                transcription_result.device,
+                len(transcription_result.transcript.segments),
+            )
         finally:
             _remove_file(audio_path)
 
+    correction_started_at = monotonic()
     transcript = _build_final_transcript(
         transcription_result=transcription_result,
         glossary_terms=glossary_terms,
         prompt_context=prompt_context,
+    )
+    correction_status = (
+        transcript.asr_meta.correction_status if transcript.asr_meta else "unknown"
+    )
+    logger.info(
+        (
+            "asr timing: stage=correction elapsed_seconds=%.2f "
+            "status=%s segment_count=%s"
+        ),
+        monotonic() - correction_started_at,
+        correction_status,
+        len(transcript.segments),
+    )
+    logger.info(
+        (
+            "asr timing: stage=total elapsed_seconds=%.2f "
+            "model=%s device=%s segment_count=%s"
+        ),
+        monotonic() - total_started_at,
+        transcription_result.model,
+        transcription_result.device,
+        len(transcript.segments),
     )
 
     return TranscribeResponse(
