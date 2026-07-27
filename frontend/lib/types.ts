@@ -14,6 +14,8 @@ export interface AsrStatusResponse {
   cloud_available: boolean;
   cloud_provider: "aliyun" | string;
   cloud_model: string;
+  recommended_engine: "local_whisper" | "sensevoice_small";
+  whisper_model: string;
   sensevoice_available: boolean;
   sensevoice_model: string;
   sensevoice_message?: string | null;

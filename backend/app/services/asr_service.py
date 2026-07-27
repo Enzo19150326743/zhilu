@@ -64,6 +64,11 @@ DEFAULT_WHISPER_SEGMENT_NORMALIZATION_ENABLED = True
 DEFAULT_WHISPER_SEGMENT_MAX_SECONDS = 8
 DEFAULT_WHISPER_SEGMENT_MAX_CHARACTERS = 120
 DEFAULT_WHISPER_SEGMENT_SILENCE_GAP_SECONDS = 2
+DEFAULT_SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED = True
+DEFAULT_SENSEVOICE_SEGMENT_MIN_SENTENCE_SECONDS = 4
+DEFAULT_SENSEVOICE_SEGMENT_MAX_SECONDS = 8
+DEFAULT_SENSEVOICE_SEGMENT_MAX_CHARACTERS = 120
+DEFAULT_SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS = 2
 TRANSCRIBE_AUDIO_TEMPLATE = "transcribe-audio.%(ext)s"
 TEMP_SUFFIXES = {".part", ".ytdl", ".tmp", ".temp"}
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -221,15 +226,30 @@ def transcribe_media_audio(
                         error.message,
                         status_code=error.status_code,
                     ) from error
+                raw_sensevoice_transcript = _normalize_transcript_plain_text(
+                    sensevoice_result.transcript
+                )
+                normalized_sensevoice_segments = _normalize_sensevoice_segments(
+                    raw_sensevoice_transcript.segments
+                )
                 transcription_result = WhisperTranscriptionResult(
-                    transcript=sensevoice_result.transcript,
+                    transcript=TranscriptPayload(
+                        segments=normalized_sensevoice_segments,
+                        plain_text=_join_segment_text(normalized_sensevoice_segments),
+                    ),
                     model=sensevoice_result.model,
                     device=sensevoice_result.device,
                     compute_type=sensevoice_result.compute_type,
                     language=sensevoice_result.language,
                     engine="sensevoice-small",
                     provider="local",
-                    timestamp_source=sensevoice_result.timestamp_source,
+                    timestamp_source=(
+                        f"{sensevoice_result.timestamp_source}-normalized"
+                        if len(normalized_sensevoice_segments)
+                        < len(raw_sensevoice_transcript.segments)
+                        else sensevoice_result.timestamp_source
+                    ),
+                    raw_transcript=raw_sensevoice_transcript.model_copy(deep=True),
                 )
             elif transcriber is None:
                 transcription_result = _transcribe_audio_with_whisper(
@@ -721,6 +741,56 @@ def _normalize_whisper_segments(
                 10,
             )
         ),
+    )
+    return normalize_adjacent_segments(segments, config=config)
+
+
+def _normalize_sensevoice_segments(
+    segments: list[TranscriptSegment],
+) -> list[TranscriptSegment]:
+    """合并 SenseVoice 过短句段，原始词时间戳由调用方另行保留。"""
+    if not _get_env_flag(
+        "SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED",
+        DEFAULT_SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED,
+    ):
+        return [segment.model_copy() for segment in segments]
+
+    max_seconds = float(
+        _get_env_int(
+            "SENSEVOICE_SEGMENT_MAX_SECONDS",
+            DEFAULT_SENSEVOICE_SEGMENT_MAX_SECONDS,
+            2,
+            30,
+        )
+    )
+    min_sentence_seconds = min(
+        max_seconds,
+        float(
+            _get_env_int(
+                "SENSEVOICE_SEGMENT_MIN_SENTENCE_SECONDS",
+                DEFAULT_SENSEVOICE_SEGMENT_MIN_SENTENCE_SECONDS,
+                1,
+                10,
+            )
+        ),
+    )
+    config = SegmentNormalizationConfig(
+        max_seconds=max_seconds,
+        max_characters=_get_env_int(
+            "SENSEVOICE_SEGMENT_MAX_CHARACTERS",
+            DEFAULT_SENSEVOICE_SEGMENT_MAX_CHARACTERS,
+            20,
+            500,
+        ),
+        silence_gap_seconds=float(
+            _get_env_int(
+                "SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS",
+                DEFAULT_SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS,
+                1,
+                10,
+            )
+        ),
+        min_sentence_seconds=min_sentence_seconds,
     )
     return normalize_adjacent_segments(segments, config=config)
 

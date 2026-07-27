@@ -46,7 +46,7 @@ from app.schemas import (
     TranscribeRequest,
     TranscribeResponse,
 )
-from app.services.asr_service import transcribe_media_audio
+from app.services.asr_service import DEFAULT_ASR_MODEL, transcribe_media_audio
 from app.services import http_fetch_service
 from app.services.bilibili_service import (
     download_bilibili_video_format,
@@ -354,6 +354,12 @@ def get_asr_status() -> AsrStatusResponse:
         cloud_available=is_fun_asr_configured(),
         cloud_model=(
             os.getenv("FUN_ASR_MODEL", "").strip() or DEFAULT_FUN_ASR_MODEL
+        ),
+        recommended_engine=(
+            "sensevoice_small" if sensevoice_available else "local_whisper"
+        ),
+        whisper_model=(
+            os.getenv("ASR_WHISPER_MODEL", "").strip() or DEFAULT_ASR_MODEL
         ),
         sensevoice_available=sensevoice_available,
         sensevoice_model=(

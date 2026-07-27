@@ -14,6 +14,7 @@ class SegmentNormalizationConfig:
     max_seconds: float
     max_characters: int
     silence_gap_seconds: float
+    min_sentence_seconds: float = 0
     sentence_endings: tuple[str, ...] = DEFAULT_SENTENCE_ENDINGS
 
 
@@ -63,7 +64,10 @@ def normalize_adjacent_segments(
             item.start for item in pending_segments
         )
         if (
-            _ends_sentence(combined_text, config.sentence_endings)
+            (
+                _ends_sentence(combined_text, config.sentence_endings)
+                and combined_seconds >= config.min_sentence_seconds
+            )
             or combined_seconds >= config.max_seconds
             or len(combined_text) >= config.max_characters
         ):

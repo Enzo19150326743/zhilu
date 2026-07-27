@@ -87,12 +87,12 @@ function buildAsrSummaryPlaceholder(
     key_points: [
       `《${videoTitle}》的逐字稿已准备好。`,
       "总结与导图已重置，避免继续展示与当前逐字稿不一致的内容。",
-      "确认转写版本后，可手动生成新的摘录、导图和知识稿。"
+      "确认逐字稿后，可手动生成新的摘录、导图和知识稿。"
     ],
     timeline: [],
-    structured_analysis_markdown: `## ${videoTitle}\n### 当前状态\n逐字稿已更新，可以先切换或并排对比不同识别版本。\n### 下一步\n确认转写效果后重新生成总结和导图。`,
+    structured_analysis_markdown: `## ${videoTitle}\n### 当前状态\n逐字稿已更新，可以先检查内容是否准确。\n### 下一步\n确认转写效果后重新生成总结和导图。`,
     takeaways: [
-      "确认转写版本后，可以继续生成摘录、导图和问答。",
+      "确认逐字稿后，可以继续生成摘录、导图和问答。",
       "专有名词、人名和断句仍建议结合原媒体复核。"
     ],
     to_confirm: ["逐字稿中的关键摘录需要结合原媒体复核。"]
@@ -150,6 +150,18 @@ function isRecoverableTranscribeError(error: unknown): boolean {
     error instanceof ApiClientError &&
     (error.errorCode === "REQUEST_INTERRUPTED" || error.errorCode === "TIMEOUT")
   );
+}
+
+function getRecommendedLocalAsrEngine(
+  status: AsrStatusResponse | null
+): AsrEngine {
+  if (
+    status?.recommended_engine === "sensevoice_small" &&
+    status.sensevoice_available
+  ) {
+    return "sensevoice_small";
+  }
+  return "local_whisper";
 }
 
 function getSummaryTaskMessage(response: SummarizeResponse): string {
@@ -260,7 +272,10 @@ export default function HomePage() {
 
     apiClient
       .getAsrStatus()
-      .then(setAsrStatus)
+      .then((response) => {
+        setAsrStatus(response);
+        setPendingAsrEngine(getRecommendedLocalAsrEngine(response));
+      })
       .catch(() => setAsrStatus(null));
 
     void refreshLibraryItems(false, INITIAL_LIBRARY_LIMIT);
@@ -796,8 +811,8 @@ export default function HomePage() {
         getDefaultTranscribeSettings(activeDetail.video)
       )
     );
-    // 云端识别只在用户明确选择时启用，每次打开弹窗都恢复隐私优先的本地默认值。
-    setPendingAsrEngine("local_whisper");
+    // 云端仍需用户明确选择；本地模型按后端能力状态选择推荐项。
+    setPendingAsrEngine(getRecommendedLocalAsrEngine(asrStatus));
     setIsTranscribeSettingsOpen(true);
   };
 
@@ -937,7 +952,10 @@ export default function HomePage() {
       return;
     }
 
-    void startTranscribe(task.contextSettings, "local_whisper");
+    void startTranscribe(
+      task.contextSettings,
+      getRecommendedLocalAsrEngine(asrStatus)
+    );
   };
 
   const handleSaveNoteDraft = async (
@@ -1288,6 +1306,7 @@ export default function HomePage() {
         asrEngine={pendingAsrEngine}
         cloudAvailable={asrStatus?.cloud_available ?? false}
         cloudModel={asrStatus?.cloud_model ?? null}
+        whisperModel={asrStatus?.whisper_model ?? null}
         sensevoiceAvailable={asrStatus?.sensevoice_available ?? false}
         sensevoiceMessage={asrStatus?.sensevoice_message ?? null}
         sensevoiceModel={asrStatus?.sensevoice_model ?? null}

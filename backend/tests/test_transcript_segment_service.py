@@ -66,6 +66,26 @@ class TranscriptSegmentServiceTests(unittest.TestCase):
         self.assertEqual([item.text for item in duration_limited], ["一 二 三", "四"])
         self.assertEqual(len(character_limited), 2)
 
+    def test_short_sentences_wait_for_minimum_sentence_duration(self) -> None:
+        normalized = normalize_adjacent_segments(
+            [
+                TranscriptSegment(start=0, end=1, text="第一句。"),
+                TranscriptSegment(start=1, end=2, text="第二句。"),
+                TranscriptSegment(start=2, end=4.5, text="第三句。"),
+                TranscriptSegment(start=4.5, end=6, text="第四句。"),
+            ],
+            config=SegmentNormalizationConfig(
+                max_seconds=8,
+                max_characters=120,
+                silence_gap_seconds=2,
+                min_sentence_seconds=4,
+            ),
+        )
+
+        self.assertEqual(len(normalized), 2)
+        self.assertEqual(normalized[0].text, "第一句。 第二句。 第三句。")
+        self.assertEqual((normalized[0].start, normalized[0].end), (0, 4.5))
+
 
 if __name__ == "__main__":
     unittest.main()

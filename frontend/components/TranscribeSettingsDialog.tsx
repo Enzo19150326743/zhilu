@@ -12,6 +12,7 @@ interface TranscribeSettingsDialogProps {
   asrEngine: AsrEngine;
   cloudAvailable: boolean;
   cloudModel?: string | null;
+  whisperModel?: string | null;
   sensevoiceAvailable: boolean;
   sensevoiceModel?: string | null;
   sensevoiceMessage?: string | null;
@@ -29,6 +30,7 @@ export function TranscribeSettingsDialog({
   asrEngine,
   cloudAvailable,
   cloudModel,
+  whisperModel,
   sensevoiceAvailable,
   sensevoiceModel,
   sensevoiceMessage,
@@ -71,29 +73,6 @@ export function TranscribeSettingsDialog({
             <div className="grid gap-2 sm:grid-cols-3">
               <button
                 className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                  asrEngine === "local_whisper"
-                    ? "border-zinc-950 bg-zinc-950 text-white"
-                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
-                }`}
-                disabled={isTranscribing}
-                type="button"
-                onClick={() => onChangeAsrEngine("local_whisper")}
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  <HardDrive className="h-4 w-4" aria-hidden="true" />
-                  本地识别
-                </span>
-                <span
-                  className={`mt-1.5 block text-xs leading-5 ${
-                    asrEngine === "local_whisper" ? "text-zinc-300" : "text-zinc-500"
-                  }`}
-                >
-                  默认、免费，音频不会上传到云端。
-                </span>
-              </button>
-
-              <button
-                className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                   asrEngine === "sensevoice_small"
                     ? "border-emerald-600 bg-emerald-50 text-emerald-950"
                     : "border-zinc-200 bg-white text-zinc-700 hover:border-emerald-300"
@@ -105,15 +84,52 @@ export function TranscribeSettingsDialog({
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <Cpu className="h-4 w-4" aria-hidden="true" />
                   SenseVoice
+                  {sensevoiceAvailable ? (
+                    <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      推荐
+                    </span>
+                  ) : null}
                 </span>
                 <span className="mt-1.5 block text-xs leading-5 text-zinc-500">
                   {sensevoiceAvailable
-                    ? "本地免费识别，适合与 Whisper 重转写对比。"
+                    ? "中文长视频优先：速度更快、内容更完整，本地免费。"
                     : sensevoiceMessage || "本地 SenseVoice 依赖尚未安装。"}
                 </span>
                 {sensevoiceAvailable && sensevoiceModel ? (
                   <span className="mt-1 block break-all text-[11px] text-emerald-700">
                     {sensevoiceModel}
+                  </span>
+                ) : null}
+              </button>
+
+              <button
+                className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  asrEngine === "local_whisper"
+                    ? "border-zinc-950 bg-zinc-950 text-white"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                }`}
+                disabled={isTranscribing}
+                type="button"
+                onClick={() => onChangeAsrEngine("local_whisper")}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <HardDrive className="h-4 w-4" aria-hidden="true" />
+                  Whisper
+                </span>
+                <span
+                  className={`mt-1.5 block text-xs leading-5 ${
+                    asrEngine === "local_whisper" ? "text-zinc-300" : "text-zinc-500"
+                  }`}
+                >
+                  英文术语、数字和技术内容更稳，本地免费但速度较慢。
+                </span>
+                {whisperModel ? (
+                  <span
+                    className={`mt-1 block break-all text-[11px] ${
+                      asrEngine === "local_whisper" ? "text-zinc-300" : "text-zinc-500"
+                    }`}
+                  >
+                    {whisperModel}
                   </span>
                 ) : null}
               </button>

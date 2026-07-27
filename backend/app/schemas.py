@@ -179,6 +179,10 @@ class AsrStatusResponse(BaseModel):
     cloud_available: bool
     cloud_provider: str = "aliyun"
     cloud_model: str
+    recommended_engine: Literal["local_whisper", "sensevoice_small"] = (
+        "local_whisper"
+    )
+    whisper_model: str = "large-v3-turbo"
     sensevoice_available: bool = False
     sensevoice_model: str = "iic/SenseVoiceSmall"
     sensevoice_message: str | None = None

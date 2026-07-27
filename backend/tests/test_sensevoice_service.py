@@ -177,8 +177,73 @@ class SenseVoiceServiceTests(unittest.TestCase):
         self.assertEqual(response.transcript_variant_key, "sensevoice_small")
         self.assertEqual(response.transcript.asr_meta.engine, "sensevoice-small")
         self.assertEqual(response.transcript.asr_meta.device, "cpu")
+        self.assertEqual(len(response.transcript.raw_segments or []), 1)
         self.assertIsNotNone(response.transcript.asr_meta.transcription_seconds)
         self.assertIn("SenseVoiceSmall", response.message)
+
+    def test_asr_service_merges_short_sensevoice_segments_before_correction(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            audio_path = Path(temporary_directory) / "source.webm"
+            audio_path.write_bytes(b"audio")
+            sensevoice_result = SenseVoiceTranscriptionResult(
+                transcript=TranscriptPayload(
+                    segments=[
+                        TranscriptSegment(start=0, end=1, text="第一句。"),
+                        TranscriptSegment(start=1, end=2, text="第二句。"),
+                        TranscriptSegment(start=2, end=4.5, text="第三句。"),
+                        TranscriptSegment(start=4.5, end=6, text="第四句。"),
+                    ],
+                    plain_text="第一句。 第二句。 第三句。 第四句。",
+                ),
+                model="iic/SenseVoiceSmall",
+                device="cuda:0",
+            )
+
+            with patch(
+                "app.services.asr_service.transcribe_audio_with_sensevoice",
+                return_value=sensevoice_result,
+            ):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "AI_API_KEY": "",
+                        "DEEPSEEK_API_KEY": "",
+                        "SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED": "1",
+                    },
+                    clear=False,
+                ):
+                    response = asr_service.transcribe_media_audio(
+                        "https://example.com/video",
+                        audio_downloader=lambda _: audio_path,
+                        asr_engine="sensevoice_small",
+                    )
+
+        self.assertEqual(len(response.transcript.segments), 2)
+        self.assertEqual(len(response.transcript.raw_segments or []), 4)
+        self.assertEqual(
+            response.transcript.segments[0].text,
+            "第一句。 第二句。 第三句。",
+        )
+        self.assertEqual(
+            response.transcript.asr_meta.timestamp_source,
+            "sensevoice-word-timestamp-normalized",
+        )
+
+    def test_sensevoice_segment_normalization_can_be_disabled(self) -> None:
+        segments = [
+            TranscriptSegment(start=0, end=1, text="第一句。"),
+            TranscriptSegment(start=1, end=2, text="第二句。"),
+        ]
+        with patch.dict(
+            os.environ,
+            {"SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED": "0"},
+            clear=False,
+        ):
+            normalized = asr_service._normalize_sensevoice_segments(segments)
+
+        self.assertEqual(len(normalized), 2)
 
     def test_sensevoice_failure_does_not_call_whisper(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -109,6 +109,11 @@ SENSEVOICE_MODEL=iic/SenseVoiceSmall
 SENSEVOICE_DEVICE=auto
 SENSEVOICE_GPU_BATCH_SIZE_SECONDS=60
 SENSEVOICE_CPU_BATCH_SIZE_SECONDS=300
+SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED=1
+SENSEVOICE_SEGMENT_MIN_SENTENCE_SECONDS=4
+SENSEVOICE_SEGMENT_MAX_SECONDS=8
+SENSEVOICE_SEGMENT_MAX_CHARACTERS=120
+SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS=2
 ```
 
 `auto` 会优先尝试 CUDA，失败后在同一个 SenseVoice 引擎内回退 CPU，并记录实际设备。
@@ -116,6 +121,8 @@ RTX 3050 Laptop 等 4GB 级显卡默认使用更保守的 60 秒 GPU 批量；CP
 300 秒。需要 NVIDIA GPU 时，请先运行项目根目录的
 `scripts/install-sensevoice-cuda.ps1` 安装官方 CUDA 版 PyTorch，然后重启后端。
 同一媒体使用不同引擎重转写时，各版本独立保存在本地历史中；新任务失败不会覆盖旧稿。
+SenseVoice 可用时会成为转写弹窗的推荐默认项；未安装时自动使用 Whisper。短于4秒的
+SenseVoice句段会在校对前继续合并，优先形成4–8秒的校对单元，原始句段仍完整保存。
 
 Whisper 默认在识别完成后、DeepSeek 校对前合并过碎的相邻片段：
 
