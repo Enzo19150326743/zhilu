@@ -350,6 +350,12 @@ def _chunk_segments(
     segments: list[TranscriptSegment],
     chunk_chars: int,
 ) -> list[list[IndexedSegment]]:
+    """
+    将全部片段组织为多个校对批次。
+
+    NOTE: chunk_chars 只限制一次 DeepSeek 请求的大致输入量；这里会遍历全文，
+    不是只读取前 3500 字符，也不会丢弃最后一个批次。
+    """
     chunks: list[list[IndexedSegment]] = []
     current_chunk: list[IndexedSegment] = []
     current_chars = 0

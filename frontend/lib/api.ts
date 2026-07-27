@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  AsrStatusResponse,
   DemoDetail,
   DemoListResponse,
   DownloadResponse,
@@ -179,6 +180,11 @@ export const apiClient = {
   },
   getRateLimitStatus(): Promise<RateLimitStatusResponse> {
     return requestJson<RateLimitStatusResponse>("/api/rate-limit/status", {
+      timeoutMs: 2500
+    });
+  },
+  getAsrStatus(): Promise<AsrStatusResponse> {
+    return requestJson<AsrStatusResponse>("/api/asr/status", {
       timeoutMs: 2500
     });
   },

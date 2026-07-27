@@ -61,6 +61,10 @@ class DeepSeekClientError(Exception):
     """DeepSeek HTTP 调用失败时返回给上层的脱敏错误。"""
 
 
+class DeepSeekOutputTruncatedError(DeepSeekClientError):
+    """模型因输出长度限制而没有返回完整结果。"""
+
+
 def post_deepseek_chat_completion(
     *,
     api_key: str,

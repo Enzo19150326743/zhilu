@@ -19,6 +19,8 @@ import {
 } from "@/lib/transcribe-settings";
 import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
 import type {
+  AsrEngine,
+  AsrStatusResponse,
   AppStatus,
   DemoDetail,
   DemoItem,
@@ -189,6 +191,9 @@ export default function HomePage() {
   const [summaryTasks, setSummaryTasks] = useState<SummaryTask[]>([]);
   const [transcribeTasks, setTranscribeTasks] = useState<TranscribeTask[]>([]);
   const [isTranscribeSettingsOpen, setIsTranscribeSettingsOpen] = useState(false);
+  const [asrStatus, setAsrStatus] = useState<AsrStatusResponse | null>(null);
+  const [pendingAsrEngine, setPendingAsrEngine] =
+    useState<AsrEngine>("local_whisper");
   const [pendingTranscribeSettings, setPendingTranscribeSettings] =
     useState<TranscribeContextSettings>(() => getDefaultTranscribeSettings(null));
   const [hiddenTaskIds, setHiddenTaskIds] = useState<Set<string>>(
@@ -234,6 +239,11 @@ export default function HomePage() {
       .getDemos()
       .then((response) => setDemos(response.demos))
       .catch(() => setDemos(mockDemos));
+
+    apiClient
+      .getAsrStatus()
+      .then(setAsrStatus)
+      .catch(() => setAsrStatus(null));
 
     void refreshLibraryItems(false, INITIAL_LIBRARY_LIMIT);
   }, []);
@@ -761,15 +771,20 @@ export default function HomePage() {
         getDefaultTranscribeSettings(activeDetail.video)
       )
     );
+    // 云端识别只在用户明确选择时启用，每次打开弹窗都恢复隐私优先的本地默认值。
+    setPendingAsrEngine("local_whisper");
     setIsTranscribeSettingsOpen(true);
   };
 
   const handleConfirmTranscribeSettings = () => {
     setIsTranscribeSettingsOpen(false);
-    void startTranscribe(pendingTranscribeSettings);
+    void startTranscribe(pendingTranscribeSettings, pendingAsrEngine);
   };
 
-  const startTranscribe = async (settings?: TranscribeContextSettings) => {
+  const startTranscribe = async (
+    settings?: TranscribeContextSettings,
+    asrEngine: AsrEngine = "local_whisper"
+  ) => {
     if (!activeDetail || !isParseResponse(activeDetail)) {
       setErrorMessage("当前记录无法生成转写稿，请先解析公开视频链接。");
       return;
@@ -797,7 +812,9 @@ export default function HomePage() {
         videoId: taskVideoId,
         title: taskTitle,
         status: "running",
-        startedAt: Date.now()
+        startedAt: Date.now(),
+        asrEngine,
+        contextSettings: settings
       },
       ...currentTasks.filter((task) => task.sourceUrl !== taskSourceUrl)
     ]);
@@ -806,11 +823,12 @@ export default function HomePage() {
 
     try {
       const response = await apiClient.transcribeVideo({
+        asr_engine: asrEngine,
         context_settings: settings ?? null,
         url: taskSourceUrl,
         video_id: taskVideoId
       });
-      const successMessage = "逐字稿已生成，正在继续生成总结。";
+      const successMessage = `${response.message} 正在继续生成总结。`;
       applyTranscribeSuccess(
         taskId,
         taskSourceUrl,
@@ -865,6 +883,19 @@ export default function HomePage() {
         )
       );
     }
+  };
+
+  const handleRetryTranscribeLocally = (taskId: string) => {
+    const task = transcribeTasks.find((item) => item.id === taskId);
+    if (
+      !task ||
+      task.asrEngine !== "fun_asr_flash" ||
+      task.sourceUrl !== activeSourceUrl
+    ) {
+      return;
+    }
+
+    void startTranscribe(task.contextSettings, "local_whisper");
   };
 
   const handleSaveNoteDraft = async (
@@ -1208,17 +1239,23 @@ export default function HomePage() {
         </>
       )}
       <TranscribeSettingsDialog
+        asrEngine={pendingAsrEngine}
+        cloudAvailable={asrStatus?.cloud_available ?? false}
+        cloudModel={asrStatus?.cloud_model ?? null}
         isOpen={isTranscribeSettingsOpen}
         isTranscribing={isCurrentDetailTranscribing}
         mediaTitle={activeDetail?.video.title ?? null}
         settings={pendingTranscribeSettings}
         onChange={setPendingTranscribeSettings}
+        onChangeAsrEngine={setPendingAsrEngine}
         onClose={() => setIsTranscribeSettingsOpen(false)}
         onConfirm={handleConfirmTranscribeSettings}
       />
       <TranscribeTaskToasts
+        activeSourceUrl={activeSourceUrl}
         tasks={visibleTasks}
         onDismiss={handleDismissWorkbenchTask}
+        onRetryLocally={handleRetryTranscribeLocally}
       />
     </main>
   );

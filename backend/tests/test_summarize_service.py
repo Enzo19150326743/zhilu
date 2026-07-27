@@ -4,7 +4,10 @@ import unittest
 from unittest.mock import patch
 
 from app.schemas import SummarizeRequest, TranscriptSegment
-from app.services.deepseek_client import DeepSeekClientError
+from app.services.deepseek_client import (
+    DeepSeekClientError,
+    DeepSeekOutputTruncatedError,
+)
 from app.services.summarize_service import (
     UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
     _build_deepseek_prompt,
@@ -187,6 +190,51 @@ class SummarizeServiceTests(unittest.TestCase):
             post_deepseek.call_args.kwargs["timeout_seconds"],
             120,
         )
+
+    def test_prompt_keeps_content_after_previous_character_limit(self) -> None:
+        """
+        超过旧 16000 字限制的正文尾部也必须完整进入总结提示词。
+        """
+        unique_tail = "总结尾部唯一标记-7f4a9c"
+        request = SummarizeRequest(
+            transcript_plain_text=f"{'前' * 20000}{unique_tail}",
+            video_title="长文本示例",
+        )
+
+        prompt = _build_deepseek_prompt(request)
+
+        self.assertIn(unique_tail, prompt)
+
+    def test_finish_reason_length_is_not_silently_fallbacked(self) -> None:
+        """
+        模型明确报告输出被截断时，应中止并抛出专用错误。
+        """
+        request = SummarizeRequest(
+            transcript_plain_text="用于测试输出截断的内容文本。",
+            video_title="输出截断示例",
+        )
+        response_payload = {
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {"content": '{"tldr":"未完成"'},
+                }
+            ]
+        }
+
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=False):
+            with patch(
+                "app.services.summarize_service.post_deepseek_chat_completion",
+                return_value=response_payload,
+            ):
+                with self.assertRaises(DeepSeekOutputTruncatedError):
+                    _request_deepseek_summary(request)
+
+            def raise_truncated(_: SummarizeRequest) -> str:
+                raise DeepSeekOutputTruncatedError("AI 输出达到长度限制")
+
+            with self.assertRaises(DeepSeekOutputTruncatedError):
+                summarize_transcript(request, ai_requester=raise_truncated)
 
     def test_prompt_marks_podcast_shownotes_as_non_transcript(self) -> None:
         """

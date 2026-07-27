@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from app.demo_data import get_demo_by_id, load_demo_seed
 from app.schemas import (
     ApiError,
+    AsrStatusResponse,
     BilibiliAuthStatusResponse,
     DemoDetailResponse,
     DemoItem,
@@ -57,7 +58,12 @@ from app.services.douyin_service import (
     download_douyin_video,
     is_douyin_url,
 )
+from app.services.fun_asr_service import (
+    DEFAULT_FUN_ASR_MODEL,
+    is_fun_asr_configured,
+)
 from app.services.demo_cover_service import resolve_demo_cover_url
+from app.services.deepseek_client import DeepSeekOutputTruncatedError
 from app.services.library_service import (
     clear_library_items,
     delete_library_item,
@@ -334,6 +340,17 @@ def get_health() -> HealthResponse:
     返回本地服务状态。
     """
     return HealthResponse(status="ok", mode="local", version=APP_VERSION)
+
+
+@app.get("/api/asr/status", response_model=AsrStatusResponse)
+def get_asr_status() -> AsrStatusResponse:
+    """返回云端转写是否可选，不向前端暴露任何密钥内容。"""
+    return AsrStatusResponse(
+        cloud_available=is_fun_asr_configured(),
+        cloud_model=(
+            os.getenv("FUN_ASR_MODEL", "").strip() or DEFAULT_FUN_ASR_MODEL
+        ),
+    )
 
 
 @app.get("/api/image-proxy")
@@ -661,7 +678,21 @@ def summarize_video(
         return cached_summary_response
 
     enforce_rate_limit(request, "summarize", SUMMARY_RATE_LIMIT_PER_HOUR)
-    summarize_response = summarize_transcript(summarize_request)
+    try:
+        summarize_response = summarize_transcript(summarize_request)
+    except DeepSeekOutputTruncatedError as error:
+        logger.warning("AI summary output truncated")
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "success": False,
+                "error_code": "AI_OUTPUT_TRUNCATED",
+                "message": (
+                    "AI 输出达到长度限制，结果未完整生成。"
+                    "请稍后重试，或提高对应的最大输出长度后再试。"
+                ),
+            },
+        ) from error
     if not summarize_response.is_ai_generated:
         cached_summary_response = get_cached_summary_response(summarize_request)
         if cached_summary_response is not None:
@@ -769,7 +800,21 @@ def answer_media_question(request: Request, qa_request: QaRequest) -> QaResponse
         )
 
     enforce_rate_limit(request, "qa", QA_RATE_LIMIT_PER_HOUR)
-    return answer_question(qa_request)
+    try:
+        return answer_question(qa_request)
+    except DeepSeekOutputTruncatedError as error:
+        logger.warning("AI qa output truncated")
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "success": False,
+                "error_code": "AI_OUTPUT_TRUNCATED",
+                "message": (
+                    "AI 输出达到长度限制，结果未完整生成。"
+                    "请稍后重试，或提高对应的最大输出长度后再试。"
+                ),
+            },
+        ) from error
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)
@@ -778,7 +823,7 @@ def transcribe_video(
     transcribe_request: TranscribeRequest,
 ) -> TranscribeResponse:
     """
-    当平台没有现成字幕时，使用本地 Whisper 从音频生成 AI 转写稿。
+    当平台没有现成字幕时，按用户选择使用本地或云端 ASR 生成转写稿。
     """
     video_url = normalize_public_video_url(transcribe_request.url)
     transcribe_context = _get_transcribe_prompt_context(video_url)
@@ -796,6 +841,7 @@ def transcribe_video(
         media_platform=transcribe_context.get("platform"),
         media_type=transcribe_context.get("media_type"),
         context_settings=transcribe_request.context_settings,
+        asr_engine=transcribe_request.asr_engine,
     )
     try:
         update_transcript_for_source_url(video_url, transcribe_response.transcript)

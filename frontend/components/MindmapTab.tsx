@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertCircle, GitFork, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  GitFork,
+  Loader2,
+  Maximize2,
+  Move,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MindmapMeta, SummaryDisplayState } from "@/lib/types";
 
@@ -11,6 +20,13 @@ interface MindmapTabProps {
 }
 
 type RenderState = "idle" | "loading" | "ready" | "error";
+
+interface MarkmapInstance {
+  destroy: () => void;
+  fit: () => Promise<void>;
+  rescale: (scale: number) => Promise<void> | void;
+  setHighlight: (node: unknown | null) => void;
+}
 
 const contentCategoryLabels: Record<string, string> = {
   business_tech: "商业科技 / 干货",
@@ -52,6 +68,7 @@ export function MindmapTab({
   summaryDisplayState
 }: MindmapTabProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const markmapRef = useRef<MarkmapInstance | null>(null);
   const [renderState, setRenderState] = useState<RenderState>("idle");
   const [renderError, setRenderError] = useState<string | null>(null);
   const normalizedMarkdown = mindmapMarkdown?.trim() ?? "";
@@ -80,7 +97,8 @@ export function MindmapTab({
     }
 
     let isCancelled = false;
-    let markmap: { destroy: () => void; fit: () => Promise<void> } | null = null;
+    let markmap: MarkmapInstance | null = null;
+    let handleSvgClick: ((event: MouseEvent) => void) | null = null;
 
     async function renderMindmap() {
       setRenderState("loading");
@@ -113,7 +131,21 @@ export function MindmapTab({
             spacingVertical: 10
           },
           root
-        );
+        ) as MarkmapInstance;
+        markmapRef.current = markmap;
+        handleSvgClick = (event: MouseEvent) => {
+          const target = event.target;
+          if (!(target instanceof Element)) {
+            return;
+          }
+
+          const nodeElement = target.closest("g.markmap-node");
+          const nodeData = nodeElement
+            ? (nodeElement as Element & { __data__?: unknown }).__data__
+            : null;
+          markmapRef.current?.setHighlight(nodeData ?? null);
+        };
+        svgRef.current.addEventListener("click", handleSvgClick);
         await markmap.fit();
 
         if (!isCancelled) {
@@ -131,9 +163,28 @@ export function MindmapTab({
 
     return () => {
       isCancelled = true;
+      if (svgRef.current && handleSvgClick) {
+        svgRef.current.removeEventListener("click", handleSvgClick);
+      }
       markmap?.destroy();
+      if (markmapRef.current === markmap) {
+        markmapRef.current = null;
+      }
     };
   }, [normalizedMarkdown]);
+
+  const handleFit = () => {
+    void markmapRef.current?.fit();
+  };
+
+  const handleReset = () => {
+    markmapRef.current?.setHighlight(null);
+    void markmapRef.current?.fit();
+  };
+
+  const handleZoom = (scale: number) => {
+    void markmapRef.current?.rescale(scale);
+  };
 
   if (summaryDisplayState === "empty") {
     return (
@@ -187,11 +238,61 @@ export function MindmapTab({
       </section>
 
       <section className="relative overflow-hidden rounded-lg border border-zinc-200 bg-[#fbfbf8]">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-lg border border-zinc-200 bg-white/95 p-1 shadow-sm backdrop-blur">
+          <button
+            aria-label="放大导图"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            disabled={renderState !== "ready"}
+            title="放大"
+            type="button"
+            onClick={() => handleZoom(1.2)}
+          >
+            <ZoomIn className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            aria-label="缩小导图"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            disabled={renderState !== "ready"}
+            title="缩小"
+            type="button"
+            onClick={() => handleZoom(0.8)}
+          >
+            <ZoomOut className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            aria-label="适应导图画布"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            disabled={renderState !== "ready"}
+            title="适应画布"
+            type="button"
+            onClick={handleFit}
+          >
+            <Maximize2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            aria-label="重置导图视图"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            disabled={renderState !== "ready"}
+            title="重置视图"
+            type="button"
+            onClick={handleReset}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
         <svg
           aria-label="智能树状导图"
           className="h-[460px] w-full"
           ref={svgRef}
         />
+
+        {renderState === "ready" ? (
+          <div className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-md bg-white/90 px-2.5 py-1.5 text-[11px] text-zinc-500 shadow-sm backdrop-blur">
+            <Move className="h-3.5 w-3.5" aria-hidden="true" />
+            拖拽画布平移 · 滚轮缩放 · 点击节点高亮或展开
+          </div>
+        ) : null}
 
         {renderState === "loading" ? (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-medium text-zinc-600 backdrop-blur-sm">

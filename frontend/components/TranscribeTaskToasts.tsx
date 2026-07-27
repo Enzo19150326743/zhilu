@@ -1,11 +1,13 @@
-import { CheckCircle2, CircleAlert, Loader2, X } from "lucide-react";
+import { CheckCircle2, CircleAlert, HardDrive, Loader2, X } from "lucide-react";
 import type { ParseTask, SummaryTask, TranscribeTask } from "@/lib/types";
 
 type WorkbenchTask = ParseTask | SummaryTask | TranscribeTask;
 
 interface TranscribeTaskToastsProps {
+  activeSourceUrl?: string | null;
   tasks: WorkbenchTask[];
   onDismiss: (taskId: string) => void;
+  onRetryLocally?: (taskId: string) => void;
 }
 
 function isSummaryTask(task: WorkbenchTask): task is SummaryTask {
@@ -14,6 +16,10 @@ function isSummaryTask(task: WorkbenchTask): task is SummaryTask {
 
 function isParseTask(task: WorkbenchTask): task is ParseTask {
   return "kind" in task && task.kind === "parse";
+}
+
+function isTranscribeTask(task: WorkbenchTask): task is TranscribeTask {
+  return !("kind" in task);
 }
 
 function getTaskStatusLabel(task: WorkbenchTask): string {
@@ -51,8 +57,10 @@ function getTaskIcon(task: WorkbenchTask) {
 }
 
 export function TranscribeTaskToasts({
+  activeSourceUrl,
   tasks,
-  onDismiss
+  onDismiss,
+  onRetryLocally
 }: TranscribeTaskToastsProps) {
   const visibleTasks = tasks.slice(0, 4);
 
@@ -90,6 +98,20 @@ export function TranscribeTaskToasts({
                 <p className="mt-1 text-xs leading-5 text-amber-800">
                   {task.errorMessage}
                 </p>
+              ) : null}
+              {task.status === "error" &&
+              isTranscribeTask(task) &&
+              task.asrEngine === "fun_asr_flash" &&
+              task.sourceUrl === activeSourceUrl &&
+              onRetryLocally ? (
+                <button
+                  className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-950 px-2.5 text-xs font-semibold text-white transition hover:bg-blue-600"
+                  type="button"
+                  onClick={() => onRetryLocally(task.id)}
+                >
+                  <HardDrive className="h-3.5 w-3.5" aria-hidden="true" />
+                  改用本地识别
+                </button>
               ) : null}
             </div>
             <button

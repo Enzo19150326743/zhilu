@@ -22,7 +22,7 @@ AI_API_KEY=your-api-key
 AI_BASE_URL=https://api.deepseek.com
 AI_MODEL=your-model-name
 AI_FAST_MODEL=your-fast-model-name
-AI_MAX_TOKENS=4096
+AI_MAX_TOKENS=8192
 AI_THINKING_TYPE=disabled
 ```
 
@@ -82,6 +82,18 @@ ASR_AUTO_FALLBACK=1
 
 更大的模型通常更慢、更占内存。`ASR_DEVICE=auto` 会优先尝试可用 GPU，失败后按配置回退 CPU。
 
+## 云端快速 ASR（可选）
+
+```dotenv
+DASHSCOPE_API_KEY=your-dashscope-api-key
+FUN_ASR_MODEL=fun-asr-flash-2026-06-15
+FUN_ASR_BASE_URL=https://dashscope.aliyuncs.com/api/v1
+```
+
+未配置 `DASHSCOPE_API_KEY` 时，转写弹窗中的云端选项会保持禁用。本地 Whisper
+仍是默认路径；只有用户手动选择云端识别时，ffmpeg 才会把下载到本地的实际媒体
+统一转换为 Opus 片段并发送给阿里云。云端失败不会自动切换本地模型。
+
 ## AI 转写校对
 
 ```dotenv
@@ -92,7 +104,10 @@ ASR_CORRECTION_CHUNK_CHARS=3500
 ASR_CORRECTION_TIMEOUT_SECONDS=120
 ```
 
-节目结构、内容标签、说话人信息和术语表只用于后续 AI 校对整理，不直接注入 Whisper 声学解码。未配置 AI Key 或校对失败时，系统保留原始 Whisper 稿。
+`ASR_CORRECTION_CHUNK_CHARS=3500` 是单次校对请求的大致批量，不是全文读取上限；
+系统会依次处理完整转写的所有批次。节目结构、内容标签、说话人信息和术语表用于
+DeepSeek 校对，也会在手动选择 Fun-ASR-Flash 时压缩为不超过 400 字符的识别上下文；
+它们不会直接注入本地 Whisper 声学解码。未配置 AI Key 或校对失败时，系统保留原始稿。
 
 ## Obsidian
 

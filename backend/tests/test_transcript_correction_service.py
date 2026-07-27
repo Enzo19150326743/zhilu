@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from unittest.mock import patch
@@ -16,6 +17,51 @@ from app.services.transcript_correction_service import (
 
 
 class TranscriptCorrectionServiceTests(unittest.TestCase):
+    def test_3500_characters_is_a_batch_size_not_a_read_limit(self) -> None:
+        unique_tail = "全文校对尾部标记"
+        transcript = _build_transcript(
+            "甲" * 1000,
+            "乙" * 1000,
+            "丙" * 1000,
+            "丁" * 1000,
+            f"戊{unique_tail}",
+        )
+        requested_batches: list[list[str]] = []
+
+        def fake_requester(indexed_segments: object, *_: object) -> str:
+            indexed_list = list(indexed_segments)  # type: ignore[arg-type]
+            requested_batches.append([segment.text for _, segment in indexed_list])
+            return json.dumps(
+                {
+                    "segments": [
+                        {"index": index, "text": segment.text}
+                        for index, segment in indexed_list
+                    ]
+                },
+                ensure_ascii=False,
+            )
+
+        with patch.dict(
+            os.environ,
+            {
+                "ASR_CORRECTION_ENABLED": "1",
+                "ASR_CORRECTION_CHUNK_CHARS": "3500",
+            },
+            clear=False,
+        ):
+            result = correct_transcript_payload(
+                transcript,
+                glossary_terms=[],
+                requester=fake_requester,
+            )
+
+        self.assertEqual(result.status, "corrected")
+        self.assertGreater(len(requested_batches), 1)
+        self.assertTrue(
+            any(unique_tail in text for batch in requested_batches for text in batch)
+        )
+        self.assertIn(unique_tail, result.transcript.plain_text)
+
     def test_correction_success_preserves_timestamps_and_updates_text(self) -> None:
         """
         DeepSeek 只允许改文本，时间戳必须由原始 ASR 片段回填。

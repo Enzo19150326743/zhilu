@@ -4,6 +4,15 @@ export interface HealthResponse {
   version: string;
 }
 
+export type AsrEngine = "local_whisper" | "fun_asr_flash";
+
+export interface AsrStatusResponse {
+  success: true;
+  cloud_available: boolean;
+  cloud_provider: "aliyun" | string;
+  cloud_model: string;
+}
+
 export interface RateLimitItem {
   action: "parse" | "summarize" | "qa" | "transcribe" | string;
   limit: number;
@@ -85,6 +94,10 @@ export interface TranscriptAsrMeta {
   content_tags?: string[];
   speaker_profiles?: TranscribeSpeakerProfile[];
   speaker_label_status?: "disabled" | "inferred" | "partial" | "failed" | string | null;
+  provider?: string | null;
+  chunk_count?: number | null;
+  timestamp_source?: string | null;
+  cloud_correction_status?: "corrected" | "skipped" | "failed" | string | null;
 }
 
 export interface TranscriptPayload {
@@ -276,6 +289,7 @@ export interface TranscribeRequest {
   url: string;
   video_id?: string | null;
   context_settings?: TranscribeContextSettings | null;
+  asr_engine?: AsrEngine;
 }
 
 export interface TranscribeResponse {
@@ -310,6 +324,8 @@ export interface TranscribeTask {
   finishedAt?: number;
   message?: string;
   errorMessage?: string;
+  asrEngine?: AsrEngine;
+  contextSettings?: TranscribeContextSettings;
 }
 
 export interface SummaryTask {

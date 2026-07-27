@@ -9,6 +9,7 @@ from app.schemas import QaReference, QaRequest, QaResponse
 from app.services.ai_settings import load_ai_settings
 from app.services.deepseek_client import (
     DeepSeekClientError,
+    DeepSeekOutputTruncatedError,
     post_deepseek_chat_completion,
 )
 
@@ -20,7 +21,6 @@ DEFAULT_QA_THINKING_MODEL = "deepseek-v4-pro"
 DEFAULT_DEEPSEEK_MAX_TOKENS = 2048
 DEFAULT_DEEPSEEK_THINKING_TYPE = "disabled"
 DEFAULT_DEEPSEEK_TIMEOUT_SECONDS = 120
-MAX_QA_CONTEXT_CHARS = 18000
 MAX_REFERENCE_COUNT = 5
 AiRequester = Callable[[QaRequest], str]
 
@@ -54,6 +54,9 @@ def answer_question(
     try:
         content = requester(qa_request)
         return _build_ai_answer_response(qa_request, content)
+    except DeepSeekOutputTruncatedError:
+        # NOTE: 不完整的 AI 输出不能降级为一条看似正常的本地回答。
+        raise
     except (DeepSeekClientError, TimeoutError, OSError, ValueError, KeyError) as error:
         config = _get_deepseek_config_snapshot(qa_request)
         logger.warning(
@@ -118,7 +121,15 @@ def _request_deepseek_qa(qa_request: QaRequest) -> str:
     if not isinstance(choices, list) or not choices:
         raise ValueError("DeepSeek response has no choices")
 
-    message = choices[0].get("message")
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        raise ValueError("DeepSeek response choice is invalid")
+    if choice.get("finish_reason") == "length":
+        raise DeepSeekOutputTruncatedError(
+            "AI 输出达到长度限制，结果未完整生成"
+        )
+
+    message = choice.get("message")
     if not isinstance(message, dict) or not isinstance(message.get("content"), str):
         raise ValueError("DeepSeek response has no content")
 
@@ -130,7 +141,7 @@ def _build_deepseek_prompt(qa_request: QaRequest) -> str:
     author = qa_request.video_author or "未知作者"
     source_url = qa_request.source_url or "未提供"
     question = qa_request.question.strip()
-    content_text = qa_request.transcript_plain_text.strip()[:MAX_QA_CONTEXT_CHARS]
+    content_text = qa_request.transcript_plain_text.strip()
     summary_context = _build_summary_context(qa_request)
 
     return f"""

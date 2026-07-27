@@ -19,6 +19,11 @@ from app.schemas import (
     TranscriptSegment,
 )
 from app.services import cuda_runtime
+from app.services.fun_asr_service import (
+    FunAsrContext,
+    FunAsrError,
+    transcribe_audio_with_fun_asr,
+)
 from app.services.text_normalization_service import to_simplified_chinese
 from app.services.transcript_correction_service import (
     TranscriptCorrectionContext,
@@ -94,13 +99,17 @@ class WhisperModelCandidate:
 
 @dataclass(frozen=True)
 class WhisperTranscriptionResult:
-    """Whisper 原始转写结果和实际使用的运行配置。"""
+    """ASR 原始转写结果和实际使用的运行配置。"""
 
     transcript: TranscriptPayload
     model: str
     device: str
     compute_type: str
     language: str | None
+    engine: str = "faster-whisper"
+    provider: str | None = "local"
+    chunk_count: int | None = None
+    timestamp_source: str | None = "whisper-segment"
 
 
 def transcribe_media_audio(
@@ -115,11 +124,12 @@ def transcribe_media_audio(
     media_platform: str | None = None,
     media_type: str | None = None,
     context_settings: TranscribeContextSettings | None = None,
+    asr_engine: str = "local_whisper",
 ) -> TranscribeResponse:
     """
-    下载公开视频音频并使用本地 Whisper 生成内容文本。
+    下载公开视频音频并按用户选择使用本地 Whisper 或 Fun-ASR-Flash。
 
-    NOTE: yt-dlp 只负责拿到公开音频资源，真正的 AI 转写稿生成由本地 ASR 完成。
+    NOTE: yt-dlp 只负责拿到公开音频资源，不根据平台名称猜测实际媒体格式。
     """
     total_started_at = monotonic()
     asr_config = get_asr_config()
@@ -153,8 +163,39 @@ def transcribe_media_audio(
             monotonic() - download_started_at,
         )
         try:
-            whisper_started_at = monotonic()
-            if transcriber is None:
+            recognition_started_at = monotonic()
+            if asr_engine == "fun_asr_flash":
+                try:
+                    cloud_result = transcribe_audio_with_fun_asr(
+                        audio_path,
+                        glossary_terms=glossary_terms,
+                        context=FunAsrContext(
+                            title=prompt_context.title,
+                            author=prompt_context.author,
+                            platform=prompt_context.platform,
+                            media_type=prompt_context.media_type,
+                            context_settings=prompt_context.context_settings,
+                        ),
+                        output_dir=temporary_path,
+                    )
+                except FunAsrError as error:
+                    raise _build_transcribe_error(
+                        error.error_code,
+                        error.message,
+                        status_code=error.status_code,
+                    ) from error
+                transcription_result = WhisperTranscriptionResult(
+                    transcript=cloud_result.transcript,
+                    model=cloud_result.model,
+                    device="cloud",
+                    compute_type="remote",
+                    language=None,
+                    engine="fun-asr-flash",
+                    provider=cloud_result.provider,
+                    chunk_count=cloud_result.chunk_count,
+                    timestamp_source=cloud_result.timestamp_source,
+                )
+            elif transcriber is None:
                 transcription_result = _transcribe_audio_with_whisper(
                     audio_path,
                     asr_config=asr_config,
@@ -171,10 +212,12 @@ def transcribe_media_audio(
                 )
             logger.info(
                 (
-                    "asr timing: stage=whisper elapsed_seconds=%.2f "
-                    "model=%s device=%s segment_count=%s"
+                    "asr timing: stage=%s elapsed_seconds=%.2f "
+                    "engine=%s model=%s device=%s segment_count=%s"
                 ),
-                monotonic() - whisper_started_at,
+                "fun_asr" if asr_engine == "fun_asr_flash" else "whisper",
+                monotonic() - recognition_started_at,
+                transcription_result.engine,
                 transcription_result.model,
                 transcription_result.device,
                 len(transcription_result.transcript.segments),
@@ -203,9 +246,10 @@ def transcribe_media_audio(
     logger.info(
         (
             "asr timing: stage=total elapsed_seconds=%.2f "
-            "model=%s device=%s segment_count=%s"
+            "engine=%s model=%s device=%s segment_count=%s"
         ),
         monotonic() - total_started_at,
+        transcription_result.engine,
         transcription_result.model,
         transcription_result.device,
         len(transcript.segments),
@@ -215,7 +259,11 @@ def transcribe_media_audio(
         source_url=response_source_url or video_url,
         video_id=video_id,
         transcript=transcript,
-        message="本地 Whisper 已生成 AI 转写稿。",
+        message=(
+            "Fun-ASR-Flash 已生成云端 AI 转写稿。"
+            if transcription_result.engine == "fun-asr-flash"
+            else "本地 Whisper 已生成 AI 转写稿。"
+        ),
     )
 
 
@@ -523,6 +571,7 @@ def _build_final_transcript(
             "raw_segments": raw_segments,
             "raw_plain_text": raw_transcript.plain_text,
             "asr_meta": TranscriptAsrMeta(
+                engine=transcription_result.engine,
                 model=transcription_result.model,
                 device=transcription_result.device,
                 compute_type=transcription_result.compute_type,
@@ -549,6 +598,14 @@ def _build_final_transcript(
                     final_transcript,
                     prompt_context.context_settings,
                     correction_result.status,
+                ),
+                provider=transcription_result.provider,
+                chunk_count=transcription_result.chunk_count,
+                timestamp_source=transcription_result.timestamp_source,
+                cloud_correction_status=(
+                    correction_result.status
+                    if transcription_result.engine == "fun-asr-flash"
+                    else None
                 ),
             ),
         }

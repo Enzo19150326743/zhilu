@@ -1,6 +1,8 @@
 import unittest
 
-from app.schemas import SummarizeRequest
+from pydantic import ValidationError
+
+from app.schemas import QaRequest, SummarizeRequest, TranscribeRequest
 
 
 class SummarizeRequestSchemaTests(unittest.TestCase):
@@ -20,6 +22,44 @@ class SummarizeRequestSchemaTests(unittest.TestCase):
         )
 
         self.assertIsNone(request.video_title)
+
+    def test_transcript_accepts_exactly_120000_characters(self) -> None:
+        transcript = "字" * 120000
+
+        summarize_request = SummarizeRequest(transcript_plain_text=transcript)
+        qa_request = QaRequest(question="问题", transcript_plain_text=transcript)
+
+        self.assertEqual(len(summarize_request.transcript_plain_text), 120000)
+        self.assertEqual(len(qa_request.transcript_plain_text), 120000)
+
+    def test_transcript_rejects_more_than_120000_characters(self) -> None:
+        transcript = "字" * 120001
+
+        with self.assertRaises(ValidationError):
+            SummarizeRequest(transcript_plain_text=transcript)
+
+        with self.assertRaises(ValidationError):
+            QaRequest(question="问题", transcript_plain_text=transcript)
+
+    def test_transcribe_request_defaults_to_local_whisper(self) -> None:
+        request = TranscribeRequest(url="https://example.com/video")
+
+        self.assertEqual(request.asr_engine, "local_whisper")
+
+    def test_transcribe_request_accepts_fun_asr_flash(self) -> None:
+        request = TranscribeRequest(
+            url="https://example.com/video",
+            asr_engine="fun_asr_flash",
+        )
+
+        self.assertEqual(request.asr_engine, "fun_asr_flash")
+
+    def test_transcribe_request_rejects_unknown_engine(self) -> None:
+        with self.assertRaises(ValidationError):
+            TranscribeRequest(
+                url="https://example.com/video",
+                asr_engine="unknown",  # type: ignore[arg-type]
+            )
 
 
 if __name__ == "__main__":

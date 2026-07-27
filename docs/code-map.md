@@ -102,6 +102,7 @@ ai-video-insight-workspace/
 - `frontend/components/FormatSelector.tsx`：格式列表和下载入口。
 - `frontend/components/AiTabs.tsx`：总结、导图、问答、原文 Tab 容器。
 - `frontend/components/SummaryTab.tsx`：结构化总结展示。
+- `frontend/components/SafeMarkdown.tsx`：结构化分析使用的安全轻量 Markdown 渲染。
 - `frontend/components/MindmapTab.tsx`：markmap 树状导图展示。
 - `frontend/components/QaTab.tsx`：内容问答。
 - `frontend/components/TranscriptTab.tsx`：内容文本、平台字幕、Shownotes、AI 转写稿和导出。
@@ -128,6 +129,7 @@ ai-video-insight-workspace/
 - `backend/app/services/xiaoyuzhou_service.py`：小宇宙公开单集 RSS / 网页解析。
 - `backend/app/services/transcript_service.py`：平台字幕和 VTT/SRT 字幕解析。
 - `backend/app/services/asr_service.py`：本地 Whisper AI 转写稿、模型 fallback、ASR 术语表和双稿串联。
+- `backend/app/services/fun_asr_service.py`：手动选择的 Fun-ASR-Flash 云端转写、ffmpeg 规范化分段、并发请求和时间戳合并。
 - `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；生产 Whisper 目前保持中性解码。
 - `backend/app/services/transcript_correction_service.py`：DeepSeek ASR 转写稿自动校对，失败时回退原始稿。
 - `backend/app/services/summarize_service.py`：DeepSeek 结构化总结和本地 fallback。
@@ -148,7 +150,7 @@ ai-video-insight-workspace/
 - 改小宇宙：先读 `docs/plans/2026-05-10-xiaoyuzhou-podcast-source.md`，再读 `backend/app/services/xiaoyuzhou_service.py`。
 - 改总结 / 导图：先读 `frontend/components/SummaryTab.tsx`、`frontend/components/MindmapTab.tsx`、`backend/app/services/summarize_service.py`。
 - 改 QA：先读 `frontend/components/QaTab.tsx`、`backend/app/services/qa_service.py`。
-- 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
+- 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/fun_asr_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
 - 改 ASR 术语：维护 `docs/asr-glossary.md` 的 Markdown bullet 项；后端只用于 DeepSeek 校对，不直接注入 Whisper 声学解码。
 - 改本地历史：先读 `frontend/components/RecentLibrary.tsx`、`backend/app/services/library_service.py`。
 - 改 Obsidian 导出：先读 `docs/plans/2026-06-12-obsidian-note-workflow-prd.md`、`backend/app/services/obsidian_export_service.py`。

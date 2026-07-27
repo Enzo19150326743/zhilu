@@ -4,7 +4,12 @@ import unittest
 from unittest.mock import patch
 
 from app.schemas import QaRequest
-from app.services.qa_service import _build_deepseek_prompt, answer_question
+from app.services.deepseek_client import DeepSeekOutputTruncatedError
+from app.services.qa_service import (
+    _build_deepseek_prompt,
+    _request_deepseek_qa,
+    answer_question,
+)
 
 
 class QaServiceTests(unittest.TestCase):
@@ -74,6 +79,52 @@ class QaServiceTests(unittest.TestCase):
         self.assertIn("文本来源：shownotes / 内容简介", prompt)
         self.assertIn("不是完整逐字稿", prompt)
         self.assertNotIn("视频字幕", prompt)
+
+    def test_prompt_keeps_content_after_previous_character_limit(self) -> None:
+        """
+        超过旧 18000 字限制的事实也必须完整进入问答提示词。
+        """
+        unique_fact = "问答尾部事实：项目代号是北斗-91。"
+        request = QaRequest(
+            question="项目代号是什么？",
+            transcript_plain_text=f"{'前' * 20000}{unique_fact}",
+            video_title="长文本问答示例",
+        )
+
+        prompt = _build_deepseek_prompt(request)
+
+        self.assertIn(unique_fact, prompt)
+
+    def test_finish_reason_length_is_not_silently_fallbacked(self) -> None:
+        """
+        模型明确报告输出被截断时，应中止并抛出专用错误。
+        """
+        request = QaRequest(
+            question="核心结论是什么？",
+            transcript_plain_text="用于测试输出截断的内容文本。",
+        )
+        response_payload = {
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {"content": '{"answer":"未完成"'},
+                }
+            ]
+        }
+
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=False):
+            with patch(
+                "app.services.qa_service.post_deepseek_chat_completion",
+                return_value=response_payload,
+            ):
+                with self.assertRaises(DeepSeekOutputTruncatedError):
+                    _request_deepseek_qa(request)
+
+            def raise_truncated(_: QaRequest) -> str:
+                raise DeepSeekOutputTruncatedError("AI 输出达到长度限制")
+
+            with self.assertRaises(DeepSeekOutputTruncatedError):
+                answer_question(request, ai_requester=raise_truncated)
 
 
 if __name__ == "__main__":

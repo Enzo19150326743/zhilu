@@ -1,4 +1,5 @@
 import { ArrowUpRight, FileAudio, Loader2, Sparkles } from "lucide-react";
+import { SafeMarkdown } from "./SafeMarkdown";
 import type {
   SummaryDisplayState,
   SummaryGenerationMeta,
@@ -189,6 +190,14 @@ export function SummaryTab({
     );
   }
 
+  const topicTags = Array.from(
+    new Set([...(summary.topics ?? []), ...(summary.content_keywords ?? [])])
+  ).filter(Boolean);
+  const applicationClues =
+    summary.application_clues?.length
+      ? summary.application_clues
+      : summary.takeaways;
+
   return (
     <div className="space-y-5">
       <section className="flex flex-col gap-4 border-y border-[var(--line-strong)] py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -319,6 +328,19 @@ export function SummaryTab({
         </p>
       </section>
 
+      {topicTags.length > 0 ? (
+        <section className="flex flex-wrap gap-2 border-b border-[var(--line)] pb-5">
+          {topicTags.map((topic) => (
+            <span
+              className="inline-flex min-h-7 items-center rounded-full border border-[var(--line-strong)] bg-white px-2.5 text-xs font-medium text-[var(--ink-soft)]"
+              key={topic}
+            >
+              {topic}
+            </span>
+          ))}
+        </section>
+      ) : null}
+
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
         <div>
           <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
@@ -347,6 +369,23 @@ export function SummaryTab({
           ))}
         </ol>
       </section>
+
+      {summary.structured_analysis_markdown.trim() ? (
+        <section className="grid gap-5 border-y border-[var(--line-strong)] py-6 lg:grid-cols-[140px_1fr] lg:gap-8">
+          <div>
+            <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
+              深度笔记
+            </p>
+            <h3 className="font-editorial mt-1 text-xl font-semibold text-[var(--ink)]">
+              结构化分析
+            </h3>
+            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+              保留论证、案例、条件与内容边界，不只压缩成要点。
+            </p>
+          </div>
+          <SafeMarkdown markdown={summary.structured_analysis_markdown} />
+        </section>
+      ) : null}
 
       {summary.timeline.length > 0 ? (
         <section>
@@ -381,7 +420,7 @@ export function SummaryTab({
           </h3>
         </div>
         <ol className="grid border-t border-[var(--line-strong)] sm:grid-cols-2">
-          {summary.takeaways.map((item, index) => (
+          {applicationClues.map((item, index) => (
             <li
               className="group grid min-h-24 grid-cols-[34px_1fr_auto] gap-3 border-b border-[var(--line)] py-4 sm:odd:pr-5 sm:even:border-l sm:even:pl-5"
               key={item}
@@ -400,6 +439,17 @@ export function SummaryTab({
           ))}
         </ol>
       </section>
+
+      {summary.content_boundaries?.length ? (
+        <section className="border-l-2 border-amber-400 bg-amber-50/70 px-4 py-4">
+          <h3 className="text-sm font-semibold text-amber-950">内容边界与待核实项</h3>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-6 text-amber-900">
+            {summary.content_boundaries.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -1,15 +1,19 @@
 "use client";
 
-import { FileAudio, Loader2, X } from "lucide-react";
+import { Cloud, FileAudio, HardDrive, Loader2, X } from "lucide-react";
 import { TranscribeSettingsPanel } from "./TranscribeSettingsPanel";
-import type { TranscribeContextSettings } from "@/lib/types";
+import type { AsrEngine, TranscribeContextSettings } from "@/lib/types";
 
 interface TranscribeSettingsDialogProps {
   isOpen: boolean;
   isTranscribing: boolean;
   mediaTitle?: string | null;
   settings: TranscribeContextSettings;
+  asrEngine: AsrEngine;
+  cloudAvailable: boolean;
+  cloudModel?: string | null;
   onChange: (settings: TranscribeContextSettings) => void;
+  onChangeAsrEngine: (asrEngine: AsrEngine) => void;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -19,7 +23,11 @@ export function TranscribeSettingsDialog({
   isTranscribing,
   mediaTitle,
   settings,
+  asrEngine,
+  cloudAvailable,
+  cloudModel,
   onChange,
+  onChangeAsrEngine,
   onClose,
   onConfirm
 }: TranscribeSettingsDialogProps) {
@@ -48,8 +56,64 @@ export function TranscribeSettingsDialog({
         </div>
 
         <div className="px-5 py-4">
+          <div className="mb-5 space-y-2">
+            <p className="text-xs font-medium text-zinc-500">识别方式</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  asrEngine === "local_whisper"
+                    ? "border-zinc-950 bg-zinc-950 text-white"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                }`}
+                disabled={isTranscribing}
+                type="button"
+                onClick={() => onChangeAsrEngine("local_whisper")}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <HardDrive className="h-4 w-4" aria-hidden="true" />
+                  本地识别
+                </span>
+                <span
+                  className={`mt-1.5 block text-xs leading-5 ${
+                    asrEngine === "local_whisper" ? "text-zinc-300" : "text-zinc-500"
+                  }`}
+                >
+                  默认、免费，音频不会上传到云端。
+                </span>
+              </button>
+
+              <button
+                className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  asrEngine === "fun_asr_flash"
+                    ? "border-blue-600 bg-blue-50 text-blue-900"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-blue-300"
+                }`}
+                disabled={isTranscribing || !cloudAvailable}
+                type="button"
+                onClick={() => onChangeAsrEngine("fun_asr_flash")}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Cloud className="h-4 w-4" aria-hidden="true" />
+                  云端快速识别
+                </span>
+                <span className="mt-1.5 block text-xs leading-5 text-zinc-500">
+                  {cloudAvailable
+                    ? "音频片段会发送给阿里云，按量计费，约 0.79 元/小时。"
+                    : "后端尚未配置 DASHSCOPE_API_KEY，当前不可选。"}
+                </span>
+                {cloudAvailable && cloudModel ? (
+                  <span className="mt-1 block text-[11px] text-blue-700">
+                    {cloudModel}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+          </div>
+
           <TranscribeSettingsPanel
-            disabled={isTranscribing}
+            disabled={
+              isTranscribing || (asrEngine === "fun_asr_flash" && !cloudAvailable)
+            }
             isAlwaysOpen
             settings={settings}
             onChange={onChange}
@@ -76,7 +140,11 @@ export function TranscribeSettingsDialog({
             ) : (
               <FileAudio className="h-4 w-4" />
             )}
-            {isTranscribing ? "生成中" : "开始生成"}
+            {isTranscribing
+              ? "生成中"
+              : asrEngine === "fun_asr_flash"
+                ? "开始云端识别"
+                : "开始本地识别"}
           </button>
         </div>
       </section>

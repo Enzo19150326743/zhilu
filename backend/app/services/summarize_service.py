@@ -16,6 +16,7 @@ from app.schemas import (
 from app.services.ai_settings import load_ai_settings
 from app.services.deepseek_client import (
     DeepSeekClientError,
+    DeepSeekOutputTruncatedError,
     post_deepseek_chat_completion,
 )
 from app.services.text_normalization_service import (
@@ -27,10 +28,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
-DEFAULT_DEEPSEEK_MAX_TOKENS = 4096
+DEFAULT_DEEPSEEK_MAX_TOKENS = 8192
 DEFAULT_DEEPSEEK_THINKING_TYPE = "disabled"
 DEFAULT_DEEPSEEK_TIMEOUT_SECONDS = 180
-MAX_TRANSCRIPT_CHARS = 16000
 UNIVERSAL_KNOWLEDGE_DRAFT_VERSION = "1.0"
 AiRequester = Callable[[SummarizeRequest], str]
 MEDIA_TYPE_LABELS = {
@@ -92,6 +92,9 @@ def summarize_transcript(
         return _simplify_summary_response(
             _build_ai_summary_response(normalized_request, content)
         )
+    except DeepSeekOutputTruncatedError:
+        # NOTE: 不完整的 AI 输出不能伪装成一次成功的本地摘要。
+        raise
     except (DeepSeekClientError, TimeoutError, OSError, ValueError, KeyError) as error:
         config = _get_deepseek_config_snapshot()
         formatted_error = _format_deepseek_error(error)
@@ -196,7 +199,15 @@ def _request_deepseek_summary(summarize_request: SummarizeRequest) -> str:
     if not isinstance(choices, list) or not choices:
         raise ValueError("DeepSeek response has no choices")
 
-    message = choices[0].get("message")
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        raise ValueError("DeepSeek response choice is invalid")
+    if choice.get("finish_reason") == "length":
+        raise DeepSeekOutputTruncatedError(
+            "AI 输出达到长度限制，结果未完整生成"
+        )
+
+    message = choice.get("message")
     if not isinstance(message, dict) or not isinstance(message.get("content"), str):
         raise ValueError("DeepSeek response has no content")
 
@@ -261,7 +272,7 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
     title = summarize_request.video_title or "未命名媒体内容"
     author = summarize_request.video_author or "未知作者"
     source_url = summarize_request.source_url or "未提供"
-    transcript = summarize_request.transcript_plain_text.strip()[:MAX_TRANSCRIPT_CHARS]
+    transcript = summarize_request.transcript_plain_text.strip()
     content_type = _get_obsidian_content_type_label(summarize_request)
     source_boundary = _build_text_source_boundary(summarize_request)
 
@@ -277,7 +288,10 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 
 通用总结规则：
 - 只根据当前媒体元数据和内容文本总结，不引用或推断任何用户的个人背景。
-- key_points 只概括当前内容中的核心观点，不把外部作者观点等同于任何用户的观点。
+- 必须完整覆盖内容文本的开头、中段和结尾，不能只抓开头，也不要为了简短遗漏后半段的重要转折或结论。
+- key_points 返回 5 到 8 条，概括核心观点、依据、案例和观点之间的关系；不把外部作者观点等同于任何用户的观点。
+- structured_analysis_markdown 必须根据当前内容类型动态组织，优先写清核心问题、论证或方法、案例与依据、适用条件、反例或争议、结论与行动线索。
+- 不要强行凑齐原文没有的栏目；证据不足或无法确定的内容写入 content_boundaries，不要编造补全。
 - 内容类型当前只允许“视频”和“播客”；不要输出“文章”，除非后续明确上线文章解析功能。
 - topics 和 content_keywords 只描述当前内容本身，不包含“视频”“播客”这类媒介形态。
 - application_clues 面向所有用户，说明内容可用于复习、创作、决策、实践或继续核查的通用线索。
@@ -295,13 +309,13 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 
 导图规则：
 - 请自动判断 content_category，只能从 self_growth、business_tech、interview_podcast、tutorial_howto 中选择一个。
-- content_category=self_growth 时，导图优先组织为：核心困境、关键观念、练习方法、行动建议、反思问题。
-- content_category=business_tech 时，导图优先组织为：背景、问题、机制/方案、风险/机会、行动建议。
-- content_category=interview_podcast 时，导图优先组织为：人物/角色、主题、观点、故事/案例、可追问问题。
-- content_category=tutorial_howto 时，导图优先组织为：目标、步骤、工具/资源、注意事项、预期结果。
-- 视频类内容优先保留主题、步骤和关键片段；播客类内容优先围绕主题、人物、观点、故事线和可追问问题组织。
+- 导图只能有一个准确的中心主题，并组织 4 到 7 个主要分支。
+- 层级控制在 3 到 4 层；每个节点使用短语，不要把整段总结塞进单个节点。
+- 分支应反映观点、依据、案例、条件、风险和结论之间的真实关系，不要机械套用固定栏目。
+- 视频类内容优先保留主题、步骤和论证关系；播客类内容优先保留人物、观点、故事和争议关系。
 - shownotes 只能代表公开内容简介，不要把它当成完整音频逐字稿。
 - mindmap_markdown 必须使用 Markdown 标题层级，便于前端渲染为树状图；不要输出普通列表作为主体结构。
+- 不虚构内容文本中不存在的主题、时间点或人物关系。
 
 内容文本：
 {transcript}
@@ -312,8 +326,8 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
   "content_type": "视频或播客",
   "topics": ["当前内容的通用主题，不包含视频或播客"],
   "tldr": "一句话总结",
-  "key_points": ["核心要点 1", "核心要点 2", "核心要点 3"],
-  "structured_analysis_markdown": "## 结构化分析\\n### ...",
+  "key_points": ["覆盖开头、中段和结尾的核心要点，共 5 到 8 条"],
+  "structured_analysis_markdown": "## 核心问题\\n### 论证、案例、条件与结论",
   "content_keywords": ["只描述当前内容的关键词，不超过 8 个"],
   "application_clues": ["面向任意用户的通用使用线索"],
   "quotes": [
@@ -324,7 +338,7 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
     }}
   ],
   "content_boundaries": ["文本来源限制、证据不足或待核实信息"],
-  "mindmap_markdown": "# 媒体主题\\n## 分支\\n### 要点",
+  "mindmap_markdown": "# 唯一中心主题\\n## 主要分支\\n### 关系或要点",
   "mindmap_meta": {{
     "layout": "tree",
     "content_category": "business_tech",

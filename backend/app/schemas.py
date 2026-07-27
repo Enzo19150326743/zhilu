@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -85,7 +87,7 @@ class TranscribeContextSettings(BaseModel):
 
 
 class TranscriptAsrMeta(BaseModel):
-    """本地 ASR 转写元信息。"""
+    """本地或云端 ASR 转写元信息。"""
 
     engine: str = "faster-whisper"
     model: str
@@ -99,6 +101,10 @@ class TranscriptAsrMeta(BaseModel):
     content_tags: list[str] = Field(default_factory=list)
     speaker_profiles: list[TranscribeSpeakerProfile] = Field(default_factory=list)
     speaker_label_status: str | None = None
+    provider: str | None = None
+    chunk_count: int | None = None
+    timestamp_source: str | None = None
+    cloud_correction_status: str | None = None
 
 
 class TranscriptPayload(BaseModel):
@@ -150,11 +156,21 @@ class DownloadRequest(BaseModel):
 
 
 class TranscribeRequest(BaseModel):
-    """本地 ASR 转写请求。"""
+    """ASR 转写请求；旧客户端不传引擎时继续使用本地 Whisper。"""
 
     url: str = Field(min_length=1, max_length=2048)
     video_id: str | None = Field(default=None, max_length=200)
     context_settings: TranscribeContextSettings | None = None
+    asr_engine: Literal["local_whisper", "fun_asr_flash"] = "local_whisper"
+
+
+class AsrStatusResponse(BaseModel):
+    """前端选择转写引擎时需要的非敏感能力状态。"""
+
+    success: bool = True
+    cloud_available: bool
+    cloud_provider: str = "aliyun"
+    cloud_model: str
 
 
 class DemoItem(BaseModel):
