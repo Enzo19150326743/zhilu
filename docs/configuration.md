@@ -94,6 +94,24 @@ FUN_ASR_BASE_URL=https://dashscope.aliyuncs.com/api/v1
 仍是默认路径；只有用户手动选择云端识别时，ffmpeg 才会把下载到本地的实际媒体
 统一转换为 Opus 片段并发送给阿里云。云端失败不会自动切换本地模型。
 
+## 本地 SenseVoiceSmall（可选实验）
+
+在 `backend/` 目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-sensevoice-windows.txt
+```
+
+可选配置：
+
+```env
+SENSEVOICE_MODEL=iic/SenseVoiceSmall
+SENSEVOICE_DEVICE=auto
+```
+
+`auto` 会优先尝试 CUDA，失败后在同一个 SenseVoice 引擎内回退 CPU，并记录实际设备。
+同一媒体使用不同引擎重转写时，各版本独立保存在本地历史中；新任务失败不会覆盖旧稿。
+
 ## AI 转写校对
 
 ```dotenv

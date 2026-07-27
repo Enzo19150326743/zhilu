@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, FileAudio, HardDrive, Loader2, X } from "lucide-react";
+import { Cloud, Cpu, FileAudio, HardDrive, Loader2, X } from "lucide-react";
 import { TranscribeSettingsPanel } from "./TranscribeSettingsPanel";
 import type { AsrEngine, TranscribeContextSettings } from "@/lib/types";
 
@@ -12,6 +12,9 @@ interface TranscribeSettingsDialogProps {
   asrEngine: AsrEngine;
   cloudAvailable: boolean;
   cloudModel?: string | null;
+  sensevoiceAvailable: boolean;
+  sensevoiceModel?: string | null;
+  sensevoiceMessage?: string | null;
   onChange: (settings: TranscribeContextSettings) => void;
   onChangeAsrEngine: (asrEngine: AsrEngine) => void;
   onClose: () => void;
@@ -26,6 +29,9 @@ export function TranscribeSettingsDialog({
   asrEngine,
   cloudAvailable,
   cloudModel,
+  sensevoiceAvailable,
+  sensevoiceModel,
+  sensevoiceMessage,
   onChange,
   onChangeAsrEngine,
   onClose,
@@ -34,6 +40,10 @@ export function TranscribeSettingsDialog({
   if (!isOpen) {
     return null;
   }
+
+  const selectedEngineUnavailable =
+    (asrEngine === "fun_asr_flash" && !cloudAvailable) ||
+    (asrEngine === "sensevoice_small" && !sensevoiceAvailable);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-4 py-6 backdrop-blur-sm">
@@ -58,7 +68,7 @@ export function TranscribeSettingsDialog({
         <div className="px-5 py-4">
           <div className="mb-5 space-y-2">
             <p className="text-xs font-medium text-zinc-500">识别方式</p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               <button
                 className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                   asrEngine === "local_whisper"
@@ -80,6 +90,32 @@ export function TranscribeSettingsDialog({
                 >
                   默认、免费，音频不会上传到云端。
                 </span>
+              </button>
+
+              <button
+                className={`rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  asrEngine === "sensevoice_small"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-emerald-300"
+                }`}
+                disabled={isTranscribing || !sensevoiceAvailable}
+                type="button"
+                onClick={() => onChangeAsrEngine("sensevoice_small")}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Cpu className="h-4 w-4" aria-hidden="true" />
+                  SenseVoice
+                </span>
+                <span className="mt-1.5 block text-xs leading-5 text-zinc-500">
+                  {sensevoiceAvailable
+                    ? "本地免费识别，适合与 Whisper 重转写对比。"
+                    : sensevoiceMessage || "本地 SenseVoice 依赖尚未安装。"}
+                </span>
+                {sensevoiceAvailable && sensevoiceModel ? (
+                  <span className="mt-1 block break-all text-[11px] text-emerald-700">
+                    {sensevoiceModel}
+                  </span>
+                ) : null}
               </button>
 
               <button
@@ -112,7 +148,7 @@ export function TranscribeSettingsDialog({
 
           <TranscribeSettingsPanel
             disabled={
-              isTranscribing || (asrEngine === "fun_asr_flash" && !cloudAvailable)
+              isTranscribing || selectedEngineUnavailable
             }
             isAlwaysOpen
             settings={settings}
@@ -131,7 +167,7 @@ export function TranscribeSettingsDialog({
           </button>
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-zinc-950"
-            disabled={isTranscribing}
+            disabled={isTranscribing || selectedEngineUnavailable}
             type="button"
             onClick={onConfirm}
           >
@@ -144,7 +180,9 @@ export function TranscribeSettingsDialog({
               ? "生成中"
               : asrEngine === "fun_asr_flash"
                 ? "开始云端识别"
-                : "开始本地识别"}
+                : asrEngine === "sensevoice_small"
+                  ? "开始 SenseVoice 识别"
+                  : "开始 Whisper 识别"}
           </button>
         </div>
       </section>

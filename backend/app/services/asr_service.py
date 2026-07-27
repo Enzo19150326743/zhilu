@@ -24,6 +24,10 @@ from app.services.fun_asr_service import (
     FunAsrError,
     transcribe_audio_with_fun_asr,
 )
+from app.services.sensevoice_service import (
+    SenseVoiceError,
+    transcribe_audio_with_sensevoice,
+)
 from app.services.text_normalization_service import to_simplified_chinese
 from app.services.transcript_correction_service import (
     TranscriptCorrectionContext,
@@ -127,7 +131,7 @@ def transcribe_media_audio(
     asr_engine: str = "local_whisper",
 ) -> TranscribeResponse:
     """
-    下载公开视频音频并按用户选择使用本地 Whisper 或 Fun-ASR-Flash。
+    下载公开视频音频并按用户选择使用本地 Whisper、SenseVoice 或 Fun-ASR-Flash。
 
     NOTE: yt-dlp 只负责拿到公开音频资源，不根据平台名称猜测实际媒体格式。
     """
@@ -158,9 +162,10 @@ def transcribe_media_audio(
         )
         download_started_at = monotonic()
         audio_path = active_downloader(video_url)
+        audio_download_seconds = monotonic() - download_started_at
         logger.info(
             "asr timing: stage=audio_download elapsed_seconds=%.2f",
-            monotonic() - download_started_at,
+            audio_download_seconds,
         )
         try:
             recognition_started_at = monotonic()
@@ -195,6 +200,28 @@ def transcribe_media_audio(
                     chunk_count=cloud_result.chunk_count,
                     timestamp_source=cloud_result.timestamp_source,
                 )
+            elif asr_engine == "sensevoice_small":
+                try:
+                    sensevoice_result = transcribe_audio_with_sensevoice(
+                        audio_path,
+                        output_dir=temporary_path,
+                    )
+                except SenseVoiceError as error:
+                    raise _build_transcribe_error(
+                        error.error_code,
+                        error.message,
+                        status_code=error.status_code,
+                    ) from error
+                transcription_result = WhisperTranscriptionResult(
+                    transcript=sensevoice_result.transcript,
+                    model=sensevoice_result.model,
+                    device=sensevoice_result.device,
+                    compute_type=sensevoice_result.compute_type,
+                    language=sensevoice_result.language,
+                    engine="sensevoice-small",
+                    provider="local",
+                    timestamp_source=sensevoice_result.timestamp_source,
+                )
             elif transcriber is None:
                 transcription_result = _transcribe_audio_with_whisper(
                     audio_path,
@@ -210,13 +237,20 @@ def transcribe_media_audio(
                     compute_type=asr_config.compute_type,
                     language=asr_config.language,
                 )
+            transcription_seconds = monotonic() - recognition_started_at
             logger.info(
                 (
                     "asr timing: stage=%s elapsed_seconds=%.2f "
                     "engine=%s model=%s device=%s segment_count=%s"
                 ),
-                "fun_asr" if asr_engine == "fun_asr_flash" else "whisper",
-                monotonic() - recognition_started_at,
+                (
+                    "fun_asr"
+                    if asr_engine == "fun_asr_flash"
+                    else "sensevoice"
+                    if asr_engine == "sensevoice_small"
+                    else "whisper"
+                ),
+                transcription_seconds,
                 transcription_result.engine,
                 transcription_result.model,
                 transcription_result.device,
@@ -234,12 +268,27 @@ def transcribe_media_audio(
     correction_status = (
         transcript.asr_meta.correction_status if transcript.asr_meta else "unknown"
     )
+    correction_seconds = monotonic() - correction_started_at
+    total_seconds = monotonic() - total_started_at
+    if transcript.asr_meta:
+        transcript = transcript.model_copy(
+            update={
+                "asr_meta": transcript.asr_meta.model_copy(
+                    update={
+                        "audio_download_seconds": round(audio_download_seconds, 3),
+                        "transcription_seconds": round(transcription_seconds, 3),
+                        "correction_seconds": round(correction_seconds, 3),
+                        "total_seconds": round(total_seconds, 3),
+                    }
+                )
+            }
+        )
     logger.info(
         (
             "asr timing: stage=correction elapsed_seconds=%.2f "
             "status=%s segment_count=%s"
         ),
-        monotonic() - correction_started_at,
+        correction_seconds,
         correction_status,
         len(transcript.segments),
     )
@@ -248,7 +297,7 @@ def transcribe_media_audio(
             "asr timing: stage=total elapsed_seconds=%.2f "
             "engine=%s model=%s device=%s segment_count=%s"
         ),
-        monotonic() - total_started_at,
+        total_seconds,
         transcription_result.engine,
         transcription_result.model,
         transcription_result.device,
@@ -259,9 +308,12 @@ def transcribe_media_audio(
         source_url=response_source_url or video_url,
         video_id=video_id,
         transcript=transcript,
+        transcript_variant_key=asr_engine,
         message=(
             "Fun-ASR-Flash 已生成云端 AI 转写稿。"
             if transcription_result.engine == "fun-asr-flash"
+            else "本地 SenseVoiceSmall 已生成 AI 转写稿。"
+            if transcription_result.engine == "sensevoice-small"
             else "本地 Whisper 已生成 AI 转写稿。"
         ),
     )

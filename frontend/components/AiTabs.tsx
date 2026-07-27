@@ -33,6 +33,8 @@ interface AiTabsProps {
   summaryNotice: string | null;
   transcribeErrorMessage: string | null;
   transcript: TranscriptPayload | null;
+  transcriptVariants: Record<string, TranscriptPayload>;
+  activeTranscriptVariant?: string | null;
   textSourceType?: string | null;
   sourceUrl?: string | null;
   videoAuthor?: string | null;
@@ -74,6 +76,8 @@ export function AiTabs({
   summaryNotice,
   transcribeErrorMessage,
   transcript,
+  transcriptVariants,
+  activeTranscriptVariant,
   textSourceType,
   sourceUrl,
   videoAuthor,
@@ -201,6 +205,8 @@ export function AiTabs({
             transcribeErrorMessage={transcribeErrorMessage}
             textSourceType={textSourceType}
             transcript={transcript}
+            transcriptVariants={transcriptVariants}
+            activeTranscriptVariant={activeTranscriptVariant}
             videoPlatform={videoPlatform}
             videoTitle={videoTitle}
             onSaveNoteDraft={onSaveNoteDraft}

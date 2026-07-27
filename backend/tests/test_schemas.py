@@ -54,6 +54,14 @@ class SummarizeRequestSchemaTests(unittest.TestCase):
 
         self.assertEqual(request.asr_engine, "fun_asr_flash")
 
+    def test_transcribe_request_accepts_sensevoice_small(self) -> None:
+        request = TranscribeRequest(
+            url="https://example.com/video",
+            asr_engine="sensevoice_small",
+        )
+
+        self.assertEqual(request.asr_engine, "sensevoice_small")
+
     def test_transcribe_request_rejects_unknown_engine(self) -> None:
         with self.assertRaises(ValidationError):
             TranscribeRequest(

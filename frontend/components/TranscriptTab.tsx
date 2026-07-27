@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   FileAudio,
   FileDown,
+  GitCompareArrows,
   Loader2,
   Plus,
   Quote,
@@ -20,7 +21,6 @@ import type {
   SummaryHighlight,
   TranscribeContextSettings,
   TranscriptPayload,
-  TranscriptSegment,
   VideoSummary
 } from "@/lib/types";
 import { TranscribeSettingsPanel } from "./TranscribeSettingsPanel";
@@ -36,6 +36,8 @@ interface TranscriptTabProps {
   textSourceType?: string | null;
   transcribeErrorMessage: string | null;
   transcript: TranscriptPayload | null;
+  transcriptVariants: Record<string, TranscriptPayload>;
+  activeTranscriptVariant?: string | null;
   videoPlatform?: string | null;
   videoTitle?: string | null;
   onSaveNoteDraft: (sourceUrl: string, noteDraft: NoteDraft) => Promise<NoteDraft>;
@@ -64,6 +66,110 @@ function formatTimestamp(seconds: number): string {
   return `${minutes.toString().padStart(2, "0")}:${remainSeconds
     .toString()
     .padStart(2, "0")}`;
+}
+
+function formatElapsedSeconds(seconds: number | null | undefined): string {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) {
+    return "未记录";
+  }
+  return seconds < 60 ? `${seconds.toFixed(1)} 秒` : `${(seconds / 60).toFixed(1)} 分钟`;
+}
+
+function getTranscriptVariantLabel(variantKey: string): string {
+  if (variantKey === "local_whisper") {
+    return "Whisper";
+  }
+  if (variantKey === "sensevoice_small") {
+    return "SenseVoiceSmall";
+  }
+  if (variantKey === "fun_asr_flash") {
+    return "Fun-ASR-Flash";
+  }
+  return variantKey;
+}
+
+function inferTranscriptVariantKey(transcript: TranscriptPayload): string {
+  const engine = transcript.asr_meta?.engine?.toLowerCase() ?? "";
+  if (engine.includes("sensevoice")) {
+    return "sensevoice_small";
+  }
+  if (engine.includes("fun-asr")) {
+    return "fun_asr_flash";
+  }
+  return "local_whisper";
+}
+
+function canShowRawVersion(transcript: TranscriptPayload | null): boolean {
+  return Boolean(
+    transcript &&
+      ((transcript.raw_segments?.length ?? 0) > 0 || transcript.raw_plain_text?.trim())
+  );
+}
+
+function getTranscriptForViewMode(
+  transcript: TranscriptPayload,
+  viewMode: TranscriptViewMode
+): TranscriptPayload {
+  if (viewMode !== "raw" || !canShowRawVersion(transcript)) {
+    return transcript;
+  }
+
+  const rawPlainText = transcript.raw_plain_text?.trim() ?? "";
+  const rawSegments = transcript.raw_segments ?? [];
+  return {
+    ...transcript,
+    plain_text: rawPlainText || transcript.plain_text,
+    segments:
+      rawSegments.length > 0
+        ? rawSegments
+        : rawPlainText
+          ? [{ end: 0, start: 0, text: rawPlainText }]
+          : transcript.segments
+  };
+}
+
+function TranscriptComparisonColumn({
+  transcript,
+  variantKey,
+  viewMode
+}: {
+  transcript: TranscriptPayload;
+  variantKey: string;
+  viewMode: TranscriptViewMode;
+}) {
+  const visibleTranscript = getTranscriptForViewMode(transcript, viewMode);
+  const meta = transcript.asr_meta;
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <header className="border-b border-zinc-200 bg-zinc-50 px-4 py-3">
+        <p className="text-sm font-semibold text-zinc-950">
+          {getTranscriptVariantLabel(variantKey)}
+        </p>
+        <p className="mt-1 break-all text-xs text-zinc-500">
+          {meta?.model ?? "未记录模型"} · {meta?.device ?? "未知设备"}
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-zinc-600">
+          <span>识别 {formatElapsedSeconds(meta?.transcription_seconds)}</span>
+          <span>校对 {formatElapsedSeconds(meta?.correction_seconds)}</span>
+          <span>总计 {formatElapsedSeconds(meta?.total_seconds)}</span>
+        </div>
+      </header>
+      <div className="max-h-[520px] overflow-auto">
+        {visibleTranscript.segments.map((segment, index) => (
+          <div
+            className="grid gap-2 border-b border-zinc-100 px-3 py-3 last:border-b-0 sm:grid-cols-[58px_minmax(0,1fr)]"
+            key={`${variantKey}-${index}-${segment.start}-${segment.end}`}
+          >
+            <span className="mono text-[11px] text-zinc-400">
+              {formatTimestamp(segment.start)}
+            </span>
+            <p className="text-sm leading-6 text-zinc-700">{segment.text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function getTextSourceLabel(textSourceType: string | null | undefined): string {
@@ -113,11 +219,14 @@ function getTextSourceHint(
     return "这是节目页公开发布的 shownotes 原文，不是完整音频对话稿。";
   }
   if (textSourceType === "asr_transcript") {
+    const engineLabel = transcript
+      ? getTranscriptVariantLabel(inferTranscriptVariantKey(transcript))
+      : "ASR";
     if (transcript?.asr_meta?.correction_status === "corrected") {
-      return "当前默认展示校对稿，可切换查看 Whisper 原始识别稿。";
+      return `当前默认展示校对稿，可切换查看 ${engineLabel} 原始识别稿。`;
     }
     if (transcript?.asr_meta?.correction_status === "failed") {
-      return "自动校对未成功，当前已回退展示 Whisper 原始识别稿。";
+      return `自动校对未成功，当前已回退展示 ${engineLabel} 原始识别稿。`;
     }
     return null;
   }
@@ -383,6 +492,8 @@ export function TranscriptTab({
   textSourceType,
   transcribeErrorMessage,
   transcript,
+  transcriptVariants,
+  activeTranscriptVariant,
   videoPlatform,
   videoTitle,
   onSaveNoteDraft,
@@ -408,6 +519,9 @@ export function TranscriptTab({
   );
   const [transcriptViewMode, setTranscriptViewMode] =
     useState<TranscriptViewMode>("final");
+  const [selectedTranscriptVariant, setSelectedTranscriptVariant] =
+    useState<string>(activeTranscriptVariant ?? "");
+  const [isComparingTranscripts, setIsComparingTranscripts] = useState(false);
   const [transcribeSettings, setTranscribeSettings] =
     useState<TranscribeContextSettings>(() =>
       buildInitialTranscribeSettings(videoPlatform, mediaType)
@@ -422,40 +536,36 @@ export function TranscriptTab({
   );
   const isShownotes = textSourceType === "shownotes";
   const isPodcast = mediaType === "podcast";
-  const sourceLabel = getTranscriptSourceLabel(textSourceType, transcript);
-  const sourceHint = getTextSourceHint(textSourceType, transcript);
-  const rawSegments = transcript?.raw_segments ?? [];
-  const rawPlainText = transcript?.raw_plain_text?.trim() ?? "";
+  const normalizedTranscriptVariants = useMemo(() => {
+    const variants = { ...transcriptVariants };
+    if (transcript?.asr_meta && Object.keys(variants).length === 0) {
+      variants[inferTranscriptVariantKey(transcript)] = transcript;
+    }
+    return variants;
+  }, [transcript, transcriptVariants]);
+  const transcriptVariantKeys = useMemo(
+    () => Object.keys(normalizedTranscriptVariants),
+    [normalizedTranscriptVariants]
+  );
+  const transcriptVariantSignature = transcriptVariantKeys.join("|");
+  const selectedTranscript =
+    normalizedTranscriptVariants[selectedTranscriptVariant] ?? transcript;
+  const sourceLabel = getTranscriptSourceLabel(textSourceType, selectedTranscript);
+  const sourceHint = getTextSourceHint(textSourceType, selectedTranscript);
+  const rawSegments = selectedTranscript?.raw_segments ?? [];
+  const rawPlainText = selectedTranscript?.raw_plain_text?.trim() ?? "";
   const canShowRawTranscript = Boolean(
     textSourceType === "asr_transcript" &&
-      transcript &&
+      selectedTranscript &&
       (rawSegments.length > 0 || rawPlainText)
   );
   const visibleTranscript = useMemo<TranscriptPayload | null>(() => {
-    if (!transcript) {
+    if (!selectedTranscript) {
       return null;
     }
-
-    if (transcriptViewMode !== "raw" || !canShowRawTranscript) {
-      return transcript;
-    }
-
-    const fallbackRawSegments: TranscriptSegment[] = rawPlainText
-      ? [{ end: 0, start: 0, text: rawPlainText }]
-      : [];
-    const visibleRawSegments =
-      rawSegments.length > 0 ? rawSegments : fallbackRawSegments;
-
-    return {
-      ...transcript,
-      plain_text: rawPlainText || transcript.plain_text,
-      segments: visibleRawSegments
-    };
+    return getTranscriptForViewMode(selectedTranscript, transcriptViewMode);
   }, [
-    canShowRawTranscript,
-    rawPlainText,
-    rawSegments,
-    transcript,
+    selectedTranscript,
     transcriptViewMode
   ]);
   const candidateHighlights = useMemo(
@@ -490,6 +600,21 @@ export function TranscriptTab({
     setTranscriptViewMode("final");
     setSelectedExcerpt(null);
   }, [sourceUrl, transcript]);
+
+  useEffect(() => {
+    const nextVariant =
+      activeTranscriptVariant && normalizedTranscriptVariants[activeTranscriptVariant]
+        ? activeTranscriptVariant
+        : transcriptVariantKeys[0] ?? "";
+    setSelectedTranscriptVariant(nextVariant);
+    setIsComparingTranscripts(false);
+  }, [
+    activeTranscriptVariant,
+    normalizedTranscriptVariants,
+    sourceUrl,
+    transcriptVariantKeys,
+    transcriptVariantSignature
+  ]);
 
   useEffect(() => {
     setTranscribeSettings(buildInitialTranscribeSettings(videoPlatform, mediaType));
@@ -1042,7 +1167,15 @@ export function TranscriptTab({
     );
   }
 
-  const activeTranscript = visibleTranscript ?? transcript;
+  const activeTranscript = visibleTranscript ?? selectedTranscript ?? transcript;
+  const preferredComparisonKeys = ["local_whisper", "sensevoice_small"].filter(
+    (variantKey) => Boolean(normalizedTranscriptVariants[variantKey])
+  );
+  const comparisonVariantKeys =
+    preferredComparisonKeys.length === 2
+      ? preferredComparisonKeys
+      : transcriptVariantKeys.slice(0, 2);
+  const canCompareTranscripts = comparisonVariantKeys.length === 2;
   const shownotesParagraphs = activeTranscript.plain_text
     .split(/\n+/)
     .map((paragraph) => paragraph.trim())
@@ -1152,6 +1285,37 @@ export function TranscriptTab({
           ) : null}
         </div>
         <div className="flex flex-wrap justify-end gap-2">
+          {transcriptVariantKeys.length > 1 && !isComparingTranscripts ? (
+            <select
+              aria-label="选择转写稿版本"
+              className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 outline-none transition focus:border-blue-400"
+              value={selectedTranscriptVariant}
+              onChange={(event) => {
+                setSelectedTranscriptVariant(event.target.value);
+                setTranscriptViewMode("final");
+              }}
+            >
+              {transcriptVariantKeys.map((variantKey) => (
+                <option key={variantKey} value={variantKey}>
+                  {getTranscriptVariantLabel(variantKey)}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          {canCompareTranscripts ? (
+            <button
+              className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+                isComparingTranscripts
+                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  : "border-zinc-200 bg-white text-zinc-700 hover:border-blue-300"
+              }`}
+              type="button"
+              onClick={() => setIsComparingTranscripts((current) => !current)}
+            >
+              <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
+              {isComparingTranscripts ? "退出对比" : "并排对比"}
+            </button>
+          ) : null}
           {canShowRawTranscript ? (
             <div className="inline-flex h-10 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 p-1">
               <button
@@ -1178,7 +1342,7 @@ export function TranscriptTab({
               </button>
             </div>
           ) : null}
-          {isPodcast && isShownotes && canTranscribe ? (
+          {canTranscribe ? (
             <button
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isTranscribing}
@@ -1190,7 +1354,7 @@ export function TranscriptTab({
               ) : (
                 <FileAudio className="h-4 w-4" aria-hidden="true" />
               )}
-              {isTranscribing ? "生成中" : "生成转写稿"}
+              {isTranscribing ? "生成中" : "重新转写"}
             </button>
           ) : null}
           {renderTopActions("zinc")}
@@ -1199,38 +1363,51 @@ export function TranscriptTab({
 
       {renderNoteWorkflow()}
 
-      <div
-        className="max-h-[460px] overflow-auto rounded-lg border border-zinc-200"
-        ref={(element) => {
-          transcriptTextRootRef.current = element;
-        }}
-      >
-        {activeTranscript.segments.map((segment) => (
-          <div
-            className="grid gap-3 border-b border-zinc-200 bg-white px-4 py-3 last:border-b-0 sm:grid-cols-[86px_minmax(0,1fr)]"
-            key={`${segment.start}-${segment.end}-${segment.speaker ?? ""}-${segment.text}`}
-          >
-            <div className="select-none space-y-1">
-              <div className="mono text-xs text-zinc-500">
-                {formatTimestamp(segment.start)}
-              </div>
-              {segment.speaker ? (
-                <span className="inline-flex max-w-[76px] truncate rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                  {segment.speaker}
-                </span>
-              ) : null}
-            </div>
-            <p
-              className="transcript-excerpt-text text-sm leading-6 text-zinc-700"
-              data-excerpt-end={segment.end}
-              data-excerpt-start={segment.start}
-              data-transcript-excerpt="true"
+      {isComparingTranscripts && canCompareTranscripts ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {comparisonVariantKeys.map((variantKey) => (
+            <TranscriptComparisonColumn
+              key={variantKey}
+              transcript={normalizedTranscriptVariants[variantKey]}
+              variantKey={variantKey}
+              viewMode={transcriptViewMode}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          className="max-h-[460px] overflow-auto rounded-lg border border-zinc-200"
+          ref={(element) => {
+            transcriptTextRootRef.current = element;
+          }}
+        >
+          {activeTranscript.segments.map((segment) => (
+            <div
+              className="grid gap-3 border-b border-zinc-200 bg-white px-4 py-3 last:border-b-0 sm:grid-cols-[86px_minmax(0,1fr)]"
+              key={`${segment.start}-${segment.end}-${segment.speaker ?? ""}-${segment.text}`}
             >
-              {segment.text}
-            </p>
-          </div>
-        ))}
-      </div>
+              <div className="select-none space-y-1">
+                <div className="mono text-xs text-zinc-500">
+                  {formatTimestamp(segment.start)}
+                </div>
+                {segment.speaker ? (
+                  <span className="inline-flex max-w-[76px] truncate rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    {segment.speaker}
+                  </span>
+                ) : null}
+              </div>
+              <p
+                className="transcript-excerpt-text text-sm leading-6 text-zinc-700"
+                data-excerpt-end={segment.end}
+                data-excerpt-start={segment.start}
+                data-transcript-excerpt="true"
+              >
+                {segment.text}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

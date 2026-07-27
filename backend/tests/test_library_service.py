@@ -249,6 +249,51 @@ class LibraryServiceTests(unittest.TestCase):
         self.assertEqual(detail.transcript.asr_meta.correction_status, "corrected")
         self.assertTrue(items[0].has_transcript)
 
+    def test_transcript_update_keeps_independent_engine_variants(self) -> None:
+        with self._temporary_library():
+            parse_response = _build_parse_response(
+                media_type="video",
+                text_source_type="transcript",
+            )
+            parse_response.video.has_transcript = False
+            parse_response.transcript = TranscriptPayload(segments=[], plain_text="")
+            library_service.upsert_library_item(parse_response)
+
+            whisper_transcript = _build_asr_transcript(
+                text="Whisper 稿件。",
+                engine="faster-whisper",
+                model="large-v3-turbo",
+            )
+            sensevoice_transcript = _build_asr_transcript(
+                text="SenseVoice 稿件。",
+                engine="sensevoice-small",
+                model="iic/SenseVoiceSmall",
+            )
+            library_service.update_transcript_for_source_url(
+                "https://example.com/podcast",
+                whisper_transcript,
+                "local_whisper",
+            )
+            library_service.update_transcript_for_source_url(
+                "https://example.com/podcast",
+                sensevoice_transcript,
+                "sensevoice_small",
+            )
+
+            detail = library_service.get_library_detail("podcast_001")
+
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail.active_transcript_variant, "sensevoice_small")
+        self.assertEqual(
+            set(detail.transcript_variants),
+            {"local_whisper", "sensevoice_small"},
+        )
+        self.assertEqual(detail.transcript.plain_text, "SenseVoice 稿件。")
+        self.assertEqual(
+            detail.transcript_variants["local_whisper"].plain_text,
+            "Whisper 稿件。",
+        )
+
     def test_transcript_update_persists_speaker_and_context_meta(self) -> None:
         """
         speaker 和转写设置都在 payload_json 内保存，不需要新增数据库表。
@@ -409,6 +454,27 @@ def _build_parse_response(
             takeaways=[],
         ),
         mindmap_markdown="# 播客单集",
+    )
+
+
+def _build_asr_transcript(
+    *,
+    text: str,
+    engine: str,
+    model: str,
+) -> TranscriptPayload:
+    return TranscriptPayload(
+        segments=[TranscriptSegment(start=0, end=2, text=text)],
+        plain_text=text,
+        raw_segments=[TranscriptSegment(start=0, end=2, text=text)],
+        raw_plain_text=text,
+        asr_meta=TranscriptAsrMeta(
+            engine=engine,
+            model=model,
+            device="cpu",
+            compute_type="test",
+            correction_status="skipped",
+        ),
     )
 
 

@@ -142,6 +142,7 @@ def update_summary_for_source_url(
 def update_transcript_for_source_url(
     source_url: str | None,
     transcript: TranscriptPayload,
+    transcript_variant_key: str | None = None,
 ) -> None:
     """
     将本地 ASR 生成的内容文本写回对应解析记录；没有历史记录时保持静默。
@@ -170,7 +171,31 @@ def update_transcript_for_source_url(
             video["media_type"] = "video"
 
         payload["video"] = video
-        payload["transcript"] = transcript.model_dump(mode="json")
+        existing_transcript = payload.get("transcript")
+        transcript_variants = payload.get("transcript_variants")
+        if not isinstance(transcript_variants, dict):
+            transcript_variants = {}
+
+        # 旧历史只有一个 transcript；首次重转写时先把它迁移到对应引擎键下。
+        if not transcript_variants and isinstance(existing_transcript, dict):
+            try:
+                legacy_transcript = TranscriptPayload.model_validate(existing_transcript)
+            except ValueError:
+                legacy_transcript = None
+            if legacy_transcript and legacy_transcript.asr_meta:
+                legacy_key = _get_transcript_variant_key(legacy_transcript)
+                transcript_variants[legacy_key] = legacy_transcript.model_dump(mode="json")
+
+        active_variant_key = (
+            transcript_variant_key.strip()
+            if isinstance(transcript_variant_key, str) and transcript_variant_key.strip()
+            else _get_transcript_variant_key(transcript)
+        )
+        serialized_transcript = transcript.model_dump(mode="json")
+        transcript_variants[active_variant_key] = serialized_transcript
+        payload["transcript"] = serialized_transcript
+        payload["transcript_variants"] = transcript_variants
+        payload["active_transcript_variant"] = active_variant_key
         payload["summary"] = _build_transcript_update_summary_placeholder(video)
         payload["mindmap_markdown"] = _build_transcript_update_mindmap_placeholder(
             video
@@ -196,6 +221,21 @@ def update_transcript_for_source_url(
                 str(row["source_url"]),
             ),
         )
+
+
+def _get_transcript_variant_key(transcript: TranscriptPayload) -> str:
+    engine = (
+        transcript.asr_meta.engine.strip().lower()
+        if transcript.asr_meta and transcript.asr_meta.engine
+        else ""
+    )
+    if engine in {"faster-whisper", "whisper", "local_whisper"}:
+        return "local_whisper"
+    if engine in {"sensevoice", "sensevoice-small", "sensevoice_small"}:
+        return "sensevoice_small"
+    if engine in {"fun-asr-flash", "fun_asr_flash"}:
+        return "fun_asr_flash"
+    return engine or "local_whisper"
 
 
 def update_note_draft_for_source_url(
@@ -243,7 +283,7 @@ def _build_transcript_update_summary_placeholder(
     return {
         "tldr": "AI 转写稿已生成，可基于新的内容文本重新生成结构化总结。",
         "key_points": [
-            f"《{title}》已写入本地 Whisper 生成的 AI 转写稿。",
+            f"《{title}》已写入新的 AI 转写稿。",
             "旧总结可能基于平台字幕或 shownotes，当前已重置为待重新生成状态。",
             "请重新生成总结后再查看摘录和导图。",
         ],

@@ -62,6 +62,10 @@ from app.services.fun_asr_service import (
     DEFAULT_FUN_ASR_MODEL,
     is_fun_asr_configured,
 )
+from app.services.sensevoice_service import (
+    DEFAULT_SENSEVOICE_MODEL,
+    get_sensevoice_status,
+)
 from app.services.demo_cover_service import resolve_demo_cover_url
 from app.services.deepseek_client import DeepSeekOutputTruncatedError
 from app.services.library_service import (
@@ -344,12 +348,19 @@ def get_health() -> HealthResponse:
 
 @app.get("/api/asr/status", response_model=AsrStatusResponse)
 def get_asr_status() -> AsrStatusResponse:
-    """返回云端转写是否可选，不向前端暴露任何密钥内容。"""
+    """返回本地/云端转写能力状态，不向前端暴露任何密钥内容。"""
+    sensevoice_available, sensevoice_message = get_sensevoice_status()
     return AsrStatusResponse(
         cloud_available=is_fun_asr_configured(),
         cloud_model=(
             os.getenv("FUN_ASR_MODEL", "").strip() or DEFAULT_FUN_ASR_MODEL
         ),
+        sensevoice_available=sensevoice_available,
+        sensevoice_model=(
+            os.getenv("SENSEVOICE_MODEL", "").strip()
+            or DEFAULT_SENSEVOICE_MODEL
+        ),
+        sensevoice_message=sensevoice_message,
     )
 
 
@@ -844,7 +855,11 @@ def transcribe_video(
         asr_engine=transcribe_request.asr_engine,
     )
     try:
-        update_transcript_for_source_url(video_url, transcribe_response.transcript)
+        update_transcript_for_source_url(
+            video_url,
+            transcribe_response.transcript,
+            transcribe_response.transcript_variant_key,
+        )
     except (sqlite3.Error, OSError, ValueError) as error:
         logger.warning(
             "library transcript update failed: %s",

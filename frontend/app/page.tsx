@@ -83,16 +83,16 @@ function buildAsrSummaryPlaceholder(
   return {
     content_type: contentType,
     topics: ["选题"],
-    tldr: "逐字稿已生成，正在继续生成结构化总结。",
+    tldr: "逐字稿已更新，可先对比版本，再生成结构化总结。",
     key_points: [
       `《${videoTitle}》的逐字稿已准备好。`,
-      "总结与导图已重置，系统会基于新逐字稿继续处理。",
-      "结构化总结完成后，摘录、导图和知识稿会同步更新。"
+      "总结与导图已重置，避免继续展示与当前逐字稿不一致的内容。",
+      "确认转写版本后，可手动生成新的摘录、导图和知识稿。"
     ],
     timeline: [],
-    structured_analysis_markdown: `## ${videoTitle}\n### 当前状态\n逐字稿已生成，正在继续生成总结和导图。\n### 下一步\n等待结构化结果写回。`,
+    structured_analysis_markdown: `## ${videoTitle}\n### 当前状态\n逐字稿已更新，可以先切换或并排对比不同识别版本。\n### 下一步\n确认转写效果后重新生成总结和导图。`,
     takeaways: [
-      "总结完成后，可以继续查看摘录、导图和问答。",
+      "确认转写版本后，可以继续生成摘录、导图和问答。",
       "专有名词、人名和断句仍建议结合原媒体复核。"
     ],
     to_confirm: ["逐字稿中的关键摘录需要结合原媒体复核。"]
@@ -105,7 +105,8 @@ function buildAsrMindmapPlaceholder(videoTitle: string): string {
 
 function buildTranscribedDetail(
   baseDetail: ParseResponse,
-  transcript: TranscriptPayload
+  transcript: TranscriptPayload,
+  transcriptVariantKey: string
 ): ParseResponse {
   const updatedVideo = {
     ...baseDetail.video,
@@ -114,6 +115,21 @@ function buildTranscribedDetail(
     text_source_type: "asr_transcript"
   };
   const updatedTitle = updatedVideo.title || "未命名内容";
+  const existingVariants = { ...(baseDetail.transcript_variants ?? {}) };
+  if (
+    Object.keys(existingVariants).length === 0 &&
+    baseDetail.video.text_source_type === "asr_transcript" &&
+    baseDetail.transcript.asr_meta
+  ) {
+    const existingEngine = baseDetail.transcript.asr_meta.engine.toLowerCase();
+    const existingKey = existingEngine.includes("sensevoice")
+      ? "sensevoice_small"
+      : existingEngine.includes("fun-asr")
+        ? "fun_asr_flash"
+        : "local_whisper";
+    existingVariants[existingKey] = baseDetail.transcript;
+  }
+  existingVariants[transcriptVariantKey] = transcript;
 
   return {
     ...baseDetail,
@@ -123,6 +139,8 @@ function buildTranscribedDetail(
     mindmap_meta: null,
     summary: buildAsrSummaryPlaceholder(updatedTitle, updatedVideo.media_type),
     transcript,
+    transcript_variants: existingVariants,
+    active_transcript_variant: transcriptVariantKey,
     video: updatedVideo
   };
 }
@@ -308,7 +326,6 @@ export default function HomePage() {
     activeDetail &&
       isParseResponse(activeDetail) &&
       !activeDetail.is_placeholder &&
-      (!hasUsableContentText || canUpgradeShownotesToTranscript) &&
       !isCurrentDetailSummarizing &&
       !isCurrentDetailTranscribing
   );
@@ -694,17 +711,22 @@ export default function HomePage() {
 
   const waitForRecoveredTranscribeDetail = async (
     videoId: string,
-    sourceUrl: string
+    sourceUrl: string,
+    transcriptVariantKey: AsrEngine,
+    previousVariantJson: string | null
   ): Promise<ParseResponse | null> =>
     pollForRecoveredValue({
       fetchValue: () => apiClient.getLibraryDetail(videoId),
       intervalMs: TRANSCRIBE_RECOVERY_INTERVAL_MS,
-      isRecovered: (detail) =>
-        Boolean(
+      isRecovered: (detail) => {
+        const recoveredVariant = detail.transcript_variants?.[transcriptVariantKey];
+        return Boolean(
           detail.source_url === sourceUrl &&
             getTextSourceType(detail.video) === "asr_transcript" &&
-            detail.transcript?.plain_text.trim()
-        ),
+            recoveredVariant?.plain_text.trim() &&
+            JSON.stringify(recoveredVariant) !== previousVariantJson
+        );
+      },
       timeoutMs: TRANSCRIBE_RECOVERY_TIMEOUT_MS
     });
 
@@ -712,7 +734,8 @@ export default function HomePage() {
     taskId: string,
     taskSourceUrl: string,
     updatedDetail: ParseResponse,
-    successMessage: string
+    successMessage: string,
+    continueWithSummary: boolean
   ) => {
     setTranscribeTasks((currentTasks) =>
       currentTasks.map((task) =>
@@ -742,11 +765,13 @@ export default function HomePage() {
     if (activeSourceUrlRef.current === taskSourceUrl) {
       setSummaryGenerationMeta(null);
       setSummaryNotice(successMessage);
-      setActiveTab("summary");
+      setActiveTab(continueWithSummary ? "summary" : "transcript");
     }
 
     void refreshLibraryItems();
-    void runSummaryForDetail(updatedDetail);
+    if (continueWithSummary) {
+      void runSummaryForDetail(updatedDetail);
+    }
   };
 
   const handleTranscribeRequest = (settings?: TranscribeContextSettings) => {
@@ -793,6 +818,11 @@ export default function HomePage() {
     const taskSourceUrl = activeDetail.source_url;
     const taskVideoId = activeDetail.video.video_id;
     const taskTitle = activeDetail.video.title || "未命名内容";
+    const isRetranscription = Boolean(activeDetail.transcript?.plain_text.trim());
+    const previousVariant = activeDetail.transcript_variants?.[asrEngine] ?? null;
+    const previousVariantJson = previousVariant
+      ? JSON.stringify(previousVariant)
+      : null;
 
     if (
       transcribeTasks.some(
@@ -828,12 +858,19 @@ export default function HomePage() {
         url: taskSourceUrl,
         video_id: taskVideoId
       });
-      const successMessage = `${response.message} 正在继续生成总结。`;
+      const successMessage = isRetranscription
+        ? `${response.message} 已保留旧版本，可在内容文本中切换或并排对比。`
+        : `${response.message} 正在继续生成总结。`;
       applyTranscribeSuccess(
         taskId,
         taskSourceUrl,
-        buildTranscribedDetail(activeDetail, response.transcript),
-        successMessage
+        buildTranscribedDetail(
+          activeDetail,
+          response.transcript,
+          response.transcript_variant_key
+        ),
+        successMessage,
+        !isRetranscription
       );
     } catch (error) {
       if (isRecoverableTranscribeError(error)) {
@@ -855,14 +892,19 @@ export default function HomePage() {
 
         const recoveredDetail = await waitForRecoveredTranscribeDetail(
           taskVideoId,
-          taskSourceUrl
+          taskSourceUrl,
+          asrEngine,
+          previousVariantJson
         );
         if (recoveredDetail) {
           applyTranscribeSuccess(
             taskId,
             taskSourceUrl,
             recoveredDetail,
-            "逐字稿已生成，已从本地历史恢复结果。"
+            isRetranscription
+              ? "逐字稿已从本地历史恢复，可在内容文本中对比版本。"
+              : "逐字稿已生成，已从本地历史恢复结果。",
+            !isRetranscription
           );
           return;
         }
@@ -1195,6 +1237,10 @@ export default function HomePage() {
                 summaryNotice={summaryNotice}
                 transcribeErrorMessage={activeTranscribeErrorMessage}
                 transcript={activeDetail?.transcript ?? null}
+                transcriptVariants={activeDetail?.transcript_variants ?? {}}
+                activeTranscriptVariant={
+                  activeDetail?.active_transcript_variant ?? null
+                }
                 textSourceType={
                   activeDetail?.video ? getTextSourceType(activeDetail.video) : null
                 }
@@ -1242,6 +1288,9 @@ export default function HomePage() {
         asrEngine={pendingAsrEngine}
         cloudAvailable={asrStatus?.cloud_available ?? false}
         cloudModel={asrStatus?.cloud_model ?? null}
+        sensevoiceAvailable={asrStatus?.sensevoice_available ?? false}
+        sensevoiceMessage={asrStatus?.sensevoice_message ?? null}
+        sensevoiceModel={asrStatus?.sensevoice_model ?? null}
         isOpen={isTranscribeSettingsOpen}
         isTranscribing={isCurrentDetailTranscribing}
         mediaTitle={activeDetail?.video.title ?? null}

@@ -69,6 +69,12 @@ backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-gpu-wind
 
 项目只修改当前 Python 进程的 DLL 搜索目录，不写入 Windows 全局 `PATH`。GPU 加载、推理或显存不足时，会按配置回退到 CPU。
 
+如需启用本地 SenseVoiceSmall 对比路径，再运行：
+
+```powershell
+backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-sensevoice-windows.txt
+```
+
 ## 构建生产前端
 
 ```powershell

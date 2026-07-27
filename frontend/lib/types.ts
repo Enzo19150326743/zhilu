@@ -4,13 +4,19 @@ export interface HealthResponse {
   version: string;
 }
 
-export type AsrEngine = "local_whisper" | "fun_asr_flash";
+export type AsrEngine =
+  | "local_whisper"
+  | "sensevoice_small"
+  | "fun_asr_flash";
 
 export interface AsrStatusResponse {
   success: true;
   cloud_available: boolean;
   cloud_provider: "aliyun" | string;
   cloud_model: string;
+  sensevoice_available: boolean;
+  sensevoice_model: string;
+  sensevoice_message?: string | null;
 }
 
 export interface RateLimitItem {
@@ -98,6 +104,10 @@ export interface TranscriptAsrMeta {
   chunk_count?: number | null;
   timestamp_source?: string | null;
   cloud_correction_status?: "corrected" | "skipped" | "failed" | string | null;
+  audio_download_seconds?: number | null;
+  transcription_seconds?: number | null;
+  correction_seconds?: number | null;
+  total_seconds?: number | null;
 }
 
 export interface TranscriptPayload {
@@ -221,6 +231,8 @@ export interface DemoDetail {
   formats: VideoFormat[];
   format_diagnostics?: FormatDiagnostics | null;
   transcript: TranscriptPayload;
+  transcript_variants?: Record<string, TranscriptPayload>;
+  active_transcript_variant?: string | null;
   summary: VideoSummary;
   mindmap_markdown: string;
   mindmap_meta?: MindmapMeta | null;
@@ -297,6 +309,7 @@ export interface TranscribeResponse {
   source_url: string;
   video_id?: string | null;
   transcript: TranscriptPayload;
+  transcript_variant_key: AsrEngine | string;
   message: string;
 }
 

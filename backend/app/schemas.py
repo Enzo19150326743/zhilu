@@ -105,6 +105,10 @@ class TranscriptAsrMeta(BaseModel):
     chunk_count: int | None = None
     timestamp_source: str | None = None
     cloud_correction_status: str | None = None
+    audio_download_seconds: float | None = None
+    transcription_seconds: float | None = None
+    correction_seconds: float | None = None
+    total_seconds: float | None = None
 
 
 class TranscriptPayload(BaseModel):
@@ -161,7 +165,11 @@ class TranscribeRequest(BaseModel):
     url: str = Field(min_length=1, max_length=2048)
     video_id: str | None = Field(default=None, max_length=200)
     context_settings: TranscribeContextSettings | None = None
-    asr_engine: Literal["local_whisper", "fun_asr_flash"] = "local_whisper"
+    asr_engine: Literal[
+        "local_whisper",
+        "sensevoice_small",
+        "fun_asr_flash",
+    ] = "local_whisper"
 
 
 class AsrStatusResponse(BaseModel):
@@ -171,6 +179,9 @@ class AsrStatusResponse(BaseModel):
     cloud_available: bool
     cloud_provider: str = "aliyun"
     cloud_model: str
+    sensevoice_available: bool = False
+    sensevoice_model: str = "iic/SenseVoiceSmall"
+    sensevoice_message: str | None = None
 
 
 class DemoItem(BaseModel):
@@ -342,6 +353,8 @@ class DemoDetailResponse(BaseModel):
     formats: list[VideoFormat]
     format_diagnostics: FormatDiagnostics | None = None
     transcript: TranscriptPayload
+    transcript_variants: dict[str, TranscriptPayload] = Field(default_factory=dict)
+    active_transcript_variant: str | None = None
     summary: VideoSummary
     mindmap_markdown: str
     mindmap_meta: MindmapMeta | None = None
@@ -406,6 +419,7 @@ class TranscribeResponse(BaseModel):
     source_url: str
     video_id: str | None = None
     transcript: TranscriptPayload
+    transcript_variant_key: str = "local_whisper"
     message: str
 
 

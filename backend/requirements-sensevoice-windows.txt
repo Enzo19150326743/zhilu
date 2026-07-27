@@ -1,0 +1,6 @@
+# 可选的本地 SenseVoiceSmall 实验依赖。
+# 与 requirements.txt 分开，未启用 SenseVoice 时不会增加基础安装体积。
+funasr==1.3.29
+torch>=2.7.0,<3.0.0
+torchaudio>=2.7.0,<3.0.0
+
