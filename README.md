@@ -29,8 +29,8 @@
 | 能力 | 得到什么 |
 |---|---|
 | 多媒体文本获取 | 从 B 站、抖音、小宇宙等公开来源取得字幕、Shownotes 或媒体信息 |
-| 多路径 AI 转写 | 支持 Whisper、SenseVoiceSmall 和 Fun-ASR-Flash；同一媒体可保留多份稿件并排比较 |
-| 结构化理解 | 生成一句话摘要、核心观点、行动建议和思维导图 |
+| 多路径 AI 转写 | 中文长内容默认推荐 SenseVoiceSmall，英文术语和数字密集内容可改用 Whisper，云端识别保持手动选择 |
+| 结构化理解 | 根据课程、访谈、观点视频或播客组织摘要，并生成可缩放、平移和高亮的树状导图 |
 | 内容问答 | 围绕当前媒体文本继续追问，不脱离来源凭空扩写 |
 | 摘录工作流 | 区分用户确认摘录与 AI 未确认候选，保留可靠原文 |
 | Markdown 沉淀 | 下载 `.md`，或选择直接写入本地 Obsidian Vault |
@@ -50,8 +50,32 @@
 ```
 
 1. 粘贴公开媒体链接并生成底稿。
-2. 检查文本来源；缺少字幕时按需生成 AI 转写稿。
+2. 检查文本来源；缺少字幕时优先用 SenseVoiceSmall 转写中文长内容，也可按内容切换模型。
 3. 整理总结、导图和摘录，然后导出 Markdown。
+
+## 本地转写怎么选
+
+| 模型 | 推荐场景 | 运行方式 | 需要注意 |
+|---|---|---|---|
+| **SenseVoiceSmall（默认推荐）** | 中文长视频、中文播客、多人对谈 | 本地免费；优先 CUDA，失败时可回退 CPU | 英文术语、连续数字和代码名称仍建议结合原媒体复核 |
+| **Whisper large-v3-turbo** | 英文较多、数字密集、技术术语较多的内容 | 本地免费；支持 CUDA 和 CPU | 在当前本地配置下通常比 SenseVoiceSmall 慢 |
+| **Fun-ASR-Flash** | 已配置阿里云密钥、希望手动尝试云端快速识别 | 云端按量计费 | 只有用户明确选择后才上传音频片段，不会静默回退本地模型 |
+
+每次转写只运行你选中的一个模型，不会为了“交叉验证”自动双跑。只有第一次结果不理想时，才需要主动重转写并保留另一份稿件作比较。
+
+SenseVoiceSmall 的短句会在校对前整理成约 4～8 秒的连续片段，减少逐字稿里一两秒一断的阅读跳跃；原始细粒度片段仍完整保留，不牺牲回看与排查能力。
+
+## 结构化摘要与交互导图
+
+总结与导图由同一次完整文本分析生成，并根据内容类型调整组织重点，而不是把课程、访谈和观点视频强行套进同一个模板。
+
+- 一个明确的中心主题，通常组织为 4～7 个主要分支。
+- 默认展开到第三级，节点尽量使用短语表达观点、依据、案例、条件和结论。
+- 支持放大、缩小、适应画布、重置视图和拖拽画布平移。
+- 点击节点可以高亮当前主题或展开、收起子树；点击画布可取消高亮。
+- 对 Shownotes 等非完整逐字稿，会在导图上明确提示内容边界。
+
+![知录交互式思维导图](./docs/images/readme/workbench-mindmap.png)
 
 ## 支持范围
 
@@ -96,7 +120,7 @@ cd zhilu
 - 第一次建议用 3～10 分钟的公开视频跑通流程。
 - 未配置 AI Key 仍能解析内容；总结、问答和校对会使用本地降级结果。
 - Whisper 首次运行可能需要下载模型，耗时取决于网络和本机性能。
-- SenseVoiceSmall 是可选本地实验能力；CPU 可安装 `backend/requirements-sensevoice-windows.txt`，Windows NVIDIA 用户运行 `scripts/install-sensevoice-cuda.ps1` 启用 CUDA，首次使用还会下载对应模型。
+- SenseVoiceSmall 是当前中文长内容的推荐本地模型；CPU 可安装 `backend/requirements-sensevoice-windows.txt`，Windows NVIDIA 用户运行 `scripts/install-sensevoice-cuda.ps1` 启用 CUDA，首次使用还会下载对应模型。
 - 修改 AI、Cookie、ASR 或下载目录后，需要重启后端并点击“重新提取”。
 - 云端识别只有在配置阿里云密钥并由用户手动选择后才会上传音频片段；失败时不会静默改用本地模型。
 - B 站只返回 480p 不一定是筛选错误，可能是平台本次公开格式上限。
@@ -107,7 +131,7 @@ cd zhilu
 
 AI 配置是可选的。你可以双击 `配置 AI.bat`，填写自己的 DeepSeek 或其他 OpenAI-compatible 接口；Key 只写入本机 `backend/.env`，不会进入前端。
 
-本地 Whisper 不要求 NVIDIA 显卡。CPU 始终是可用回退；Windows + NVIDIA 用户可以选择安装项目内 CUDA 依赖，不修改系统全局环境。
+本地 SenseVoiceSmall 与 Whisper 都不强制要求 NVIDIA 显卡。SenseVoiceSmall 可用时会成为转写弹窗的推荐默认项；未安装时自动使用 Whisper。Windows + NVIDIA 用户可以安装项目内 CUDA 依赖，推理失败时仍保留 CPU 路径，不修改系统全局环境。
 
 配置项和安全边界见 [配置指南](./docs/configuration.md)。常见错误见 [排查指南](./docs/troubleshooting.md)。
 
