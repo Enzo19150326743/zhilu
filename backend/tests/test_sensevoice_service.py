@@ -35,12 +35,14 @@ class SenseVoiceServiceTests(unittest.TestCase):
 
     def test_auto_device_falls_back_to_cpu_within_same_engine(self) -> None:
         attempted_devices: list[str] = []
+        attempted_batch_sizes: list[int] = []
 
         class FakeModel:
             def __init__(self, device: str) -> None:
                 self.device = device
 
-            def generate(self, **_: object) -> list[dict[str, object]]:
+            def generate(self, **kwargs: object) -> list[dict[str, object]]:
+                attempted_batch_sizes.append(int(kwargs["batch_size_s"]))
                 if self.device == "cuda:0":
                     raise RuntimeError("out of memory")
                 return [
@@ -80,8 +82,31 @@ class SenseVoiceServiceTests(unittest.TestCase):
                     )
 
         self.assertEqual(attempted_devices, ["cuda:0", "cpu"])
+        self.assertEqual(attempted_batch_sizes, [60, 300])
         self.assertEqual(result.device, "cpu")
         self.assertEqual(result.transcript.plain_text, "CPU 结果。")
+
+    def test_sensevoice_batch_sizes_can_be_configured(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SENSEVOICE_GPU_BATCH_SIZE_SECONDS": "90",
+                "SENSEVOICE_CPU_BATCH_SIZE_SECONDS": "420",
+            },
+            clear=False,
+        ):
+            config = sensevoice_service.get_sensevoice_config()
+
+        self.assertEqual(config.gpu_batch_size_seconds, 90)
+        self.assertEqual(config.cpu_batch_size_seconds, 420)
+        self.assertEqual(
+            sensevoice_service._resolve_batch_size_seconds("cuda:0", config),
+            90,
+        )
+        self.assertEqual(
+            sensevoice_service._resolve_batch_size_seconds("cpu", config),
+            420,
+        )
 
     def test_missing_sentence_timestamps_fails_explicitly(self) -> None:
         with self.assertRaises(ValueError):

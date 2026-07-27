@@ -321,6 +321,66 @@ class AsrServiceTests(unittest.TestCase):
         self.assertIsNone(FakeWhisperModel.transcribe_kwargs["hotwords"])
         self.assertTrue(FakeWhisperModel.transcribe_kwargs["condition_on_previous_text"])
 
+    def test_whisper_normalizes_correction_segments_and_preserves_raw_segments(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            audio_path = Path(temporary_directory) / "sample.m4a"
+            audio_path.write_text("fake audio", encoding="utf-8")
+
+            class FakeWhisperModel:
+                def __init__(self, *_: object, **__: object) -> None:
+                    pass
+
+                def transcribe(
+                    self,
+                    _: str,
+                    **__: object,
+                ) -> tuple[list[SimpleNamespace], object]:
+                    return (
+                        [
+                            SimpleNamespace(start=0, end=1.5, text="第一段"),
+                            SimpleNamespace(start=1.5, end=3, text="第二段"),
+                            SimpleNamespace(start=3, end=4.5, text="第三段"),
+                            SimpleNamespace(start=4.5, end=6, text="第四段"),
+                        ],
+                        object(),
+                    )
+
+            fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
+            env = {
+                "ASR_DEVICE": "cpu",
+                "ASR_AUTO_FALLBACK": "0",
+                "ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED": "1",
+                "ASR_WHISPER_SEGMENT_MAX_SECONDS": "4",
+                "ASR_WHISPER_SEGMENT_MAX_CHARACTERS": "120",
+                "ASR_WHISPER_SEGMENT_SILENCE_GAP_SECONDS": "2",
+            }
+            with patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                with patch.dict(os.environ, env, clear=False):
+                    result = asr_service._transcribe_audio_with_whisper(audio_path)
+
+        self.assertEqual(len(result.transcript.segments), 2)
+        self.assertEqual(result.transcript.segments[0].text, "第一段 第二段 第三段")
+        self.assertIsNotNone(result.raw_transcript)
+        self.assertEqual(len(result.raw_transcript.segments), 4)
+        self.assertEqual(result.timestamp_source, "whisper-segment-normalized")
+
+    def test_whisper_segment_normalization_can_be_disabled(self) -> None:
+        raw_segments = [
+            TranscriptSegment(start=0, end=1, text="第一段"),
+            TranscriptSegment(start=1, end=2, text="第二段"),
+        ]
+        with patch.dict(
+            os.environ,
+            {"ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED": "0"},
+            clear=False,
+        ):
+            normalized = asr_service._normalize_whisper_segments(raw_segments)
+
+        self.assertEqual(len(normalized), 2)
+        self.assertEqual([item.text for item in normalized], ["第一段", "第二段"])
+
     def test_transcribe_media_audio_persists_context_settings_in_asr_meta(self) -> None:
         """
         转写设置需要写入 asr_meta，历史重开时才能说明这份稿件的整理依据。

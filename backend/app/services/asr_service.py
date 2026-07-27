@@ -29,6 +29,10 @@ from app.services.sensevoice_service import (
     transcribe_audio_with_sensevoice,
 )
 from app.services.text_normalization_service import to_simplified_chinese
+from app.services.transcript_segment_service import (
+    SegmentNormalizationConfig,
+    normalize_adjacent_segments,
+)
 from app.services.transcript_correction_service import (
     TranscriptCorrectionContext,
     correct_transcript_payload,
@@ -56,6 +60,10 @@ DEFAULT_ASR_COMPUTE_TYPE = "int8"
 DEFAULT_ASR_LANGUAGE = "zh"
 DEFAULT_ASR_BEAM_SIZE = 5
 DEFAULT_ASR_AUTO_FALLBACK = True
+DEFAULT_WHISPER_SEGMENT_NORMALIZATION_ENABLED = True
+DEFAULT_WHISPER_SEGMENT_MAX_SECONDS = 8
+DEFAULT_WHISPER_SEGMENT_MAX_CHARACTERS = 120
+DEFAULT_WHISPER_SEGMENT_SILENCE_GAP_SECONDS = 2
 TRANSCRIBE_AUDIO_TEMPLATE = "transcribe-audio.%(ext)s"
 TEMP_SUFFIXES = {".part", ".ytdl", ".tmp", ".temp"}
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -114,6 +122,7 @@ class WhisperTranscriptionResult:
     provider: str | None = "local"
     chunk_count: int | None = None
     timestamp_source: str | None = "whisper-segment"
+    raw_transcript: TranscriptPayload | None = None
 
 
 def transcribe_media_audio(
@@ -509,7 +518,8 @@ def _transcribe_audio_with_whisper(
                 vad_filter=True,
                 **build_whisper_decode_options(),
             )
-            segments = _build_transcript_segments(raw_segments)
+            raw_transcript_segments = _build_transcript_segments(raw_segments)
+            segments = _normalize_whisper_segments(raw_transcript_segments)
         except ValueError as error:
             last_error = error
             last_error_code = "ASR_MODEL_UNAVAILABLE"
@@ -562,6 +572,15 @@ def _transcribe_audio_with_whisper(
             device=candidate.device,
             compute_type=candidate.compute_type,
             language=config.language,
+            timestamp_source=(
+                "whisper-segment-normalized"
+                if len(segments) < len(raw_transcript_segments)
+                else "whisper-segment"
+            ),
+            raw_transcript=TranscriptPayload(
+                segments=[segment.model_copy() for segment in raw_transcript_segments],
+                plain_text=_join_segment_text(raw_transcript_segments),
+            ),
         )
 
     if last_error_code == "ASR_MODEL_UNAVAILABLE":
@@ -602,7 +621,12 @@ def _build_final_transcript(
     glossary_terms: list[str],
     prompt_context: AsrPromptContext,
 ) -> TranscriptPayload:
-    raw_transcript = _normalize_transcript_plain_text(transcription_result.transcript)
+    correction_transcript = _normalize_transcript_plain_text(
+        transcription_result.transcript
+    )
+    raw_transcript = _normalize_transcript_plain_text(
+        transcription_result.raw_transcript or correction_transcript
+    )
     correction_context = TranscriptCorrectionContext(
         title=prompt_context.title,
         author=prompt_context.author,
@@ -611,7 +635,7 @@ def _build_final_transcript(
         context_settings=prompt_context.context_settings,
     )
     correction_result = correct_transcript_payload(
-        raw_transcript,
+        correction_transcript,
         glossary_terms=glossary_terms,
         context=correction_context,
     )
@@ -662,6 +686,43 @@ def _build_final_transcript(
             ),
         }
     )
+
+
+def _normalize_whisper_segments(
+    segments: list[TranscriptSegment],
+) -> list[TranscriptSegment]:
+    """在校对前合并 Whisper 碎片；模型原始片段由调用方另行保留。"""
+    if not _get_env_flag(
+        "ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED",
+        DEFAULT_WHISPER_SEGMENT_NORMALIZATION_ENABLED,
+    ):
+        return [segment.model_copy() for segment in segments]
+
+    config = SegmentNormalizationConfig(
+        max_seconds=float(
+            _get_env_int(
+                "ASR_WHISPER_SEGMENT_MAX_SECONDS",
+                DEFAULT_WHISPER_SEGMENT_MAX_SECONDS,
+                2,
+                30,
+            )
+        ),
+        max_characters=_get_env_int(
+            "ASR_WHISPER_SEGMENT_MAX_CHARACTERS",
+            DEFAULT_WHISPER_SEGMENT_MAX_CHARACTERS,
+            20,
+            500,
+        ),
+        silence_gap_seconds=float(
+            _get_env_int(
+                "ASR_WHISPER_SEGMENT_SILENCE_GAP_SECONDS",
+                DEFAULT_WHISPER_SEGMENT_SILENCE_GAP_SECONDS,
+                1,
+                10,
+            )
+        ),
+    )
+    return normalize_adjacent_segments(segments, config=config)
 
 
 def build_whisper_decode_options() -> dict[str, object]:

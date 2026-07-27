@@ -1,6 +1,7 @@
 # 可选的本地 SenseVoiceSmall 实验依赖。
-# 与 requirements.txt 分开，未启用 SenseVoice 时不会增加基础安装体积。
+# 直接安装此文件可使用 CPU；Windows NVIDIA 用户请改用
+# scripts/install-sensevoice-cuda.ps1 安装官方 CUDA 版 PyTorch。
 funasr==1.3.29
+setuptools<82
 torch>=2.7.0,<3.0.0
 torchaudio>=2.7.0,<3.0.0
-

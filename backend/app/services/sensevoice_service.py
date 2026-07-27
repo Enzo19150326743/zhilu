@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SENSEVOICE_MODEL = "iic/SenseVoiceSmall"
 DEFAULT_SENSEVOICE_DEVICE = "auto"
+DEFAULT_SENSEVOICE_GPU_BATCH_SIZE_SECONDS = 60
+DEFAULT_SENSEVOICE_CPU_BATCH_SIZE_SECONDS = 300
 SENSEVOICE_SAMPLE_RATE = 16_000
 SENSEVOICE_MAX_SEGMENT_MILLISECONDS = 20_000
 SENSEVOICE_SENTENCE_ENDINGS = ("。", "！", "？", "!", "?")
@@ -42,6 +44,8 @@ class SenseVoiceError(Exception):
 class SenseVoiceConfig:
     model: str
     device: str
+    gpu_batch_size_seconds: int = DEFAULT_SENSEVOICE_GPU_BATCH_SIZE_SECONDS
+    cpu_batch_size_seconds: int = DEFAULT_SENSEVOICE_CPU_BATCH_SIZE_SECONDS
 
 
 @dataclass(frozen=True)
@@ -86,6 +90,18 @@ def get_sensevoice_config() -> SenseVoiceConfig:
             os.getenv("SENSEVOICE_DEVICE", "").strip().lower()
             or DEFAULT_SENSEVOICE_DEVICE
         ),
+        gpu_batch_size_seconds=_read_bounded_int(
+            "SENSEVOICE_GPU_BATCH_SIZE_SECONDS",
+            DEFAULT_SENSEVOICE_GPU_BATCH_SIZE_SECONDS,
+            min_value=10,
+            max_value=300,
+        ),
+        cpu_batch_size_seconds=_read_bounded_int(
+            "SENSEVOICE_CPU_BATCH_SIZE_SECONDS",
+            DEFAULT_SENSEVOICE_CPU_BATCH_SIZE_SECONDS,
+            min_value=10,
+            max_value=600,
+        ),
     )
 
 
@@ -122,7 +138,10 @@ def transcribe_audio_with_sensevoice(
                 cache={},
                 language="auto",
                 use_itn=True,
-                batch_size_s=300,
+                batch_size_s=_resolve_batch_size_seconds(
+                    device,
+                    active_config,
+                ),
                 merge_vad=True,
                 merge_length_s=15,
                 output_timestamp=True,
@@ -208,6 +227,31 @@ def _resolve_device_candidates(configured_device: str) -> list[str]:
         return ["cpu"]
 
     return ["cuda:0", "cpu"] if torch.cuda.is_available() else ["cpu"]
+
+
+def _resolve_batch_size_seconds(
+    device: str,
+    config: SenseVoiceConfig,
+) -> int:
+    # 4GB 级显卡先用保守批量；CPU 不占显存，可以维持 FunASR 长音频默认批量。
+    if device.startswith("cuda"):
+        return config.gpu_batch_size_seconds
+    return config.cpu_batch_size_seconds
+
+
+def _read_bounded_int(
+    name: str,
+    default_value: int,
+    *,
+    min_value: int,
+    max_value: int,
+) -> int:
+    raw_value = os.getenv(name, str(default_value)).strip()
+    try:
+        parsed_value = int(raw_value)
+    except ValueError:
+        return default_value
+    return max(min_value, min(parsed_value, max_value))
 
 
 def _prepare_sensevoice_audio(audio_path: Path, output_dir: Path) -> Path:

@@ -107,10 +107,27 @@ FUN_ASR_BASE_URL=https://dashscope.aliyuncs.com/api/v1
 ```env
 SENSEVOICE_MODEL=iic/SenseVoiceSmall
 SENSEVOICE_DEVICE=auto
+SENSEVOICE_GPU_BATCH_SIZE_SECONDS=60
+SENSEVOICE_CPU_BATCH_SIZE_SECONDS=300
 ```
 
 `auto` 会优先尝试 CUDA，失败后在同一个 SenseVoice 引擎内回退 CPU，并记录实际设备。
+RTX 3050 Laptop 等 4GB 级显卡默认使用更保守的 60 秒 GPU 批量；CPU 默认保持
+300 秒。需要 NVIDIA GPU 时，请先运行项目根目录的
+`scripts/install-sensevoice-cuda.ps1` 安装官方 CUDA 版 PyTorch，然后重启后端。
 同一媒体使用不同引擎重转写时，各版本独立保存在本地历史中；新任务失败不会覆盖旧稿。
+
+Whisper 默认在识别完成后、DeepSeek 校对前合并过碎的相邻片段：
+
+```env
+ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED=1
+ASR_WHISPER_SEGMENT_MAX_SECONDS=8
+ASR_WHISPER_SEGMENT_MAX_CHARACTERS=120
+ASR_WHISPER_SEGMENT_SILENCE_GAP_SECONDS=2
+```
+
+该处理不会重新切割音频，也不会删除原始时间戳。模型原始片段继续保存到
+`raw_segments`，校对和默认阅读使用整理后的句段。设为 `0` 可恢复旧行为。
 
 ## AI 转写校对
 

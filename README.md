@@ -96,7 +96,7 @@ cd zhilu
 - 第一次建议用 3～10 分钟的公开视频跑通流程。
 - 未配置 AI Key 仍能解析内容；总结、问答和校对会使用本地降级结果。
 - Whisper 首次运行可能需要下载模型，耗时取决于网络和本机性能。
-- SenseVoiceSmall 是可选本地实验能力；先安装 `backend/requirements-sensevoice-windows.txt`，首次使用还会下载对应模型。
+- SenseVoiceSmall 是可选本地实验能力；CPU 可安装 `backend/requirements-sensevoice-windows.txt`，Windows NVIDIA 用户运行 `scripts/install-sensevoice-cuda.ps1` 启用 CUDA，首次使用还会下载对应模型。
 - 修改 AI、Cookie、ASR 或下载目录后，需要重启后端并点击“重新提取”。
 - 云端识别只有在配置阿里云密钥并由用户手动选择后才会上传音频片段；失败时不会静默改用本地模型。
 - B 站只返回 480p 不一定是筛选错误，可能是平台本次公开格式上限。

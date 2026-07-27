@@ -75,6 +75,17 @@ backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-gpu-wind
 backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-sensevoice-windows.txt
 ```
 
+上面的命令可直接使用 CPU。Windows + NVIDIA 用户希望 SenseVoiceSmall 使用 CUDA 时，
+改为在项目根目录运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-sensevoice-cuda.ps1
+```
+
+脚本只修改项目的 `backend/.venv`，从 PyTorch 官方 CUDA wheel 源安装依赖，不修改
+Windows 全局 Python 或系统 `PATH`。CUDA wheel 体积较大，脚本已启用断点续传重试；
+安装结束会打印 `cuda_available` 和实际显卡名称。
+
 ## 构建生产前端
 
 ```powershell

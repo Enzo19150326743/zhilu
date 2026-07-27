@@ -130,6 +130,7 @@ ai-video-insight-workspace/
 - `backend/app/services/transcript_service.py`：平台字幕和 VTT/SRT 字幕解析。
 - `backend/app/services/asr_service.py`：Whisper、SenseVoiceSmall 与云端 ASR 分流、模型 fallback、耗时元数据和双稿串联。
 - `backend/app/services/sensevoice_service.py`：本地 SenseVoiceSmall、ffmpeg 规范化、FSMN-VAD 长音频识别和时间戳映射。
+- `backend/app/services/transcript_segment_service.py`：按停顿、标点、时长和字符数规范化 ASR 相邻碎片；当前用于 Whisper 校对前整理。
 - `backend/app/services/fun_asr_service.py`：手动选择的 Fun-ASR-Flash 云端转写、ffmpeg 规范化分段、并发请求和时间戳合并。
 - `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；生产 Whisper 目前保持中性解码。
 - `backend/app/services/transcript_correction_service.py`：DeepSeek ASR 转写稿自动校对，失败时回退原始稿。
