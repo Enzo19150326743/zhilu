@@ -1,6 +1,6 @@
-# ASR 术语表
+# AI 校对术语初始种子
 
-> 这里维护本项目常见专有名词。后端会读取 bullet 项，用于 DeepSeek 转写稿纠错。2026-07-20 的人工参考稿评测发现全局长语义提示会污染 Whisper 声学解码，因此当前不再传给 Whisper `hotwords` / `initial_prompt`。
+> 仅在本地术语库第一次创建时，将这些 bullet 项一次性迁入可见的“系统默认”文件夹。运行时不再读取本文件；后续请在转写设置弹窗的“AI 校对术语”中维护。用户术语只用于 DeepSeek 转写稿校对，不传给 Whisper、SenseVoice 或 Fun-ASR 原始识别。
 
 - DeepSeek
 - Codex

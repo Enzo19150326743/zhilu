@@ -39,8 +39,6 @@ from app.services.transcript_correction_service import (
     format_segment_for_plain_text,
 )
 from app.services.transcribe_context_service import (
-    build_speaker_hotwords,
-    build_whisper_context_lines,
     get_speaker_label_status,
     normalize_transcribe_context_settings,
 )
@@ -71,12 +69,6 @@ DEFAULT_SENSEVOICE_SEGMENT_MAX_CHARACTERS = 120
 DEFAULT_SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS = 2
 TRANSCRIBE_AUDIO_TEMPLATE = "transcribe-audio.%(ext)s"
 TEMP_SUFFIXES = {".part", ".ytdl", ".tmp", ".temp"}
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_ASR_GLOSSARY_PATH = PROJECT_ROOT / "docs" / "asr-glossary.md"
-DEFAULT_INITIAL_PROMPT = (
-    "以下是一段中文视频或播客内容，可能包含 AI、编程、产品、平台、模型和工具相关术语。"
-    "请保持原始表达，不要总结内容，并优先正确识别专有名词、英文缩写、人名、品牌词和工具名。"
-)
 AudioDownloader = Callable[[str], Path]
 AudioTranscriber = Callable[[Path], TranscriptPayload]
 
@@ -151,12 +143,12 @@ def transcribe_media_audio(
     """
     total_started_at = monotonic()
     asr_config = get_asr_config()
-    glossary_terms = load_asr_glossary_terms()
     normalized_context_settings = normalize_transcribe_context_settings(
         context_settings,
         platform=media_platform,
         media_type=media_type,
     )
+    correction_terms = normalized_context_settings.correction_terms
     prompt_context = AsrPromptContext(
         title=_optional_text(media_title),
         author=_optional_text(media_author),
@@ -187,7 +179,8 @@ def transcribe_media_audio(
                 try:
                     cloud_result = transcribe_audio_with_fun_asr(
                         audio_path,
-                        glossary_terms=glossary_terms,
+                        # AI 校对术语不得改变云端原始识别结果。
+                        glossary_terms=[],
                         context=FunAsrContext(
                             title=prompt_context.title,
                             author=prompt_context.author,
@@ -255,8 +248,6 @@ def transcribe_media_audio(
                 transcription_result = _transcribe_audio_with_whisper(
                     audio_path,
                     asr_config=asr_config,
-                    glossary_terms=glossary_terms,
-                    prompt_context=prompt_context,
                 )
             else:
                 transcription_result = WhisperTranscriptionResult(
@@ -291,7 +282,7 @@ def transcribe_media_audio(
     correction_started_at = monotonic()
     transcript = _build_final_transcript(
         transcription_result=transcription_result,
-        glossary_terms=glossary_terms,
+        correction_terms=correction_terms,
         prompt_context=prompt_context,
     )
     correction_status = (
@@ -458,48 +449,10 @@ def get_asr_config() -> AsrConfig:
     )
 
 
-def load_asr_glossary_terms(
-    glossary_path: Path = DEFAULT_ASR_GLOSSARY_PATH,
-) -> list[str]:
-    """
-    读取 Markdown bullet 术语；文件缺失或损坏不应阻断转写主链路。
-    """
-    try:
-        lines = glossary_path.read_text(encoding="utf-8").splitlines()
-    except FileNotFoundError:
-        logger.info("asr glossary file not found")
-        return []
-    except OSError as error:
-        logger.warning("asr glossary read failed: %s", error.__class__.__name__)
-        return []
-
-    terms: list[str] = []
-    seen_terms: set[str] = set()
-    for line in lines:
-        stripped_line = line.strip()
-        if not stripped_line.startswith(("-", "*", "+")):
-            continue
-
-        term = stripped_line[1:].strip()
-        if not term:
-            continue
-
-        normalized_key = term.casefold()
-        if normalized_key in seen_terms:
-            continue
-
-        seen_terms.add(normalized_key)
-        terms.append(term)
-
-    return terms
-
-
 def _transcribe_audio_with_whisper(
     audio_path: Path,
     *,
     asr_config: AsrConfig | None = None,
-    glossary_terms: list[str] | None = None,
-    prompt_context: AsrPromptContext | None = None,
 ) -> WhisperTranscriptionResult:
     try:
         cuda_runtime.activate_cuda_dll_directories()
@@ -638,7 +591,7 @@ def _build_transcript_segments(raw_segments: Any) -> list[TranscriptSegment]:
 def _build_final_transcript(
     *,
     transcription_result: WhisperTranscriptionResult,
-    glossary_terms: list[str],
+    correction_terms: list[str],
     prompt_context: AsrPromptContext,
 ) -> TranscriptPayload:
     correction_transcript = _normalize_transcript_plain_text(
@@ -656,7 +609,7 @@ def _build_final_transcript(
     )
     correction_result = correct_transcript_payload(
         correction_transcript,
-        glossary_terms=glossary_terms,
+        glossary_terms=correction_terms,
         context=correction_context,
     )
     final_transcript = _normalize_transcript_plain_text(correction_result.transcript)
@@ -674,7 +627,9 @@ def _build_final_transcript(
                 language=transcription_result.language,
                 correction_status=correction_result.status,
                 correction_model=correction_result.model,
-                glossary_term_count=len(glossary_terms),
+                glossary_term_count=0,
+                correction_term_count=len(correction_terms),
+                correction_terms=correction_terms,
                 program_structure=(
                     prompt_context.context_settings.program_structure
                     if prompt_context.context_settings
@@ -876,52 +831,6 @@ def _dedupe_model_candidates(
         unique_candidates.append(candidate)
 
     return unique_candidates
-
-
-def _build_initial_prompt(
-    context: AsrPromptContext,
-    glossary_terms: list[str],
-) -> str:
-    prompt_parts = [DEFAULT_INITIAL_PROMPT]
-    if context.title:
-        prompt_parts.append(f"媒体标题：{context.title}")
-    if context.author:
-        prompt_parts.append(f"作者或频道：{context.author}")
-    if context.platform:
-        prompt_parts.append(f"平台：{context.platform}")
-    if context.media_type:
-        prompt_parts.append(f"媒体类型：{context.media_type}")
-    if context.context_settings:
-        prompt_parts.extend(build_whisper_context_lines(context.context_settings))
-    if glossary_terms:
-        prompt_parts.append(
-            "请优先正确识别以下术语："
-            + "、".join(glossary_terms[:120])
-            + "。"
-        )
-
-    return "\n".join(prompt_parts)
-
-
-def _build_hotwords(
-    glossary_terms: list[str],
-    context_settings: TranscribeContextSettings | None = None,
-) -> str | None:
-    hotwords: list[str] = []
-    seen_words: set[str] = set()
-    speaker_hotwords = build_speaker_hotwords(context_settings) if context_settings else []
-    for term in [*glossary_terms[:120], *speaker_hotwords]:
-        normalized_term = term.strip()
-        if not normalized_term or normalized_term.casefold() in seen_words:
-            continue
-
-        seen_words.add(normalized_term.casefold())
-        hotwords.append(normalized_term)
-
-    if not hotwords:
-        return None
-
-    return "、".join(hotwords)
 
 
 def _build_speaker_label_status(

@@ -8,7 +8,7 @@ V0.3 的主线是把“知录”从可解析、可总结的媒体工作台推进
 
 - 内容问答：基于当前工作台已有内容文本、摘要和时间轴调用 `/api/qa`。
 - 智能导图：基于 `mindmap_markdown` 和可选 `mindmap_meta` 在前端渲染树状 markmap。
-- AI 转写稿生成：平台没有现成字幕或只有 shownotes 时，用户手动调用 `/api/transcribe`，本地 Whisper 从公开音频生成 AI 转写稿；Whisper 使用中性声学解码，`docs/asr-glossary.md`、节目结构、内容标签和说话人辅助信息只提供给 DeepSeek 校对错别字、专有名词、英文缩写和断句。转写完成后前端会继续基于完整逐字稿生成总结和导图。该链路依赖 ffmpeg 和 faster-whisper 模型，后端通过 `FFMPEG_LOCATION`、`ASR_WHISPER_MODEL`、`ASR_DEVICE` 等配置读取本地环境。
+- AI 转写稿生成：平台没有现成字幕或只有 shownotes 时，用户手动调用 `/api/transcribe`；转写设置弹窗允许从本地术语库选择本期专有名词。三种 ASR 保持不接收用户术语，识别完成后才由 DeepSeek 使用本期术语、节目结构、内容标签和说话人辅助信息校对错别字、英文缩写和断句。转写完成后前端会继续基于完整逐字稿生成总结和导图。
 - 后台总结任务：AI 总结按 `source_url` 创建前端后台任务；解析结果已有完整逐字稿时自动继续总结，转写完成后也自动继续总结；用户切换到其他媒体后，原总结请求继续执行，完成后只回写同一个 `source_url` 的当前工作台。
 - 后台解析任务：真实解析也纳入浏览器侧任务流，按 URL 创建 `parseTasks`，页面不再进入整页阻塞 loading；用户可继续打开历史、Demo 或编辑下一个链接。
 - 总结未生成态：前端按 `SummaryDisplayState` 区分 `empty / demo / generated`；真实解析未生成总结时不展示后端兼容占位 summary / mindmap，示例数据和已生成总结仍展示完整内容。
@@ -94,7 +94,7 @@ TranscriptTab / SummaryTab / QaTab 点击生成 AI 转写稿
 → POST /api/transcribe，传入用户确认后的 context_settings
 → 小宇宙 / 抖音页面先解析 transcription_source_url，普通视频直接交给 yt-dlp
 → asr_service 下载 bestaudio/best 临时音频，临时文件名固定为 transcribe-audio.<ext>
-→ asr_service 读取 docs/asr-glossary.md 的 bullet 术语
+→ 转写设置提交本期选择的 correction_terms；首次打开术语库时将 docs/asr-glossary.md 一次性迁入可见默认文件夹
 → transcribe_context_service 规范化节目结构、内容标签和说话人辅助信息
 → faster-whisper 只传入 language / beam_size / condition_on_previous_text，以中性解码生成原始 TranscriptPayload
 → transcript_correction_service 将节目结构、说话人辅助信息和术语表作为校对语境，按片段分块调用 DeepSeek；失败时回退原始稿
@@ -151,7 +151,7 @@ POST /api/parse 返回的 placeholder summary / mindmap 只作为兼容数据
 - 2026-07-19 验证边界：RTX 3050 Laptop 4GB、驱动 576.80 上，10 条固定 3 分钟样本均以 `large-v3-turbo + cuda + int8` 完成 Whisper 推理，0 条回退 CPU；DeepSeek 校对是后续独立环节，不能把校对状态误写成 CUDA 失败。
 - 2026-07-20 质量评测边界：10 条固定中文样本的人工参考稿共 9459 个规范化字符。基础 `base + cpu + int8` 微平均 CER 为 12.28%；第四轮 `large-v3-turbo + cuda + int8` 原始稿为 7.41%，DeepSeek 校对终稿为 7.14%，相对基础错误下降 41.91%，9/10 条改善；专有名词命中率从 50.00% 提升到 68.75%。该结果同时改变模型、设备和校对链路，只代表小样本产品方案对比。
 - Whisper 模型名或模型路径配置不可用时，后端应返回 `ASR_MODEL_UNAVAILABLE` 或 `ASR_MODEL_FAILED`；前端请求层应区分后端不可达、请求中断和后端业务错误，不要把所有 `fetch` 异常都显示成后端未启动。
-- ASR 术语固定维护在 `docs/asr-glossary.md`，后端只读取 Markdown bullet 项；文件不存在、为空或读取失败时不阻断转写。2026-07-20 起这些术语只进入 DeepSeek 校对，不再传给 Whisper 的 `initial_prompt` / `hotwords`。
+- AI 校对术语由独立 SQLite 术语库维护；`docs/asr-glossary.md` 只在术语表首次创建时作为一次性种子。每期只有用户明确选择的术语进入 DeepSeek 校对，默认不选择历史术语，也不存在运行时隐藏名单。
 - Whisper 声学解码必须保持语义中性：`initial_prompt=None`、`hotwords=None`、`condition_on_previous_text=True`。评测第三轮证实，跨样本复用全局长语义 Prompt 会诱发漏转、重复和无关术语侵入，使微平均 CER 升至 21.74%；若未来重新引入声学提示，必须在独立验证集上提供显著收益证据。
 - DeepSeek ASR 校对只修正错别字、同音词、专有名词、英文缩写、标点和明显断句，不允许总结、扩写、删减事实或改时间戳；未配置 Key、超时、HTTP 错误、JSON 异常或片段数量不匹配时，`/api/transcribe` 必须使用原始 Whisper 稿返回。
 - `/api/transcribe` 请求体可选新增 `context_settings`，包含节目结构单选、内容标签多选和最多 6 位说话人辅助信息；旧前端不传该字段时必须继续可用。

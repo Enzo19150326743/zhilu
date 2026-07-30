@@ -30,6 +30,7 @@
 |---|---|
 | 多媒体文本获取 | 从 B 站、抖音、小宇宙等公开来源取得字幕、Shownotes 或媒体信息 |
 | 多路径 AI 转写 | 中文长内容默认推荐 SenseVoiceSmall，英文术语和数字密集内容可改用 Whisper，云端识别保持手动选择 |
+| AI 校对热词与术语库 | 转写前批量选择本期热词，识别完成后注入 AI 校对；支持文件夹、最近使用和常用术语管理 |
 | 结构化理解 | 根据课程、访谈、观点视频或播客组织摘要，并生成可缩放、平移和高亮的树状导图 |
 | 内容问答 | 围绕当前媒体文本继续追问，不脱离来源凭空扩写 |
 | 摘录工作流 | 区分用户确认摘录与 AI 未确认候选，保留可靠原文 |
@@ -64,6 +65,12 @@
 每次转写只运行你选中的一个模型，不会为了“交叉验证”自动双跑。只有第一次结果不理想时，才需要主动重转写并保留另一份稿件作比较。
 
 SenseVoiceSmall 的短句会在校对前整理成约 4～8 秒的连续片段，减少逐字稿里一两秒一断的阅读跳跃；原始细粒度片段仍完整保留，不牺牲回看与排查能力。
+
+## AI 校对热词与常用术语库
+
+“转写设置”中可以提前填写人名、品牌、英文缩写和专业术语。支持使用逗号、顿号或换行批量输入，也可以从最近使用、常用术语或自建文件夹中选择。
+
+这些热词只在 Whisper、SenseVoiceSmall 或 Fun-ASR 完成原始识别后提供给 AI 校对，用于修正常见同音词、错别字和英文写法，不会污染原始识别稿。每次新转写默认不自动选择历史术语；转写成功后才会更新使用次数和最近使用时间。AI API 不可用或校对失败时仍保留原始稿，并明确提示本期术语没有生效。
 
 ## 结构化摘要与交互导图
 
@@ -110,6 +117,45 @@ cd zhilu
 
 首次运行会自动创建 Python 虚拟环境、安装前后端依赖、询问是否配置自己的 AI API，然后打开 `http://localhost:3000`。后续仍然双击同一个文件启动。
 
+### 推荐：一次准备完整本地转写环境
+
+如果确定要使用本地转写，建议在第一次启动前双击：
+
+```powershell
+.\准备完整本地转写环境.bat
+```
+
+脚本会先显示预计下载量并等待确认，然后自动检测 Windows NVIDIA 显卡，安装适合当前电脑的依赖，并提前缓存以下模型：
+
+| 下载内容 | 约计体积 | 用途 |
+|---|---:|---|
+| [Whisper large-v3-turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo/tree/main) | 1.62 GB | 英文、数字和技术术语较多的内容 |
+| [SenseVoiceSmall](https://huggingface.co/FunAudioLLM/SenseVoiceSmall/tree/main) | 0.94 GB | 中文长视频、播客和多人对谈 |
+| FSMN-VAD | 较小 | 为 SenseVoiceSmall 切分长音频 |
+| Python / CPU 或 CUDA 依赖 | 随平台和上游版本变化 | 运行两个本地识别引擎 |
+
+完整 CPU 环境预计下载约 **3～5 GB**，建议预留 **6～10 GB**；完整 NVIDIA 环境预计下载约 **6～8 GB**，建议预留 **12～15 GB**。这是包含依赖和两个模型的保守区间，上游版本与缓存状态会让实际数字波动。准备完成后再运行：
+
+```powershell
+.\启动网站.bat
+```
+
+需要显式指定模式时，可以运行：
+
+```powershell
+# 自动检测（推荐）
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-local-asr.ps1 -Mode Auto
+
+# 强制只安装 CPU 环境
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-local-asr.ps1 -Mode Cpu
+
+# 强制安装 Windows NVIDIA / CUDA 环境
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-local-asr.ps1 -Mode Nvidia
+```
+
+> [!WARNING]
+> Fork 或把前端部署到静态 Web 托管平台，不会把本地模型一起部署。必须在真正运行 FastAPI 后端的 Windows 机器上执行准备脚本；模型缓存、虚拟环境和 CUDA 文件不会提交到 GitHub。纯静态前端部署无法运行本地 ASR。
+
 > [!NOTE]
 > 这不是一个只靠 `npm install` 就能运行的纯前端项目。根目录启动器会同时管理 FastAPI 后端和 Next.js 前端；`frontend/npm run dev` 只启动前端。
 
@@ -119,8 +165,8 @@ cd zhilu
 
 - 第一次建议用 3～10 分钟的公开视频跑通流程。
 - 未配置 AI Key 仍能解析内容；总结、问答和校对会使用本地降级结果。
-- Whisper 首次运行可能需要下载模型，耗时取决于网络和本机性能。
-- SenseVoiceSmall 是当前中文长内容的推荐本地模型；CPU 可安装 `backend/requirements-sensevoice-windows.txt`，Windows NVIDIA 用户运行 `scripts/install-sensevoice-cuda.ps1` 启用 CUDA，首次使用还会下载对应模型。
+- 没有提前运行完整环境准备脚本时，Whisper 或 SenseVoiceSmall 仍可能在第一次使用时下载对应模型。
+- 完整环境准备脚本只修改项目虚拟环境和用户模型缓存，不会安装显卡驱动或修改系统全局 `PATH`。
 - 修改 AI、Cookie、ASR 或下载目录后，需要重启后端并点击“重新提取”。
 - 云端识别只有在配置阿里云密钥并由用户手动选择后才会上传音频片段；失败时不会静默改用本地模型。
 - B 站只返回 480p 不一定是筛选错误，可能是平台本次公开格式上限。

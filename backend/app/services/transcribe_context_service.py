@@ -44,6 +44,7 @@ def normalize_transcribe_context_settings(
     )
     content_tags = _normalize_content_tags(raw_settings.content_tags)
     speakers = _normalize_speakers(raw_settings.speakers)
+    correction_terms = _normalize_correction_terms(raw_settings.correction_terms)
     if not speakers:
         speakers = _build_default_speakers(program_structure)
 
@@ -51,6 +52,7 @@ def normalize_transcribe_context_settings(
         program_structure=program_structure,
         content_tags=content_tags,
         speakers=speakers,
+        correction_terms=correction_terms,
     )
 
 
@@ -197,6 +199,24 @@ def _normalize_speakers(
         speakers.append(speaker)
 
     return speakers
+
+
+def _normalize_correction_terms(raw_terms: list[str]) -> list[str]:
+    terms: list[str] = []
+    seen_terms: set[str] = set()
+    for raw_term in raw_terms[:120]:
+        term = _normalize_text(raw_term)
+        if not term:
+            continue
+
+        normalized_key = term.casefold()
+        if normalized_key in seen_terms:
+            continue
+
+        seen_terms.add(normalized_key)
+        terms.append(term)
+
+    return terms
 
 
 def _build_default_speakers(program_structure: str) -> list[TranscribeSpeakerProfile]:

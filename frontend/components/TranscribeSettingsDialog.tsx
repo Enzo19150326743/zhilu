@@ -16,6 +16,8 @@ interface TranscribeSettingsDialogProps {
   sensevoiceAvailable: boolean;
   sensevoiceModel?: string | null;
   sensevoiceMessage?: string | null;
+  correctionAvailable: boolean;
+  correctionMessage?: string | null;
   onChange: (settings: TranscribeContextSettings) => void;
   onChangeAsrEngine: (asrEngine: AsrEngine) => void;
   onClose: () => void;
@@ -34,6 +36,8 @@ export function TranscribeSettingsDialog({
   sensevoiceAvailable,
   sensevoiceModel,
   sensevoiceMessage,
+  correctionAvailable,
+  correctionMessage,
   onChange,
   onChangeAsrEngine,
   onClose,
@@ -49,8 +53,8 @@ export function TranscribeSettingsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-4 py-6 backdrop-blur-sm">
-      <section className="max-h-[88vh] w-full max-w-2xl overflow-auto rounded-xl border border-zinc-200 bg-white shadow-[0_24px_80px_rgba(24,24,27,0.28)]">
-        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
+      <section className="max-h-[88vh] w-full max-w-4xl overflow-auto rounded-xl border border-zinc-200 bg-white shadow-[0_24px_80px_rgba(24,24,27,0.28)]">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-200 bg-white px-5 py-4">
           <div>
             <p className="text-sm font-semibold text-zinc-950">转写设置</p>
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">
@@ -58,6 +62,7 @@ export function TranscribeSettingsDialog({
             </p>
           </div>
           <button
+            aria-label="关闭转写设置"
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isTranscribing}
             type="button"
@@ -163,6 +168,8 @@ export function TranscribeSettingsDialog({
           </div>
 
           <TranscribeSettingsPanel
+            correctionAvailable={correctionAvailable}
+            correctionMessage={correctionMessage}
             disabled={
               isTranscribing || selectedEngineUnavailable
             }
@@ -172,7 +179,7 @@ export function TranscribeSettingsDialog({
           />
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-4 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-4 sm:flex-row sm:justify-end">
           <button
             className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isTranscribing}

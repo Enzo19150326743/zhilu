@@ -73,6 +73,15 @@ class CorrectionPayloadTruncatedError(ValueError):
     """校对返回内容被截断或不是完整 JSON。"""
 
 
+def get_transcript_correction_status() -> tuple[bool, str]:
+    """返回不包含密钥内容的 DeepSeek 校对能力状态。"""
+    if not _is_correction_enabled():
+        return False, "AI 校对已在后端配置中关闭，所选术语当前不会应用到终稿。"
+    if not load_ai_settings().api_key:
+        return False, "后端尚未配置 AI_API_KEY，所选术语当前不会应用到终稿。"
+    return True, "所选术语会在语音识别完成后用于 DeepSeek 校对。"
+
+
 def correct_transcript_payload(
     transcript: TranscriptPayload,
     *,

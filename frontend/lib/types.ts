@@ -19,6 +19,8 @@ export interface AsrStatusResponse {
   sensevoice_available: boolean;
   sensevoice_model: string;
   sensevoice_message?: string | null;
+  correction_available: boolean;
+  correction_message?: string | null;
 }
 
 export interface RateLimitItem {
@@ -87,6 +89,35 @@ export interface TranscribeContextSettings {
   program_structure: "auto" | "solo" | "interview" | "roundtable" | string;
   content_tags: string[];
   speakers: TranscribeSpeakerProfile[];
+  correction_terms: string[];
+}
+
+export interface CorrectionTermFolder {
+  id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CorrectionTermItem {
+  id: number;
+  text: string;
+  folder_id?: number | null;
+  usage_count: number;
+  last_used_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CorrectionTermLibraryResponse {
+  success: true;
+  folders: CorrectionTermFolder[];
+  terms: CorrectionTermItem[];
+}
+
+export interface CorrectionTermMutationResponse {
+  success: true;
+  message: string;
 }
 
 export interface TranscriptAsrMeta {
@@ -98,6 +129,8 @@ export interface TranscriptAsrMeta {
   correction_status: "corrected" | "skipped" | "failed" | string;
   correction_model?: string | null;
   glossary_term_count: number;
+  correction_term_count?: number;
+  correction_terms?: string[];
   program_structure?: string | null;
   content_tags?: string[];
   speaker_profiles?: TranscribeSpeakerProfile[];

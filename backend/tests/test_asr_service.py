@@ -158,21 +158,6 @@ class AsrServiceTests(unittest.TestCase):
 
         remove_file.assert_called_once_with(audio_path)
 
-    def test_glossary_loader_reads_unique_markdown_bullets(self) -> None:
-        """
-        术语表由非技术用户维护，后端只读取 bullet 项并自动去重。
-        """
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            glossary_path = Path(temporary_directory) / "asr-glossary.md"
-            glossary_path.write_text(
-                "# 术语表\n\n- DeepSeek\n- Codex\n- DeepSeek\n\n正文不读取\n",
-                encoding="utf-8",
-            )
-
-            terms = asr_service.load_asr_glossary_terms(glossary_path)
-
-        self.assertEqual(terms, ["DeepSeek", "Codex"])
-
     def test_auto_device_falls_back_without_injecting_semantic_whisper_prompt(
         self,
     ) -> None:
@@ -230,12 +215,6 @@ class AsrServiceTests(unittest.TestCase):
                 with patch.dict(os.environ, env, clear=False):
                     result = asr_service._transcribe_audio_with_whisper(
                         audio_path,
-                        glossary_terms=["DeepSeek", "Codex"],
-                        prompt_context=asr_service.AsrPromptContext(
-                            title="AI 编程访谈",
-                            author="示例作者",
-                            platform="bilibili",
-                        ),
                     )
 
         self.assertEqual(
@@ -289,12 +268,6 @@ class AsrServiceTests(unittest.TestCase):
                     return [FakeSegment()], object()
 
             fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
-            context_settings = TranscribeContextSettings(
-                program_structure="interview",
-                content_tags=["ai_tech"],
-                speakers=[TranscribeSpeakerProfile(name="老王", role="嘉宾")],
-            )
-
             with patch.dict(sys.modules, {"faster_whisper": fake_module}):
                 result = asr_service._transcribe_audio_with_whisper(
                     audio_path,
@@ -306,13 +279,6 @@ class AsrServiceTests(unittest.TestCase):
                         language="zh",
                         beam_size=5,
                         auto_fallback=False,
-                    ),
-                    glossary_terms=["DeepSeek"],
-                    prompt_context=asr_service.AsrPromptContext(
-                        title="AI 访谈",
-                        platform="bilibili",
-                        media_type="video",
-                        context_settings=context_settings,
                     ),
                 )
 
@@ -408,6 +374,7 @@ class AsrServiceTests(unittest.TestCase):
                         TranscribeSpeakerProfile(name="主持人", role="主持人"),
                         TranscribeSpeakerProfile(name="嘉宾", role="嘉宾"),
                     ],
+                    correction_terms=["DeepSeek", "Cursor"],
                 ),
                 media_platform="bilibili",
                 media_type="video",
@@ -418,9 +385,49 @@ class AsrServiceTests(unittest.TestCase):
         self.assertEqual(response.transcript.asr_meta.program_structure, "interview")
         self.assertEqual(response.transcript.asr_meta.content_tags, ["ai_tech"])
         self.assertEqual(
+            response.transcript.asr_meta.correction_terms,
+            ["DeepSeek", "Cursor"],
+        )
+        self.assertEqual(response.transcript.asr_meta.correction_term_count, 2)
+        self.assertEqual(response.transcript.asr_meta.glossary_term_count, 0)
+        self.assertEqual(
             [speaker.name for speaker in response.transcript.asr_meta.speaker_profiles],
             ["主持人", "嘉宾"],
         )
+
+    def test_fun_asr_does_not_receive_user_correction_terms(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            audio_path = Path(temporary_directory) / "sample.m4a"
+            audio_path.write_text("fake audio", encoding="utf-8")
+
+            def fake_download(_: str) -> Path:
+                return audio_path
+
+            cloud_result = SimpleNamespace(
+                transcript=TranscriptPayload(
+                    segments=[TranscriptSegment(start=0, end=1, text="原始内容")],
+                    plain_text="原始内容",
+                ),
+                model="fun-asr-flash",
+                provider="aliyun",
+                chunk_count=1,
+                timestamp_source="fun-asr-word",
+            )
+            with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+                with patch(
+                    "app.services.asr_service.transcribe_audio_with_fun_asr",
+                    return_value=cloud_result,
+                ) as cloud_transcribe:
+                    transcribe_media_audio(
+                        "https://example.com/video",
+                        audio_downloader=fake_download,
+                        asr_engine="fun_asr_flash",
+                        context_settings=TranscribeContextSettings(
+                            correction_terms=["DeepSeek", "Cursor"]
+                        ),
+                    )
+
+        self.assertEqual(cloud_transcribe.call_args.kwargs["glossary_terms"], [])
 
     def test_platform_rejected_audio_download_uses_specific_error(self) -> None:
         """

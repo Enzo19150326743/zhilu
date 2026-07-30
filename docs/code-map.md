@@ -118,6 +118,8 @@ ai-video-insight-workspace/
 - `backend/app/demo_data.py`：Demo 数据读取。
 - `backend/requirements.txt`：Python 依赖。
 - `backend/tests/`：后端单测。
+- `scripts/prepare-local-asr.ps1`：一次安装本地转写依赖并预下载 Whisper、SenseVoiceSmall 和 FSMN-VAD。
+- `scripts/prefetch-asr-models.py`：固定模型目标和预下载实现，可用 `--plan-only` 只查看清单。
 
 ## 后端服务地图
 
@@ -133,6 +135,7 @@ ai-video-insight-workspace/
 - `backend/app/services/transcript_segment_service.py`：按停顿、标点、时长和字符数规范化 ASR 相邻碎片；当前用于 Whisper 校对前整理。
 - `backend/app/services/fun_asr_service.py`：手动选择的 Fun-ASR-Flash 云端转写、ffmpeg 规范化分段、并发请求和时间戳合并。
 - `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；生产 Whisper 目前保持中性解码。
+- `backend/app/services/correction_term_service.py`：本地 AI 校对术语库、文件夹、一次性旧词迁移和使用统计。
 - `backend/app/services/transcript_correction_service.py`：DeepSeek ASR 转写稿自动校对，失败时回退原始稿。
 - `backend/app/services/summarize_service.py`：DeepSeek 结构化总结和本地 fallback。
 - `backend/app/services/qa_service.py`：内容文本问答和本地 fallback。
@@ -153,7 +156,7 @@ ai-video-insight-workspace/
 - 改总结 / 导图：先读 `frontend/components/SummaryTab.tsx`、`frontend/components/MindmapTab.tsx`、`backend/app/services/summarize_service.py`。
 - 改 QA：先读 `frontend/components/QaTab.tsx`、`backend/app/services/qa_service.py`。
 - 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/sensevoice_service.py`、`backend/app/services/fun_asr_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
-- 改 ASR 术语：维护 `docs/asr-glossary.md` 的 Markdown bullet 项；后端只用于 DeepSeek 校对，不直接注入 Whisper 声学解码。
+- 改 AI 校对术语：先读 `frontend/components/CorrectionTermSelector.tsx` 和 `backend/app/services/correction_term_service.py`；`docs/asr-glossary.md` 只负责首次初始化种子。
 - 改本地历史：先读 `frontend/components/RecentLibrary.tsx`、`backend/app/services/library_service.py`。
 - 改 Obsidian 导出：先读 `docs/plans/2026-06-12-obsidian-note-workflow-prd.md`、`backend/app/services/obsidian_export_service.py`。
 - 改启动器：先读 `启动网站.bat`、`scripts/launch-site.ps1`、`scripts/wait-for-url.ps1`。

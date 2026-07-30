@@ -44,7 +44,8 @@ export function getDefaultTranscribeSettings(
   return {
     program_structure: programStructure,
     content_tags: [],
-    speakers: buildDefaultSpeakers(programStructure)
+    speakers: buildDefaultSpeakers(programStructure),
+    correction_terms: []
   };
 }
 
@@ -61,11 +62,15 @@ export function normalizeTranscribeSettings(
   const speakers = Array.isArray(settings?.speakers)
     ? settings.speakers
     : fallbackSettings.speakers;
+  const correctionTerms = Array.isArray(settings?.correction_terms)
+    ? settings.correction_terms
+    : fallbackSettings.correction_terms;
 
   return {
     program_structure: programStructure,
     content_tags: contentTags,
-    speakers
+    speakers,
+    correction_terms: correctionTerms
   };
 }
 

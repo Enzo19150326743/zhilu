@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 MAX_SUMMARY_VIDEO_TITLE_LENGTH = 300
+MAX_CORRECTION_TERMS = 120
+MAX_CORRECTION_TERM_LENGTH = 80
 
 
 class HealthResponse(BaseModel):
@@ -84,6 +86,39 @@ class TranscribeContextSettings(BaseModel):
     program_structure: str = Field(default="auto", max_length=40)
     content_tags: list[str] = Field(default_factory=list, max_length=12)
     speakers: list[TranscribeSpeakerProfile] = Field(default_factory=list, max_length=6)
+    correction_terms: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_CORRECTION_TERMS,
+    )
+
+    @field_validator("correction_terms", mode="before")
+    @classmethod
+    def normalize_correction_terms(cls, value: object) -> object:
+        if not isinstance(value, list):
+            return value
+
+        terms: list[str] = []
+        seen_terms: set[str] = set()
+        for raw_term in value:
+            if not isinstance(raw_term, str):
+                continue
+
+            term = " ".join(raw_term.strip().split())
+            if not term:
+                continue
+            if len(term) > MAX_CORRECTION_TERM_LENGTH:
+                raise ValueError(
+                    f"单个 AI 校对术语不能超过 {MAX_CORRECTION_TERM_LENGTH} 个字符"
+                )
+
+            normalized_key = term.casefold()
+            if normalized_key in seen_terms:
+                continue
+
+            seen_terms.add(normalized_key)
+            terms.append(term)
+
+        return terms
 
 
 class TranscriptAsrMeta(BaseModel):
@@ -97,6 +132,8 @@ class TranscriptAsrMeta(BaseModel):
     correction_status: str
     correction_model: str | None = None
     glossary_term_count: int = 0
+    correction_term_count: int = 0
+    correction_terms: list[str] = Field(default_factory=list)
     program_structure: str | None = None
     content_tags: list[str] = Field(default_factory=list)
     speaker_profiles: list[TranscribeSpeakerProfile] = Field(default_factory=list)
@@ -186,6 +223,64 @@ class AsrStatusResponse(BaseModel):
     sensevoice_available: bool = False
     sensevoice_model: str = "iic/SenseVoiceSmall"
     sensevoice_message: str | None = None
+    correction_available: bool = False
+    correction_message: str | None = None
+
+
+class CorrectionTermFolder(BaseModel):
+    """用户自建的 AI 校对术语文件夹。"""
+
+    id: int
+    name: str
+    created_at: str
+    updated_at: str
+
+
+class CorrectionTermItem(BaseModel):
+    """一条可复用的 AI 校对术语。"""
+
+    id: int
+    text: str
+    folder_id: int | None = None
+    usage_count: int = 0
+    last_used_at: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class CorrectionTermLibraryResponse(BaseModel):
+    """术语库完整快照，由前端生成最近和常用智能视图。"""
+
+    success: bool = True
+    folders: list[CorrectionTermFolder]
+    terms: list[CorrectionTermItem]
+
+
+class CorrectionTermFolderRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class CorrectionTermBulkCreateRequest(BaseModel):
+    terms: list[str] = Field(min_length=1, max_length=MAX_CORRECTION_TERMS)
+    folder_id: int | None = None
+
+
+class CorrectionTermRenameRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=MAX_CORRECTION_TERM_LENGTH)
+
+
+class CorrectionTermBatchMoveRequest(BaseModel):
+    term_ids: list[int] = Field(min_length=1, max_length=MAX_CORRECTION_TERMS)
+    folder_id: int | None = None
+
+
+class CorrectionTermBatchDeleteRequest(BaseModel):
+    term_ids: list[int] = Field(min_length=1, max_length=MAX_CORRECTION_TERMS)
+
+
+class CorrectionTermMutationResponse(BaseModel):
+    success: bool = True
+    message: str
 
 
 class DemoItem(BaseModel):

@@ -13,10 +13,13 @@ import type {
   TranscribeContextSettings,
   TranscribeSpeakerProfile
 } from "@/lib/types";
+import { CorrectionTermSelector } from "./CorrectionTermSelector";
 
 interface TranscribeSettingsPanelProps {
   disabled?: boolean;
   isAlwaysOpen?: boolean;
+  correctionAvailable?: boolean;
+  correctionMessage?: string | null;
   settings: TranscribeContextSettings;
   onChange: (settings: TranscribeContextSettings) => void;
 }
@@ -26,6 +29,8 @@ type SpeakerField = keyof TranscribeSpeakerProfile;
 export function TranscribeSettingsPanel({
   disabled = false,
   isAlwaysOpen = false,
+  correctionAvailable = false,
+  correctionMessage,
   settings,
   onChange
 }: TranscribeSettingsPanelProps) {
@@ -139,6 +144,21 @@ export function TranscribeSettingsPanel({
         </div>
       </div>
 
+      {isAlwaysOpen ? (
+        <CorrectionTermSelector
+          correctionAvailable={correctionAvailable}
+          correctionMessage={correctionMessage}
+          disabled={disabled}
+          selectedTerms={normalizedSettings.correction_terms}
+          onChange={(correctionTerms) =>
+            onChange({
+              ...normalizedSettings,
+              correction_terms: correctionTerms
+            })
+          }
+        />
+      ) : null}
+
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <p className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500">
@@ -201,6 +221,7 @@ export function TranscribeSettingsPanel({
                   }
                 />
                 <button
+                  aria-label={`删除说话人 ${index + 1}`}
                   className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={disabled}
                   type="button"

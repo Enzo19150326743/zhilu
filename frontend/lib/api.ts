@@ -1,6 +1,8 @@
 import type {
   ApiError,
   AsrStatusResponse,
+  CorrectionTermLibraryResponse,
+  CorrectionTermMutationResponse,
   DemoDetail,
   DemoListResponse,
   DownloadResponse,
@@ -28,7 +30,7 @@ const BACKEND_BASE_URL =
 
 interface RequestJsonOptions {
   body?: unknown;
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   timeoutMs?: number;
 }
 
@@ -187,6 +189,76 @@ export const apiClient = {
     return requestJson<AsrStatusResponse>("/api/asr/status", {
       timeoutMs: 2500
     });
+  },
+  getCorrectionTermLibrary(): Promise<CorrectionTermLibraryResponse> {
+    return requestJson<CorrectionTermLibraryResponse>("/api/correction-terms", {
+      timeoutMs: 5000
+    });
+  },
+  createCorrectionTermFolder(
+    name: string
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>(
+      "/api/correction-term-folders",
+      { body: { name }, method: "POST", timeoutMs: 5000 }
+    );
+  },
+  renameCorrectionTermFolder(
+    folderId: number,
+    name: string
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>(
+      `/api/correction-term-folders/${folderId}`,
+      { body: { name }, method: "PATCH", timeoutMs: 5000 }
+    );
+  },
+  deleteCorrectionTermFolder(
+    folderId: number
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>(
+      `/api/correction-term-folders/${folderId}`,
+      { method: "DELETE", timeoutMs: 5000 }
+    );
+  },
+  createCorrectionTerms(
+    terms: string[],
+    folderId: number | null
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>("/api/correction-terms", {
+      body: { folder_id: folderId, terms },
+      method: "POST",
+      timeoutMs: 5000
+    });
+  },
+  renameCorrectionTerm(
+    termId: number,
+    text: string
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>(
+      `/api/correction-terms/${termId}`,
+      { body: { text }, method: "PATCH", timeoutMs: 5000 }
+    );
+  },
+  moveCorrectionTerms(
+    termIds: number[],
+    folderId: number | null
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>(
+      "/api/correction-terms/batch-move",
+      {
+        body: { folder_id: folderId, term_ids: termIds },
+        method: "POST",
+        timeoutMs: 5000
+      }
+    );
+  },
+  deleteCorrectionTerms(
+    termIds: number[]
+  ): Promise<CorrectionTermMutationResponse> {
+    return requestJson<CorrectionTermMutationResponse>(
+      "/api/correction-terms/batch-delete",
+      { body: { term_ids: termIds }, method: "POST", timeoutMs: 5000 }
+    );
   },
   getDemos(): Promise<DemoListResponse> {
     return requestJson<DemoListResponse>("/api/demo", { timeoutMs: 3000 });

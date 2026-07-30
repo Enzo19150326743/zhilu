@@ -1310,6 +1310,8 @@ export default function HomePage() {
         sensevoiceAvailable={asrStatus?.sensevoice_available ?? false}
         sensevoiceMessage={asrStatus?.sensevoice_message ?? null}
         sensevoiceModel={asrStatus?.sensevoice_model ?? null}
+        correctionAvailable={asrStatus?.correction_available ?? false}
+        correctionMessage={asrStatus?.correction_message ?? null}
         isOpen={isTranscribeSettingsOpen}
         isTranscribing={isCurrentDetailTranscribing}
         mediaTitle={activeDetail?.video.title ?? null}

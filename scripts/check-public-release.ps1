@@ -43,13 +43,14 @@ $gitDir = Join-Path $projectDir ".git"
 $relativeFiles = @()
 if (Test-Path -LiteralPath $gitDir) {
   # 首次初始化后文件尚未暂存，扫描必须同时覆盖已跟踪与未忽略的候选文件。
-  $null = & git -C $projectDir status --short --untracked-files=all 2>&1
-  $gitStatusExitCode = $LASTEXITCODE
-  if ($gitStatusExitCode -ne 0) {
-    throw "Unable to refresh Git release candidates."
+  $gitStatusOutput = @(& git -C $projectDir status --short --untracked-files=all 2>&1)
+  $gitStatusSucceeded = $?
+  if (-not $gitStatusSucceeded) {
+    throw "Unable to refresh Git release candidates: $($gitStatusOutput -join ' ')"
   }
   $relativeFiles = @(& git -c core.quotepath=false -C $projectDir ls-files --cached --others --exclude-standard)
-  if ($LASTEXITCODE -ne 0) {
+  $gitListSucceeded = $?
+  if (-not $gitListSucceeded) {
     throw "Unable to collect Git release candidates."
   }
   foreach ($relativePath in $relativeFiles) {

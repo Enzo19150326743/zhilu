@@ -21,6 +21,13 @@ from app.schemas import (
     ApiError,
     AsrStatusResponse,
     BilibiliAuthStatusResponse,
+    CorrectionTermBatchDeleteRequest,
+    CorrectionTermBatchMoveRequest,
+    CorrectionTermBulkCreateRequest,
+    CorrectionTermFolderRequest,
+    CorrectionTermLibraryResponse,
+    CorrectionTermMutationResponse,
+    CorrectionTermRenameRequest,
     DemoDetailResponse,
     DemoItem,
     DemoListResponse,
@@ -53,6 +60,18 @@ from app.services.bilibili_service import (
     get_bilibili_auth_status,
     is_bilibili_url,
     resolve_bilibili_transcription_source,
+)
+from app.services.correction_term_service import (
+    CorrectionTermError,
+    add_terms,
+    create_folder,
+    delete_folder,
+    delete_terms,
+    get_term_library,
+    move_terms,
+    record_term_usage,
+    rename_folder,
+    rename_term,
 )
 from app.services.douyin_service import (
     download_douyin_video,
@@ -92,6 +111,9 @@ from app.services.rate_limit_service import (
 from app.services.summarize_service import (
     UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
     summarize_transcript,
+)
+from app.services.transcript_correction_service import (
+    get_transcript_correction_status,
 )
 from app.services.ytdlp_service import download_video_format
 
@@ -350,6 +372,7 @@ def get_health() -> HealthResponse:
 def get_asr_status() -> AsrStatusResponse:
     """返回本地/云端转写能力状态，不向前端暴露任何密钥内容。"""
     sensevoice_available, sensevoice_message = get_sensevoice_status()
+    correction_available, correction_message = get_transcript_correction_status()
     return AsrStatusResponse(
         cloud_available=is_fun_asr_configured(),
         cloud_model=(
@@ -367,7 +390,132 @@ def get_asr_status() -> AsrStatusResponse:
             or DEFAULT_SENSEVOICE_MODEL
         ),
         sensevoice_message=sensevoice_message,
+        correction_available=correction_available,
+        correction_message=correction_message,
     )
+
+
+@app.get("/api/correction-terms", response_model=CorrectionTermLibraryResponse)
+def get_correction_terms() -> CorrectionTermLibraryResponse:
+    """返回本地 AI 校对术语库完整快照。"""
+    return get_term_library()
+
+
+@app.post(
+    "/api/correction-term-folders",
+    response_model=CorrectionTermMutationResponse,
+)
+def create_correction_term_folder(
+    folder_request: CorrectionTermFolderRequest,
+) -> CorrectionTermMutationResponse:
+    try:
+        create_folder(folder_request.name)
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(message="术语文件夹已创建。")
+
+
+@app.patch(
+    "/api/correction-term-folders/{folder_id}",
+    response_model=CorrectionTermMutationResponse,
+)
+def rename_correction_term_folder(
+    folder_id: int,
+    folder_request: CorrectionTermFolderRequest,
+) -> CorrectionTermMutationResponse:
+    try:
+        rename_folder(folder_id, folder_request.name)
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(message="术语文件夹已重命名。")
+
+
+@app.delete(
+    "/api/correction-term-folders/{folder_id}",
+    response_model=CorrectionTermMutationResponse,
+)
+def delete_correction_term_folder(folder_id: int) -> CorrectionTermMutationResponse:
+    try:
+        delete_folder(folder_id)
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(
+        message="文件夹已删除，其中的术语已移到未分类。"
+    )
+
+
+@app.post("/api/correction-terms", response_model=CorrectionTermMutationResponse)
+def create_correction_terms(
+    term_request: CorrectionTermBulkCreateRequest,
+) -> CorrectionTermMutationResponse:
+    try:
+        created_count, existing_count = add_terms(
+            term_request.terms,
+            term_request.folder_id,
+        )
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(
+        message=(
+            f"已新增 {created_count} 个术语。"
+            if existing_count == 0
+            else f"已新增 {created_count} 个术语，{existing_count} 个已存在。"
+        )
+    )
+
+
+@app.patch(
+    "/api/correction-terms/{term_id}",
+    response_model=CorrectionTermMutationResponse,
+)
+def rename_correction_term(
+    term_id: int,
+    term_request: CorrectionTermRenameRequest,
+) -> CorrectionTermMutationResponse:
+    try:
+        rename_term(term_id, term_request.text)
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(message="术语已重命名。")
+
+
+@app.post(
+    "/api/correction-terms/batch-move",
+    response_model=CorrectionTermMutationResponse,
+)
+def move_correction_terms(
+    term_request: CorrectionTermBatchMoveRequest,
+) -> CorrectionTermMutationResponse:
+    try:
+        moved_count = move_terms(term_request.term_ids, term_request.folder_id)
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(message=f"已移动 {moved_count} 个术语。")
+
+
+@app.post(
+    "/api/correction-terms/batch-delete",
+    response_model=CorrectionTermMutationResponse,
+)
+def delete_correction_terms(
+    term_request: CorrectionTermBatchDeleteRequest,
+) -> CorrectionTermMutationResponse:
+    try:
+        deleted_count = delete_terms(term_request.term_ids)
+    except CorrectionTermError as error:
+        _raise_correction_term_error(error)
+    return CorrectionTermMutationResponse(message=f"已删除 {deleted_count} 个术语。")
+
+
+def _raise_correction_term_error(error: CorrectionTermError) -> None:
+    raise HTTPException(
+        status_code=error.status_code,
+        detail={
+            "success": False,
+            "error_code": error.error_code,
+            "message": error.message,
+        },
+    ) from error
 
 
 @app.get("/api/image-proxy")
@@ -869,6 +1017,20 @@ def transcribe_video(
     except (sqlite3.Error, OSError, ValueError) as error:
         logger.warning(
             "library transcript update failed: %s",
+            error.__class__.__name__,
+        )
+
+    correction_terms = (
+        transcribe_request.context_settings.correction_terms
+        if transcribe_request.context_settings
+        else []
+    )
+    try:
+        record_term_usage(correction_terms)
+    except (CorrectionTermError, sqlite3.Error, OSError) as error:
+        # 术语统计属于辅助记录，不能覆盖已经成功生成的转写稿。
+        logger.warning(
+            "correction term usage update failed: %s",
             error.__class__.__name__,
         )
 
