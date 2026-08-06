@@ -35,6 +35,29 @@ interface SummaryEmptyStateProps {
   onTranscribe: () => void;
 }
 
+interface SummarySectionHeadingProps {
+  index: string;
+  label: string;
+  title: string;
+}
+
+function SummarySectionHeading({
+  index,
+  label,
+  title
+}: SummarySectionHeadingProps) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
+        {index} / {label}
+      </p>
+      <h3 className="font-editorial mt-1 text-xl font-semibold text-[var(--ink)]">
+        {title}
+      </h3>
+    </div>
+  );
+}
+
 function SummaryEmptyState({
   canSummarize,
   canTranscribe,
@@ -314,16 +337,9 @@ export function SummaryTab({
         </div>
       ) : null}
 
-      <section className="relative grid overflow-hidden bg-[var(--paper-deep)]/55 px-5 py-6 sm:grid-cols-[112px_1fr] sm:gap-6 sm:px-6 sm:py-7">
-        <div className="mb-4 flex items-center justify-between sm:mb-0 sm:block">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
-            摘要
-          </p>
-          <span className="font-editorial mt-3 block text-3xl text-[var(--accent)]/45">
-            01
-          </span>
-        </div>
-        <p className="font-editorial text-pretty border-l-2 border-[var(--accent)] pl-5 text-lg font-semibold leading-8 text-[var(--ink)] sm:text-xl sm:leading-9">
+      <section className="grid gap-5 bg-[var(--paper-deep)]/55 px-5 py-6 lg:grid-cols-[140px_1fr] lg:gap-8 sm:px-6 sm:py-7">
+        <SummarySectionHeading index="01" label="摘要" title="一句话摘要" />
+        <p className="font-editorial text-pretty text-lg font-semibold leading-8 text-[var(--ink)] sm:text-xl sm:leading-9">
           {summary.tldr}
         </p>
       </section>
@@ -342,17 +358,7 @@ export function SummaryTab({
       ) : null}
 
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
-            02 / 观点
-          </p>
-          <h3 className="font-editorial mt-1 text-xl font-semibold text-[var(--ink)]">
-            核心观点
-          </h3>
-          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-            沿着编号快速浏览这份内容的论证骨架。
-          </p>
-        </div>
+        <SummarySectionHeading index="02" label="观点" title="核心观点" />
         <ol className="border-t border-[var(--line-strong)]">
           {summary.key_points.map((point, index) => (
             <li
@@ -372,17 +378,11 @@ export function SummaryTab({
 
       {summary.structured_analysis_markdown.trim() ? (
         <section className="grid gap-5 border-y border-[var(--line-strong)] py-6 lg:grid-cols-[140px_1fr] lg:gap-8">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
-              深度笔记
-            </p>
-            <h3 className="font-editorial mt-1 text-xl font-semibold text-[var(--ink)]">
-              结构化分析
-            </h3>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-              保留论证、案例、条件与内容边界，不只压缩成要点。
-            </p>
-          </div>
+          <SummarySectionHeading
+            index="03"
+            label="深度笔记"
+            title="结构化分析"
+          />
           <SafeMarkdown markdown={summary.structured_analysis_markdown} />
         </section>
       ) : null}
@@ -411,14 +411,7 @@ export function SummaryTab({
       ) : null}
 
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
-        <div>
-          <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
-            03 / 行动
-          </p>
-          <h3 className="font-editorial mt-1 text-xl font-semibold text-[var(--ink)]">
-            可行动建议
-          </h3>
-        </div>
+        <SummarySectionHeading index="04" label="行动" title="可行动建议" />
         <ol className="grid border-t border-[var(--line-strong)] sm:grid-cols-2">
           {applicationClues.map((item, index) => (
             <li
