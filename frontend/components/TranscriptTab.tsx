@@ -8,7 +8,8 @@ import {
   FileDown,
   GitCompareArrows,
   Loader2,
-  Plus
+  Plus,
+  Search
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranscriptNoteWorkflow } from "@/hooks/use-transcript-note-workflow";
@@ -19,6 +20,7 @@ import type {
   VideoSummary
 } from "@/lib/types";
 import { TranscriptComparisonColumn } from "./TranscriptComparisonColumn";
+import { IconActionButton } from "./IconActionButton";
 import { TranscriptNoteWorkflow } from "./TranscriptNoteWorkflow";
 import { TranscribeSettingsPanel } from "./TranscribeSettingsPanel";
 import {
@@ -78,6 +80,7 @@ export function TranscriptTab({
   const [selectedTranscriptVariant, setSelectedTranscriptVariant] =
     useState<string>(activeTranscriptVariant ?? "");
   const [isComparingTranscripts, setIsComparingTranscripts] = useState(false);
+  const [transcriptQuery, setTranscriptQuery] = useState("");
   const [transcribeSettings, setTranscribeSettings] =
     useState<TranscribeContextSettings>(() =>
       buildInitialTranscribeSettings(videoPlatform, mediaType)
@@ -143,6 +146,7 @@ export function TranscriptTab({
   ]);
   useEffect(() => {
     setTranscriptViewMode("final");
+    setTranscriptQuery("");
   }, [sourceUrl, transcript]);
 
   useEffect(() => {
@@ -195,38 +199,33 @@ export function TranscriptTab({
     onTranscribe(transcribeSettings);
   };
 
-  const renderTopActions = (tone: "amber" | "zinc") => {
-    const borderClass = tone === "amber" ? "border-[var(--line-ink)]" : "border-[var(--line-strong)]";
-    const textClass = tone === "amber" ? "text-[#7a4a1f]" : "text-[var(--ink-soft)]";
-    const hoverClass =
-      tone === "amber"
-        ? "hover:border-[var(--line-ink)] hover:text-[var(--ink)]"
-        : "hover:border-[var(--line-strong)] hover:text-[var(--ink)]";
-
+  const renderTopActions = (sourceKind: "shownotes" | "transcript") => {
     return (
       <>
-        <button
-          className={`inline-flex h-10 items-center gap-2 rounded-[2px] border ${borderClass} bg-[var(--paper-raised)] px-3 text-sm font-medium ${textClass} transition-colors ${hoverClass} active:scale-[0.96]`}
-          type="button"
-          onClick={handleCopy}
-        >
-          {hasCopied ? (
-            <ClipboardCheck className="h-4 w-4 text-[#2f5d3a]" />
-          ) : (
-            <Clipboard className="h-4 w-4" />
-          )}
-          {hasCopied ? "已复制" : tone === "amber" ? "复制原文" : "复制全文"}
-        </button>
-        <button
-          className={`inline-flex h-10 items-center gap-2 rounded-[2px] border ${borderClass} bg-[var(--paper-raised)] px-3 text-sm font-medium ${textClass} transition-colors ${hoverClass} active:scale-[0.96]`}
-          type="button"
+        <IconActionButton
+          icon={hasCopied ? ClipboardCheck : Clipboard}
+          label={
+            hasCopied
+              ? "全文已复制"
+              : sourceKind === "shownotes"
+                ? "复制公开笔记"
+                : "复制全文"
+          }
+          tone={hasCopied ? "accent" : "default"}
+          onClick={() => void handleCopy()}
+        />
+        <IconActionButton
+          icon={FileDown}
+          label={
+            hasExported
+              ? "全文已导出"
+              : sourceKind === "shownotes"
+                ? "导出公开笔记"
+                : "导出全文"
+          }
+          tone={hasExported ? "accent" : "default"}
           onClick={handleExport}
-        >
-          <FileDown
-            className={`h-4 w-4 ${hasExported ? "text-[#2f5d3a]" : ""}`}
-          />
-          {hasExported ? "已导出" : tone === "amber" ? "导出原文" : "导出全文"}
-        </button>
+        />
       </>
     );
   };
@@ -331,6 +330,12 @@ export function TranscriptTab({
     .map((paragraph) => paragraph.trim())
     .filter(Boolean)
     .map((paragraph) => ({ end: 0, start: 0, text: paragraph }));
+  const normalizedTranscriptQuery = transcriptQuery.trim().toLocaleLowerCase("zh-CN");
+  const visibleSegments = normalizedTranscriptQuery
+    ? activeTranscript.segments.filter((segment) =>
+        segment.text.toLocaleLowerCase("zh-CN").includes(normalizedTranscriptQuery)
+      )
+    : activeTranscript.segments;
 
   if (isShownotes) {
     return (
@@ -371,7 +376,7 @@ export function TranscriptTab({
                   {isTranscribing ? "生成中" : "生成转写稿"}
                 </button>
               ) : null}
-              {renderTopActions("amber")}
+              {renderTopActions("shownotes")}
             </div>
           </div>
         </section>
@@ -384,29 +389,32 @@ export function TranscriptTab({
           />
         ) : null}
 
-        {renderNoteWorkflow()}
-
-        <article
-          className="max-h-[500px] overflow-auto rounded-[2px] bg-[var(--paper-raised)] px-5 py-5 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.1)]"
-          ref={(element) => {
-            transcriptTextRootRef.current = element;
-          }}
-        >
-          <div className="mx-auto max-w-3xl space-y-5">
-            {shownotesParagraphs.map((segment, index) => (
-              <div className="group" key={`${index}-${segment.text}`}>
-                <p
-                  className="transcript-excerpt-text whitespace-pre-wrap text-base leading-8 text-[var(--ink-soft)]"
-                  data-excerpt-end={segment.end}
-                  data-excerpt-start={segment.start}
-                  data-transcript-excerpt="true"
-                >
-                  {segment.text}
-                </p>
-              </div>
-            ))}
-          </div>
-        </article>
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <article
+            className="max-h-[650px] min-w-0 overflow-auto rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-5 py-5"
+            ref={(element) => {
+              transcriptTextRootRef.current = element;
+            }}
+          >
+            <div className="mx-auto max-w-3xl space-y-5">
+              {shownotesParagraphs.map((segment, index) => (
+                <div className="group" key={`${index}-${segment.text}`}>
+                  <p
+                    className="transcript-excerpt-text whitespace-pre-wrap text-base leading-8 text-[var(--ink-soft)]"
+                    data-excerpt-end={segment.end}
+                    data-excerpt-start={segment.start}
+                    data-transcript-excerpt="true"
+                  >
+                    {segment.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </article>
+          <aside className="max-h-[650px] min-w-0 overflow-y-auto pr-1 xl:sticky xl:top-[9rem]">
+            {renderNoteWorkflow()}
+          </aside>
+        </div>
 
         {transcribeErrorMessage ? (
           <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
@@ -453,18 +461,12 @@ export function TranscriptTab({
             </select>
           ) : null}
           {canCompareTranscripts ? (
-            <button
-              className={`inline-flex h-10 items-center gap-2 rounded-[2px] border px-3 text-sm font-medium transition ${
-                isComparingTranscripts
-                  ? "border-[var(--line-ink)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                  : "border-[var(--line-strong)] bg-[var(--paper-raised)] text-[var(--ink-soft)] hover:border-[var(--accent)]"
-              }`}
-              type="button"
+            <IconActionButton
+              icon={GitCompareArrows}
+              label={isComparingTranscripts ? "退出并排对比" : "并排对比转写稿"}
+              pressed={isComparingTranscripts}
               onClick={() => setIsComparingTranscripts((current) => !current)}
-            >
-              <GitCompareArrows className="h-4 w-4" aria-hidden="true" />
-              {isComparingTranscripts ? "退出对比" : "并排对比"}
-            </button>
+            />
           ) : null}
           {canShowRawTranscript ? (
             <div className="inline-flex h-10 overflow-hidden rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] p-1">
@@ -492,72 +494,84 @@ export function TranscriptTab({
               </button>
             </div>
           ) : null}
-          {canTranscribe ? (
-            <button
-              className="inline-flex h-10 items-center gap-2 rounded-[2px] bg-[var(--ink)] px-3 text-sm font-semibold text-[var(--paper)] transition hover:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isTranscribing}
-              type="button"
-              onClick={handleTranscribeClick}
-            >
-              {isTranscribing ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <FileAudio className="h-4 w-4" aria-hidden="true" />
-              )}
-              {isTranscribing ? "生成中" : "重新转写"}
-            </button>
-          ) : null}
-          {renderTopActions("zinc")}
+          {renderTopActions("transcript")}
         </div>
       </div>
 
-      {renderNoteWorkflow()}
-
-      {isComparingTranscripts && canCompareTranscripts ? (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {comparisonVariantKeys.map((variantKey) => (
-            <TranscriptComparisonColumn
-              key={variantKey}
-              transcript={normalizedTranscriptVariants[variantKey]}
-              variantKey={variantKey}
-              viewMode={transcriptViewMode}
-            />
-          ))}
-        </div>
-      ) : (
-        <div
-          className="max-h-[460px] overflow-auto rounded-[2px] border border-[var(--line-strong)]"
-          ref={(element) => {
-            transcriptTextRootRef.current = element;
-          }}
-        >
-          {activeTranscript.segments.map((segment) => (
-            <div
-              className="grid gap-3 border-b border-[var(--line-strong)] bg-[var(--paper-raised)] px-4 py-3 last:border-b-0 sm:grid-cols-[86px_minmax(0,1fr)]"
-              key={`${segment.start}-${segment.end}-${segment.speaker ?? ""}-${segment.text}`}
-            >
-              <div className="select-none space-y-1">
-                <div className="mono text-xs text-[var(--muted)]">
-                  {formatTimestamp(segment.start)}
-                </div>
-                {segment.speaker ? (
-                  <span className="inline-flex max-w-[76px] truncate rounded-[2px] bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-                    {segment.speaker}
-                  </span>
-                ) : null}
-              </div>
-              <p
-                className="transcript-excerpt-text text-sm leading-6 text-[var(--ink-soft)]"
-                data-excerpt-end={segment.end}
-                data-excerpt-start={segment.start}
-                data-transcript-excerpt="true"
-              >
-                {segment.text}
-              </p>
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+        <div className="min-w-0">
+          {isComparingTranscripts && canCompareTranscripts ? (
+            <div className="grid gap-4 2xl:grid-cols-2">
+              {comparisonVariantKeys.map((variantKey) => (
+                <TranscriptComparisonColumn
+                  key={variantKey}
+                  transcript={normalizedTranscriptVariants[variantKey]}
+                  variantKey={variantKey}
+                  viewMode={transcriptViewMode}
+                />
+              ))}
             </div>
-          ))}
+          ) : (
+            <>
+              <label className="relative mb-3 block">
+                <span className="sr-only">搜索并定位原文</span>
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
+                />
+                <input
+                  className="h-10 w-full border border-[var(--line-strong)] bg-[var(--paper)] pl-9 pr-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                  placeholder="输入关键词，定位原文"
+                  type="search"
+                  value={transcriptQuery}
+                  onChange={(event) => setTranscriptQuery(event.target.value)}
+                />
+              </label>
+              <div
+                className="max-h-[650px] overflow-auto rounded-[2px] border border-[var(--line-strong)]"
+                ref={(element) => {
+                  transcriptTextRootRef.current = element;
+                }}
+              >
+                {visibleSegments.length > 0 ? (
+                  visibleSegments.map((segment) => (
+                    <div
+                      className="grid gap-3 border-b border-[var(--line-strong)] bg-[var(--paper-raised)] px-4 py-3 last:border-b-0 sm:grid-cols-[86px_minmax(0,1fr)]"
+                      key={`${segment.start}-${segment.end}-${segment.speaker ?? ""}-${segment.text}`}
+                    >
+                      <div className="select-none space-y-1">
+                        <div className="mono text-xs text-[var(--muted)]">
+                          {formatTimestamp(segment.start)}
+                        </div>
+                        {segment.speaker ? (
+                          <span className="inline-flex max-w-[76px] truncate rounded-[2px] bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                            {segment.speaker}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p
+                        className="transcript-excerpt-text text-sm leading-6 text-[var(--ink-soft)]"
+                        data-excerpt-end={segment.end}
+                        data-excerpt-start={segment.start}
+                        data-transcript-excerpt="true"
+                      >
+                        {segment.text}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+                    没有找到包含“{transcriptQuery.trim()}”的片段。
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      )}
+        <aside className="max-h-[700px] min-w-0 overflow-y-auto pr-1 xl:sticky xl:top-[9rem]">
+          {renderNoteWorkflow()}
+        </aside>
+      </div>
     </div>
   );
 }

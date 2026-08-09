@@ -108,10 +108,7 @@ from app.services.qa_service import answer_question
 from app.services.rate_limit_service import (
     get_rate_limit_items,
 )
-from app.services.summarize_service import (
-    UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
-    summarize_transcript,
-)
+from app.services.summarize_service import summarize_transcript
 from app.services.transcript_correction_service import (
     get_transcript_correction_status,
 )
@@ -136,7 +133,6 @@ QA_RATE_LIMIT_PER_HOUR = read_int_env("QA_RATE_LIMIT_PER_HOUR", 10)
 TRANSCRIBE_RATE_LIMIT_PER_HOUR = read_int_env("TRANSCRIBE_RATE_LIMIT_PER_HOUR", 3)
 IMAGE_PROXY_TIMEOUT_SECONDS = 15
 IMAGE_PROXY_MAX_BYTES = 8 * 1024 * 1024
-SUMMARY_CACHE_STATUSES = {"ai_generated"}
 IMAGE_PROXY_ACCEPT_HEADER = (
     "image/avif,image/webp,image/apng,image/png,image/jpeg,"
     "image/*;q=0.8,*/*;q=0.5"
@@ -790,12 +786,11 @@ def parse_video(request: Request, parse_request: ParseRequest) -> ParseResponse:
     校验真实解析入口，并返回媒体元数据解析结果。
     """
     video_url = normalize_public_video_url(parse_request.url)
-    cached_detail = None
-    if not parse_request.force_refresh:
-        try:
-            cached_detail = get_library_detail_by_source_url(video_url)
-        except (sqlite3.Error, OSError, ValueError) as error:
-            logger.warning("library cache lookup failed: %s", error.__class__.__name__)
+    try:
+        cached_detail = get_library_detail_by_source_url(video_url)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        cached_detail = None
+        logger.warning("library cache lookup failed: %s", error.__class__.__name__)
 
     if cached_detail is not None:
         return cached_detail
@@ -838,10 +833,6 @@ def summarize_video(
             },
         )
 
-    cached_summary_response = get_cached_summary_response(summarize_request)
-    if cached_summary_response is not None:
-        return cached_summary_response
-
     enforce_rate_limit(request, "summarize", SUMMARY_RATE_LIMIT_PER_HOUR)
     try:
         summarize_response = summarize_transcript(summarize_request)
@@ -858,11 +849,6 @@ def summarize_video(
                 ),
             },
         ) from error
-    if not summarize_response.is_ai_generated:
-        cached_summary_response = get_cached_summary_response(summarize_request)
-        if cached_summary_response is not None:
-            return cached_summary_response
-
     try:
         update_summary_for_source_url(
             summarize_request.source_url,
@@ -875,58 +861,6 @@ def summarize_video(
         )
 
     return summarize_response
-
-
-def get_cached_summary_response(
-    summarize_request: SummarizeRequest,
-) -> SummarizeResponse | None:
-    """
-    同一媒体源已有总结时直接复用历史结果，避免重复消耗模型 token 和本地频控额度。
-    """
-    source_url = summarize_request.source_url
-    if not source_url:
-        return None
-
-    try:
-        cached_detail = get_library_detail_by_source_url(source_url)
-    except (sqlite3.Error, OSError, ValueError) as error:
-        logger.warning(
-            "library summary cache lookup failed: %s",
-            error.__class__.__name__,
-        )
-        return None
-
-    if (
-        cached_detail is None
-        or cached_detail.library_summary_status not in SUMMARY_CACHE_STATUSES
-    ):
-        return None
-
-    # NOTE: 旧总结仍可打开，但重新生成时必须升级到通用知识草稿，不能继续复用个人化缓存。
-    if (
-        cached_detail.summary.draft_version
-        != UNIVERSAL_KNOWLEDGE_DRAFT_VERSION
-    ):
-        return None
-
-    if not cached_detail.summary.highlights:
-        return None
-
-    if all(
-        highlight.source == "local_fallback"
-        for highlight in cached_detail.summary.highlights
-    ):
-        return None
-
-    return SummarizeResponse(
-        summary=cached_detail.summary,
-        mindmap_markdown=cached_detail.mindmap_markdown,
-        mindmap_meta=cached_detail.mindmap_meta,
-        is_ai_generated=cached_detail.library_summary_status == "ai_generated",
-        model=cached_detail.library_summary_model or "历史记录",
-        fallback_reason=None,
-        is_cached=True,
-    )
 
 
 @app.post("/api/qa", response_model=QaResponse)

@@ -30,7 +30,6 @@ interface AiTabsProps {
   summaryDisplayState: SummaryDisplayState;
   summaryErrorMessage: string | null;
   summaryGenerationMeta: SummaryGenerationMeta | null;
-  summaryNotice: string | null;
   transcribeErrorMessage: string | null;
   transcript: TranscriptPayload | null;
   transcriptVariants: Record<string, TranscriptPayload>;
@@ -73,7 +72,6 @@ export function AiTabs({
   summaryDisplayState,
   summaryErrorMessage,
   summaryGenerationMeta,
-  summaryNotice,
   transcribeErrorMessage,
   transcript,
   transcriptVariants,
@@ -93,14 +91,9 @@ export function AiTabs({
 
   return (
     <section className="shadow-hard-lg min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4 sm:p-7">
-      <div className="mb-5 flex items-center justify-between gap-3 border-b-2 border-[var(--line-ink)] pb-4">
-        <span className="shadow-hard-sm mono inline-flex items-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--paper-raised)]">
-          KNOWLEDGE DRAFT
-        </span>
-      </div>
       <div
         aria-label="知识稿内容视图"
-        className="flex gap-6 overflow-x-auto"
+        className="sticky top-[4.75rem] z-20 -mx-4 -mt-4 flex gap-6 overflow-x-auto border-b-2 border-[var(--line-ink)] bg-[var(--paper-raised)] px-4 pb-3 pt-4 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pt-5"
         role="tablist"
       >
         {tabs.map((tab, tabIndex) => {
@@ -154,7 +147,7 @@ export function AiTabs({
 
       <div
         aria-label={`${tabs.find((tab) => tab.key === activeTab)?.label ?? "知识稿"}内容`}
-        className="mt-6 min-w-0"
+        className="mt-5 min-w-0"
         role="tabpanel"
       >
         {activeTab === "summary" ? (
@@ -169,7 +162,6 @@ export function AiTabs({
             summaryDisplayState={summaryDisplayState}
             summaryErrorMessage={summaryErrorMessage}
             summaryGenerationMeta={summaryGenerationMeta}
-            summaryNotice={summaryNotice}
             transcribeErrorMessage={transcribeErrorMessage}
             textSourceType={textSourceType}
             onSummarize={onSummarize}

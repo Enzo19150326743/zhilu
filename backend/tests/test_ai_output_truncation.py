@@ -14,14 +14,13 @@ class AiOutputTruncationApiTests(unittest.TestCase):
             transcript_plain_text="用于测试的内容文本。",
         )
 
-        with patch("app.main.get_cached_summary_response", return_value=None):
-            with patch("app.main.enforce_rate_limit"):
-                with patch(
-                    "app.main.summarize_transcript",
-                    side_effect=DeepSeekOutputTruncatedError("输出不完整"),
-                ):
-                    with self.assertRaises(HTTPException) as raised:
-                        summarize_video(object(), summarize_request)  # type: ignore[arg-type]
+        with patch("app.main.enforce_rate_limit"):
+            with patch(
+                "app.main.summarize_transcript",
+                side_effect=DeepSeekOutputTruncatedError("输出不完整"),
+            ):
+                with self.assertRaises(HTTPException) as raised:
+                    summarize_video(object(), summarize_request)  # type: ignore[arg-type]
 
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(

@@ -60,7 +60,6 @@ class ParseRequest(BaseModel):
     """媒体解析请求。"""
 
     url: str = Field(min_length=1, max_length=2048)
-    force_refresh: bool = False
 
 
 class TranscriptSegment(BaseModel):
@@ -481,7 +480,6 @@ class SummarizeResponse(BaseModel):
     is_ai_generated: bool
     model: str
     fallback_reason: str | None = None
-    is_cached: bool = False
 
 
 class QaReference(BaseModel):

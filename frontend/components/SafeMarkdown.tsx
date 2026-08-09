@@ -87,12 +87,48 @@ function parseMarkdown(markdown: string): MarkdownBlock[] {
   return blocks;
 }
 
-function renderHeading(level: number, text: string): ReactNode {
-  if (level <= 2) {
-    return <h3 className="font-editorial mt-7 text-xl font-semibold text-[var(--ink)] first:mt-0">{text}</h3>;
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const strongPattern = /\*\*(.+?)\*\*/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = strongPattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      nodes.push(text.slice(cursor, match.index));
+    }
+    nodes.push(
+      <strong
+        className="font-semibold text-[var(--ink)]"
+        key={`strong-${match.index}`}
+      >
+        {match[1]}
+      </strong>
+    );
+    cursor = match.index + match[0].length;
   }
 
-  return <h4 className="mt-5 text-sm font-semibold text-[var(--ink)]">{text}</h4>;
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+
+  return nodes.length > 0 ? nodes : [text];
+}
+
+function renderHeading(level: number, text: string): ReactNode {
+  if (level <= 2) {
+    return (
+      <h3 className="font-editorial mt-7 text-xl font-semibold text-[var(--ink)] first:mt-0">
+        {renderInlineMarkdown(text)}
+      </h3>
+    );
+  }
+
+  return (
+    <h4 className="mt-5 text-sm font-semibold text-[var(--ink)]">
+      {renderInlineMarkdown(text)}
+    </h4>
+  );
 }
 
 export function SafeMarkdown({ markdown }: SafeMarkdownProps) {
@@ -111,7 +147,7 @@ export function SafeMarkdown({ markdown }: SafeMarkdownProps) {
               className="my-4 border-l-2 border-[var(--accent)] bg-[var(--paper-deep)]/55 px-4 py-3 text-[var(--ink-soft)]"
               key={key}
             >
-              {block.text}
+              {renderInlineMarkdown(block.text)}
             </blockquote>
           );
         }
@@ -119,7 +155,7 @@ export function SafeMarkdown({ markdown }: SafeMarkdownProps) {
           return (
             <ul className="my-3 list-disc space-y-1.5 pl-5" key={key}>
               {block.items.map((item, itemIndex) => (
-                <li key={`${item}-${itemIndex}`}>{item}</li>
+                <li key={`${item}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>
               ))}
             </ul>
           );
@@ -128,7 +164,7 @@ export function SafeMarkdown({ markdown }: SafeMarkdownProps) {
           return (
             <ol className="my-3 list-decimal space-y-1.5 pl-5" key={key}>
               {block.items.map((item, itemIndex) => (
-                <li key={`${item}-${itemIndex}`}>{item}</li>
+                <li key={`${item}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>
               ))}
             </ol>
           );
@@ -136,7 +172,7 @@ export function SafeMarkdown({ markdown }: SafeMarkdownProps) {
 
         return (
           <p className="my-3 text-pretty" key={key}>
-            {block.text}
+            {renderInlineMarkdown(block.text)}
           </p>
         );
       })}

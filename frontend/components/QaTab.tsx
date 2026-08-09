@@ -52,6 +52,12 @@ const qaModes: Array<{
   }
 ];
 
+const suggestedQuestions = [
+  "这段内容的核心结论是什么？",
+  "作者给出了哪些可执行建议？",
+  "有哪些观点需要进一步核实？"
+];
+
 function getQaErrorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
     if (error.status === 404) {
@@ -161,7 +167,7 @@ export function QaTab({
           <div>
             <h3 className="text-sm font-semibold text-[var(--ink)]">问答模式</h3>
             <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-              基于当前内容文本回答，无法从文本确认的信息会明确说明无法确定。
+              仅根据当前内容回答，不确定处会说明。
             </p>
           </div>
           <div className="grid grid-cols-2 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] p-1">
@@ -188,15 +194,9 @@ export function QaTab({
           </div>
         </div>
 
-        <div className="mt-3 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-3 py-2">
-          <p className="text-xs font-medium text-[var(--muted)]">当前模式</p>
-          <p className="mt-1 text-sm font-semibold text-[var(--ink)]">
-            {activeModeDetail.label}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-            {activeModeDetail.description}
-          </p>
-        </div>
+        <p className="mt-3 border-t border-[var(--line-strong)] pt-3 text-xs leading-5 text-[var(--muted)]">
+          {activeModeDetail.description}
+        </p>
       </section>
 
       {!canAsk ? (
@@ -243,9 +243,30 @@ export function QaTab({
         </div>
       ) : null}
 
-      <form className="flex gap-2" onSubmit={handleAsk}>
+      {canAsk && !answer ? (
+        <section>
+          <h3 className="text-xs font-semibold text-[var(--muted)]">可以先问</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {suggestedQuestions.map((suggestedQuestion) => (
+              <button
+                className="border border-[var(--line-strong)] bg-[var(--paper-raised)] px-3 py-2 text-left text-xs text-[var(--ink-soft)] transition-[background-color,color,border-color] hover:border-[var(--line-ink)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
+                key={suggestedQuestion}
+                type="button"
+                onClick={() => setQuestion(suggestedQuestion)}
+              >
+                {suggestedQuestion}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <form
+        className="sticky bottom-3 z-10 flex gap-2 border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-2 shadow-[3px_3px_0_0_var(--ink)]"
+        onSubmit={handleAsk}
+      >
         <input
-          className="h-11 flex-1 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--paper)] disabled:text-[var(--muted)]"
+          className="focus-subtle h-11 flex-1 border border-[var(--line-strong)] bg-[var(--paper)] px-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--line-ink)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
           disabled={!canAsk || isAsking}
           placeholder={
             isShownotes

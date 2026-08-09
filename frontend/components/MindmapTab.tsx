@@ -5,12 +5,12 @@ import {
   GitFork,
   Loader2,
   Maximize2,
+  Minimize2,
   Move,
-  RotateCcw,
-  ZoomIn,
-  ZoomOut
+  RotateCcw
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { IconActionButton } from "./IconActionButton";
 import type { MindmapMeta, SummaryDisplayState } from "@/lib/types";
 
 interface MindmapTabProps {
@@ -24,42 +24,6 @@ type RenderState = "idle" | "loading" | "ready" | "error";
 interface MarkmapInstance {
   destroy: () => void;
   fit: () => Promise<void>;
-  rescale: (scale: number) => Promise<void> | void;
-  setHighlight: (node: unknown | null) => void;
-}
-
-const contentCategoryLabels: Record<string, string> = {
-  business_tech: "商业科技 / 干货",
-  general: "通用内容",
-  interview_podcast: "访谈播客",
-  self_growth: "自我成长",
-  tutorial_howto: "教程方法"
-};
-
-const mediaTypeLabels: Record<string, string> = {
-  media: "媒体内容",
-  podcast: "播客",
-  video: "视频"
-};
-
-const textSourceLabels: Record<string, string> = {
-  content: "内容文本",
-  asr_transcript: "转写稿",
-  subtitle: "平台字幕",
-  shownotes: "公开笔记",
-  transcript: "字幕 / 逐字稿"
-};
-
-function getMetaLabel(
-  labels: Record<string, string>,
-  value: string | null | undefined,
-  fallback: string
-): string {
-  if (!value) {
-    return fallback;
-  }
-
-  return labels[value] ?? fallback;
 }
 
 export function MindmapTab({
@@ -71,24 +35,9 @@ export function MindmapTab({
   const markmapRef = useRef<MarkmapInstance | null>(null);
   const [renderState, setRenderState] = useState<RenderState>("idle");
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   const normalizedMarkdown = mindmapMarkdown?.trim() ?? "";
   const isShownotes = mindmapMeta?.text_source_type === "shownotes";
-  const metaItems = useMemo(
-    () => [
-      getMetaLabel(
-        contentCategoryLabels,
-        mindmapMeta?.content_category,
-        "通用内容"
-      ),
-      getMetaLabel(mediaTypeLabels, mindmapMeta?.media_type, "媒体内容"),
-      getMetaLabel(
-        textSourceLabels,
-        mindmapMeta?.text_source_type,
-        "内容文本"
-      )
-    ],
-    [mindmapMeta]
-  );
 
   useEffect(() => {
     if (!normalizedMarkdown || !svgRef.current) {
@@ -98,7 +47,6 @@ export function MindmapTab({
 
     let isCancelled = false;
     let markmap: MarkmapInstance | null = null;
-    let handleSvgClick: ((event: MouseEvent) => void) | null = null;
 
     async function renderMindmap() {
       setRenderState("loading");
@@ -133,19 +81,6 @@ export function MindmapTab({
           root
         ) as MarkmapInstance;
         markmapRef.current = markmap;
-        handleSvgClick = (event: MouseEvent) => {
-          const target = event.target;
-          if (!(target instanceof Element)) {
-            return;
-          }
-
-          const nodeElement = target.closest("g.markmap-node");
-          const nodeData = nodeElement
-            ? (nodeElement as Element & { __data__?: unknown }).__data__
-            : null;
-          markmapRef.current?.setHighlight(nodeData ?? null);
-        };
-        svgRef.current.addEventListener("click", handleSvgClick);
         await markmap.fit();
 
         if (!isCancelled) {
@@ -163,9 +98,6 @@ export function MindmapTab({
 
     return () => {
       isCancelled = true;
-      if (svgRef.current && handleSvgClick) {
-        svgRef.current.removeEventListener("click", handleSvgClick);
-      }
       markmap?.destroy();
       if (markmapRef.current === markmap) {
         markmapRef.current = null;
@@ -173,17 +105,32 @@ export function MindmapTab({
     };
   }, [normalizedMarkdown]);
 
-  const handleFit = () => {
-    void markmapRef.current?.fit();
-  };
+  useEffect(() => {
+    if (!isExpanded) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const fitTimer = window.setTimeout(() => {
+      void markmapRef.current?.fit();
+    }, 120);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.clearTimeout(fitTimer);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isExpanded]);
 
   const handleReset = () => {
-    markmapRef.current?.setHighlight(null);
     void markmapRef.current?.fit();
-  };
-
-  const handleZoom = (scale: number) => {
-    void markmapRef.current?.rescale(scale);
   };
 
   if (summaryDisplayState === "empty") {
@@ -211,23 +158,17 @@ export function MindmapTab({
   }
 
   return (
-    <div className="space-y-4">
-      <section className="flex flex-col gap-3 border-b border-[var(--line-strong)] pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-            <GitFork className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
-            树状导图
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {metaItems.map((item) => (
-              <span
-                className="inline-flex min-h-7 items-center rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] px-2.5 text-xs font-medium text-[var(--muted-strong)]"
-                key={item}
-              >
-                {item}
-              </span>
-            ))}
-          </div>
+    <div
+      className={
+        isExpanded
+          ? "fixed inset-5 z-50 overflow-hidden border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4 shadow-[8px_8px_0_0_var(--ink)]"
+          : "space-y-4"
+      }
+    >
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+          <GitFork className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
+          树状导图
         </div>
 
         {isShownotes ? (
@@ -238,59 +179,33 @@ export function MindmapTab({
       </section>
 
       <section className="relative overflow-hidden rounded-[2px] border border-[var(--line-strong)] bg-[#fbfbf8]">
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)]/95 p-1 shadow-sm backdrop-blur">
-          <button
-            aria-label="放大导图"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-2 bg-[var(--paper-raised)]/95 p-1 backdrop-blur">
+          <IconActionButton
             disabled={renderState !== "ready"}
-            title="放大"
-            type="button"
-            onClick={() => handleZoom(1.2)}
-          >
-            <ZoomIn className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            aria-label="缩小导图"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
-            disabled={renderState !== "ready"}
-            title="缩小"
-            type="button"
-            onClick={() => handleZoom(0.8)}
-          >
-            <ZoomOut className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            aria-label="适应导图画布"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
-            disabled={renderState !== "ready"}
-            title="适应画布"
-            type="button"
-            onClick={handleFit}
-          >
-            <Maximize2 className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            aria-label="重置导图视图"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
-            disabled={renderState !== "ready"}
-            title="重置视图"
-            type="button"
+            icon={RotateCcw}
+            label="重置导图视图"
             onClick={handleReset}
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          </button>
+            tooltipSide="bottom"
+          />
+          <IconActionButton
+            icon={isExpanded ? Minimize2 : Maximize2}
+            label={isExpanded ? "退出全屏导图" : "全屏查看导图"}
+            pressed={isExpanded}
+            onClick={() => setIsExpanded((current) => !current)}
+            tooltipSide="bottom"
+          />
         </div>
 
         <svg
           aria-label="智能树状导图"
-          className="h-[460px] w-full"
+          className={isExpanded ? "h-[calc(100vh-9.5rem)] w-full" : "h-[520px] w-full"}
           ref={svgRef}
         />
 
         {renderState === "ready" ? (
           <div className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-[2px] bg-[var(--paper-raised)]/90 px-2.5 py-1.5 text-[11px] text-[var(--muted)] shadow-sm backdrop-blur">
             <Move className="h-3.5 w-3.5" aria-hidden="true" />
-            拖拽画布平移 · 滚轮缩放 · 点击节点高亮或展开
+            拖拽平移，滚轮缩放，点击节点展开或收起
           </div>
         ) : null}
 

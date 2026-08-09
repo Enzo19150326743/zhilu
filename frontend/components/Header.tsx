@@ -32,18 +32,21 @@ export function Header({ onHomeClick }: HeaderProps) {
           </div>
         </button>
 
-        <div className="flex items-center gap-5">
-          <span className="mono hidden text-[10px] uppercase tracking-[0.2em] text-[var(--muted)] md:block">
-            VOL.01 — 本地 Markdown 知识工作台
-          </span>
+        <div className="flex items-center gap-3">
           <a
-            className="ink-block mono inline-flex items-center gap-2 rounded-[2px] bg-[var(--paper-raised)] px-3.5 py-2 text-xs font-medium text-[var(--ink)]"
+            aria-label="在 GitHub 查看知录"
+            className="group relative inline-flex h-9 w-9 items-center justify-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] text-[var(--ink)] shadow-[2px_2px_0_0_var(--ink)] transition-[box-shadow,transform,background-color] duration-150 hover:translate-x-[1px] hover:translate-y-[1px] hover:bg-[var(--paper-deep)] hover:shadow-[1px_1px_0_0_var(--ink)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
             href={GITHUB_URL}
             rel="noreferrer"
             target="_blank"
           >
-            <Github className="h-3.5 w-3.5" aria-hidden="true" />
-            Star on GitHub
+            <Github className="h-4 w-4" aria-hidden="true" />
+            <span
+              className="pointer-events-none absolute right-0 top-[calc(100%+8px)] z-50 w-max border border-[var(--line-ink)] bg-[var(--ink)] px-2 py-1 text-[11px] text-[var(--paper-raised)] opacity-0 shadow-[2px_2px_0_0_var(--accent)] transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              role="tooltip"
+            >
+              在 GitHub 查看知录
+            </span>
           </a>
         </div>
       </div>

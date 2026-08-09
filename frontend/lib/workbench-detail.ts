@@ -166,10 +166,6 @@ export function getRecommendedLocalAsrEngine(
 }
 
 export function getSummaryTaskMessage(response: SummarizeResponse): string {
-  if (response.is_cached) {
-    return "该内容已生成过总结，已直接返回历史结果。";
-  }
-
   if (response.is_ai_generated) {
     return "已生成结构化总结。";
   }

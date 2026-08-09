@@ -40,7 +40,6 @@ interface UseTranscribeWorkflowOptions {
   setSummaryGenerationMeta: Dispatch<
     SetStateAction<{ isAiGenerated: boolean; model: string } | null>
   >;
-  setSummaryNotice: Dispatch<SetStateAction<string | null>>;
 }
 
 export function useTranscribeWorkflow({
@@ -53,8 +52,7 @@ export function useTranscribeWorkflow({
   setDetail,
   setErrorMessage,
   setSummaryErrorMessage,
-  setSummaryGenerationMeta,
-  setSummaryNotice
+  setSummaryGenerationMeta
 }: UseTranscribeWorkflowOptions) {
   const [transcribeTasks, setTranscribeTasks] = useState<TranscribeTask[]>([]);
   const [isTranscribeSettingsOpen, setIsTranscribeSettingsOpen] = useState(false);
@@ -131,7 +129,6 @@ export function useTranscribeWorkflow({
 
     if (isActiveSourceUrl(taskSourceUrl)) {
       setSummaryGenerationMeta(null);
-      setSummaryNotice(successMessage);
       setActiveTab(continueWithSummary ? "summary" : "transcript");
     }
     void refreshLibraryItems();
@@ -146,12 +143,17 @@ export function useTranscribeWorkflow({
       return;
     }
     if (
+      getTextSourceType(activeDetail.video) !== "shownotes" &&
+      activeDetail.transcript?.plain_text.trim()
+    ) {
+      return;
+    }
+    if (
       transcribeTasks.some(
         (task) =>
           task.sourceUrl === activeDetail.source_url && task.status === "running"
       )
     ) {
-      setSummaryNotice("该链接已经在后台生成转写稿，请等待当前任务完成。");
       return;
     }
 
@@ -178,7 +180,6 @@ export function useTranscribeWorkflow({
     const taskSourceUrl = activeDetail.source_url;
     const taskVideoId = activeDetail.video.video_id;
     const taskTitle = activeDetail.video.title || "未命名内容";
-    const isRetranscription = Boolean(activeDetail.transcript?.plain_text.trim());
     const previousVariant = activeDetail.transcript_variants?.[asrEngine] ?? null;
     const previousVariantJson = previousVariant
       ? JSON.stringify(previousVariant)
@@ -189,7 +190,6 @@ export function useTranscribeWorkflow({
         (task) => task.sourceUrl === taskSourceUrl && task.status === "running"
       )
     ) {
-      setSummaryNotice("该链接已经在后台生成转写稿，请等待当前任务完成。");
       return;
     }
 
@@ -208,7 +208,6 @@ export function useTranscribeWorkflow({
       ...currentTasks.filter((task) => task.sourceUrl !== taskSourceUrl)
     ]);
     setSummaryErrorMessage(null);
-    setSummaryNotice(null);
 
     try {
       const response = await apiClient.transcribeVideo({
@@ -217,9 +216,6 @@ export function useTranscribeWorkflow({
         url: taskSourceUrl,
         video_id: taskVideoId
       });
-      const successMessage = isRetranscription
-        ? `${response.message} 已保留旧版本，可在内容文本中切换或并排对比。`
-        : `${response.message} 正在继续生成总结。`;
       applyTranscribeSuccess(
         taskId,
         taskSourceUrl,
@@ -228,8 +224,8 @@ export function useTranscribeWorkflow({
           response.transcript,
           response.transcript_variant_key
         ),
-        successMessage,
-        !isRetranscription
+        `${response.message} 正在继续生成总结。`,
+        true
       );
     } catch (error) {
       if (isRecoverableTranscribeError(error)) {
@@ -258,10 +254,8 @@ export function useTranscribeWorkflow({
             taskId,
             taskSourceUrl,
             recoveredDetail,
-            isRetranscription
-              ? "逐字稿已从本地历史恢复，可在内容文本中对比版本。"
-              : "逐字稿已生成，已从本地历史恢复结果。",
-            !isRetranscription
+            "逐字稿已生成，已从本地历史恢复结果。",
+            true
           );
           return;
         }

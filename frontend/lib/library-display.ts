@@ -21,7 +21,7 @@ export function getLibraryStatusLabel(item: LibraryItem): string {
   }
 
   if (item.summary_status === "ai_generated") {
-    return "智能总结";
+    return "已总结";
   }
 
   if (item.summary_status === "local_fallback") {
@@ -29,6 +29,33 @@ export function getLibraryStatusLabel(item: LibraryItem): string {
   }
 
   return "可总结";
+}
+
+export function getLibraryDisplayTitle(value: string): string {
+  const normalizedValue = value.replace(/\s+/g, " ").trim();
+  if (!normalizedValue) {
+    return "未命名内容";
+  }
+
+  const withoutHashtags = normalizedValue.split(/\s+#/u)[0]?.trim() || normalizedValue;
+  const sentenceMatch = withoutHashtags.match(/^.{8,64}?[。！？!?]/u);
+  const firstSentence = sentenceMatch?.[0]?.trim();
+  if (
+    firstSentence &&
+    withoutHashtags.slice(firstSentence.length).trim().length > 12
+  ) {
+    return firstSentence;
+  }
+
+  if (withoutHashtags.length <= 68) {
+    return withoutHashtags;
+  }
+
+  if (firstSentence) {
+    return firstSentence;
+  }
+
+  return `${withoutHashtags.slice(0, 66).trimEnd()}…`;
 }
 
 export function getPlatformLabel(platform: string): string {

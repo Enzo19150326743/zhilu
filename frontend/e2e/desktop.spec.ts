@@ -8,7 +8,7 @@ const summarizedItem = {
   source_url: "https://example.com/summarized",
   summary_model: "deepseek-chat",
   summary_status: "ai_generated",
-  text_source_type: "subtitle",
+  text_source_type: "asr_transcript",
   thumbnail: "",
   title: "已总结演示",
   updated_at: "2026-08-09T10:00:00+08:00",
@@ -67,6 +67,42 @@ const needsTranscriptDetail = {
     title: needsTranscriptItem.title,
     url: needsTranscriptItem.source_url,
     video_id: needsTranscriptItem.video_id
+  }
+};
+
+const summarizedDetail = {
+  ...needsTranscriptDetail,
+  active_transcript_variant: "corrected",
+  mindmap_markdown: "# 测试主题\n## 第一分支\n### 关键结论",
+  source_url: summarizedItem.source_url,
+  summary: {
+    ...emptySummary,
+    key_points: ["关键结论"],
+    structured_analysis_markdown:
+      "## 论证与方法\n1. **提升判断力** → 通过调查研究看清方向。",
+    tldr: "用于验证导图工具提示位置。"
+  },
+  transcript: {
+    asr_meta: { correction_status: "corrected", engine: "sensevoice" },
+    plain_text: "用于验证导图工具提示位置。",
+    segments: [{ start: 0, text: "用于验证导图工具提示位置。" }]
+  },
+  transcript_variants: {
+    corrected: {
+      asr_meta: { correction_status: "corrected", engine: "sensevoice" },
+      plain_text: "用于验证导图工具提示位置。",
+      segments: [{ start: 0, text: "用于验证导图工具提示位置。" }]
+    }
+  },
+  video: {
+    ...needsTranscriptDetail.video,
+    author: summarizedItem.author,
+    has_transcript: true,
+    source_url: summarizedItem.source_url,
+    text_source_type: "asr_transcript",
+    title: summarizedItem.title,
+    url: summarizedItem.source_url,
+    video_id: summarizedItem.video_id
   }
 };
 
@@ -150,6 +186,9 @@ async function installApiMocks(page: Page, libraryDelayMs = 0) {
     if (path === `/api/library/${needsTranscriptItem.video_id}`) {
       return json(route, needsTranscriptDetail);
     }
+    if (path === `/api/library/${summarizedItem.video_id}`) {
+      return json(route, summarizedDetail);
+    }
     if (path === "/api/correction-terms") {
       return json(route, correctionLibrary);
     }
@@ -176,19 +215,21 @@ test("最近档案先显示加载态，并保持已总结与需转写互斥", as
 
   await expect(page.getByRole("status", { name: "正在加载最近档案" })).toBeVisible();
   await expect(page.getByText("暂无本地历史记录")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "已总结 · 1" })).toBeVisible();
+  await expect(page.getByText(/本地保存 \d+ 条内容/)).toHaveCount(0);
+  await expect(page.getByText("无需准备链接，直接打开示例。", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "已总结 1" })).toBeVisible();
 
-  await page.getByRole("button", { name: "已总结 · 1" }).click();
+  await page.getByRole("button", { name: "已总结 1" }).click();
   await expect(page.getByRole("button", { name: "已总结演示", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "需转写演示", exact: true })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "需转写 · 1" }).click();
+  await page.getByRole("button", { name: "需转写 1" }).click();
   await expect(page.getByRole("button", { name: "需转写演示", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "已总结演示", exact: true })).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
 
-test("无逐字稿详情隐藏旧总结，转写弹窗和术语删除保持单层任务", async ({ page }) => {
+test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   let nativeDialogOpened = false;
   page.on("dialog", async (dialog) => {
@@ -198,25 +239,122 @@ test("无逐字稿详情隐藏旧总结，转写弹窗和术语删除保持单�
   await installApiMocks(page);
   await page.goto("/");
 
-  await page.getByRole("button", { name: "需转写 · 1" }).click();
+  await page.getByRole("button", { name: "需转写 1" }).click();
   await page.getByRole("button", { name: "需转写演示", exact: true }).click();
   await expect(page.getByRole("heading", { name: "未生成总结" })).toBeVisible();
   await expect(page.getByText("不应展示的旧总结")).toHaveCount(0);
 
   const transcribeButton = page.getByRole("button", { name: "生成转写稿", exact: true });
   await transcribeButton.click();
-  await expect(page.getByRole("dialog", { name: "转写设置" })).toBeVisible();
+  const transcribeDialog = page.getByRole("dialog", { name: "转写设置" });
+  await expect(transcribeDialog).toBeVisible();
   await expect(page.getByRole("button", { name: "关闭转写设置" })).toBeFocused();
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
+  await expect(
+    transcribeDialog.getByRole("heading", { name: "转写设置" })
+  ).toHaveClass(/\bsr-only\b/);
+  await expect(transcribeDialog.getByText("需转写演示", { exact: true })).toHaveCount(0);
+  await expect(transcribeDialog.getByText("推荐", { exact: true })).toHaveCount(0);
+  await expect(transcribeDialog.getByText("iic/SenseVoiceSmall", { exact: true })).toHaveCount(0);
+  await expect(transcribeDialog.getByText("large-v3-turbo", { exact: true })).toHaveCount(0);
+  await expect(transcribeDialog.getByText(/DASHSCOPE_API_KEY/)).toHaveCount(0);
+  await expect(
+    transcribeDialog.getByRole("button", { name: "云端快速识别", exact: true })
+  ).toBeVisible();
+  await expect(transcribeDialog.getByText("当前未启用", { exact: true })).toBeVisible();
+  await expect(transcribeDialog.getByText(/用于改善标点、断句/)).toHaveCount(0);
+  await expect(transcribeDialog.getByText("本期术语", { exact: true })).toBeVisible();
+  await expect(transcribeDialog.getByText("已选 0/120", { exact: true })).toHaveCount(0);
+  const senseVoiceOption = transcribeDialog.getByRole("button", {
+    name: "SenseVoice（推荐）",
+    exact: true
+  });
+  const whisperOption = transcribeDialog.getByRole("button", {
+    name: "Whisper",
+    exact: true
+  });
+  await expect(senseVoiceOption).toContainText("中文长内容 · 较快");
+  await expect(whisperOption).toContainText("多语言识别 · 较慢");
+  await expect(senseVoiceOption).not.toContainText("本地");
+  await expect(whisperOption).not.toContainText("本地");
+  const selectedEngineBackground = await senseVoiceOption.evaluate(
+    (element) => getComputedStyle(element).backgroundColor
+  );
+  const senseVoiceDescription = senseVoiceOption.getByText(
+    "中文长内容 · 较快",
+    { exact: true }
+  );
+  const selectedDescriptionColor = await senseVoiceDescription.evaluate(
+    (element) => getComputedStyle(element).color
+  );
+  const selectedTitleColor = await senseVoiceOption
+    .locator("span")
+    .first()
+    .evaluate((element) => getComputedStyle(element).color);
+  expect(selectedDescriptionColor).not.toBe(selectedTitleColor);
+  await whisperOption.click();
+  await expect(whisperOption).toHaveCSS(
+    "background-color",
+    selectedEngineBackground
+  );
+  await expect(
+    whisperOption.getByText("多语言识别 · 较慢", { exact: true })
+  ).toHaveCSS("color", selectedDescriptionColor);
+  await expect(
+    transcribeDialog.getByRole("button", { name: "取消", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    transcribeDialog.getByRole("button", { name: "开始转写", exact: true })
+  ).toBeVisible();
+  const supplement = transcribeDialog
+    .locator("details", { hasText: "补充识别信息" })
+    .first();
+  await expect(supplement).toHaveCSS("border-top-width", "2px");
+  expect(
+    await supplement.evaluate((element) => getComputedStyle(element).boxShadow)
+  ).not.toBe("none");
+  await expect(
+    transcribeDialog.getByRole("button", { name: "AI / 科技", exact: true })
+  ).toBeHidden();
+
+  await transcribeDialog
+    .getByRole("button", { name: "双人访谈", exact: true })
+    .click();
+  await expect(transcribeDialog.getByText("已按双人访谈识别")).toBeVisible();
+  const optionalSpeakerButton = transcribeDialog.getByRole("button", {
+    name: "补充说话人（可选）",
+    exact: true
+  });
+  await expect(optionalSpeakerButton).toBeVisible();
+  await expect(
+    transcribeDialog.getByRole("button", { name: "开始转写", exact: true })
+  ).toBeEnabled();
+  await expect(
+    transcribeDialog.getByRole("button", { name: "AI / 科技", exact: true })
+  ).toBeHidden();
+
+  await optionalSpeakerButton.click();
+  await expect(
+    transcribeDialog.getByRole("button", { name: "AI / 科技", exact: true })
+  ).toBeVisible();
+  const speakerNameInputs = transcribeDialog.getByPlaceholder("姓名（如知道）");
+  await expect(speakerNameInputs.first()).toBeFocused();
+  await expect(speakerNameInputs).toHaveCount(2);
+  await expect(speakerNameInputs.first()).toHaveValue("主持人");
+  await speakerNameInputs.first().fill("小王");
+  await transcribeDialog
+    .getByRole("button", { name: "多人聊天 / 圆桌", exact: true })
+    .click();
+  await expect(speakerNameInputs.first()).toHaveValue("小王");
+  await expect(speakerNameInputs).toHaveCount(3);
+
   await page.getByRole("button", { name: "Codex", exact: true }).click();
-  await page.getByRole("button", { name: "管理与选择术语库" }).click();
-  await page.getByRole("button", { name: "删除所选" }).click();
-  await expect(page.getByText("删除选中的 1 个术语？")).toBeVisible();
+  await expect(transcribeDialog.getByText("已选 1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "管理术语库" })).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(1);
   expect(nativeDialogOpened).toBe(false);
 
-  await page.getByRole("button", { name: "取消", exact: true }).first().click();
   await page.getByRole("button", { name: "关闭转写设置" }).press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(transcribeButton).toBeFocused();
@@ -235,14 +373,192 @@ test("资料库危险操作使用站内确认并可取消", async ({ page }) => 
   await page.goto("/");
 
   await page
-    .getByRole("button", { name: "管理记录：需转写演示", exact: true })
+    .getByRole("button", { name: "删除《需转写演示》", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "删除记录" }).click();
   await expect(page.getByRole("dialog", { name: "删除《需转写演示》？" })).toBeVisible();
   expect(nativeDialogOpened).toBe(false);
 
   await page.getByRole("button", { name: "关闭删除《需转写演示》？" }).press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "需转写演示", exact: true })).toBeVisible();
+  expect(browserErrors).toEqual([]);
+});
+
+test("工作台输入聚焦克制且完整转写不再提供重新转写", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+  await page.getByRole("tab", { name: "内容问答", exact: true }).click();
+
+  await expect(
+    page.getByText("仅根据当前内容回答，不确定处会说明。", { exact: true })
+  ).toBeVisible();
+  await expect(page.getByText(/无法从文本确认的信息/)).toHaveCount(0);
+  const qaInput = page.getByPlaceholder("使用快速模式向内容提问...");
+  const qaForm = qaInput.locator("xpath=ancestor::form[1]");
+  const qaFrameColor = await qaForm.evaluate(
+    (element) => getComputedStyle(element).borderTopColor
+  );
+  await qaInput.focus();
+  await expect(qaInput).toHaveCSS("outline-style", "none");
+  await expect(qaInput).toHaveCSS("border-top-color", qaFrameColor);
+
+  await page.getByRole("tab", { name: "内容文本", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "重新转写", exact: true })
+  ).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
+test("导图工具提示只在悬停时向下展开", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+
+  await expect(
+    page.locator("strong").filter({ hasText: "提升判断力" })
+  ).toHaveText("提升判断力");
+  await expect(page.getByText("**提升判断力**", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "重新生成知识稿", exact: true })
+  ).toHaveCount(0);
+  await expect(page.getByText(/已直接返回历史结果/)).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "内容文本", exact: true }).click();
+  await expect(
+    page.getByText(/当前默认展示校对稿，可切换查看/)
+  ).toHaveCount(0);
+  await expect(page.getByPlaceholder("输入关键词，定位原文")).toBeVisible();
+
+  await page.getByRole("tab", { name: "思维导图", exact: true }).click();
+
+  const mindmapPanel = page.getByRole("tabpanel", { name: "思维导图内容" });
+  await expect(mindmapPanel.getByText("通用内容", { exact: true })).toHaveCount(0);
+  await expect(mindmapPanel.getByText("视频", { exact: true })).toHaveCount(0);
+  await expect(mindmapPanel.getByText("转写稿", { exact: true })).toHaveCount(0);
+  const mindmapHeadingRow = mindmapPanel.getByText("树状导图", { exact: true }).locator("..");
+  await expect(mindmapHeadingRow).toHaveCSS("border-bottom-width", "0px");
+
+  const canvas = page.locator('svg[aria-label="智能树状导图"]').locator("..");
+  await expect(
+    page.getByRole("button", { name: "放大导图", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "缩小导图", exact: true })
+  ).toHaveCount(0);
+  const resetButton = page.getByRole("button", {
+    name: "重置导图视图",
+    exact: true
+  });
+  const tooltip = page.getByRole("tooltip", {
+    name: "重置导图视图",
+    exact: true
+  });
+  await resetButton.hover();
+  await expect(tooltip).toHaveCSS("opacity", "1");
+
+  const [canvasBox, tooltipBox] = await Promise.all([
+    canvas.boundingBox(),
+    tooltip.boundingBox()
+  ]);
+  expect(canvasBox).not.toBeNull();
+  expect(tooltipBox).not.toBeNull();
+  expect(tooltipBox!.y).toBeGreaterThanOrEqual(canvasBox!.y);
+
+  await resetButton.click();
+  await page.locator('svg[aria-label="智能树状导图"]').hover({
+    position: { x: 12, y: 180 }
+  });
+  await expect(tooltip).toHaveCSS("opacity", "0");
+
+  const fullscreenButton = page.getByRole("button", {
+    name: "全屏查看导图",
+    exact: true
+  });
+  const fullscreenTooltip = page.getByRole("tooltip", {
+    name: "全屏查看导图",
+    exact: true
+  });
+  await fullscreenButton.hover();
+  await expect(fullscreenTooltip).toHaveCSS("opacity", "1");
+  await expect(tooltip).toHaveCSS("opacity", "0");
+
+  await expect(
+    page.getByRole("button", { name: "适应导图画布", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "重置导图视图", exact: true })
+  ).toBeVisible();
+
+  await page.getByText("第一分支", { exact: true }).click();
+  const highlightRect = page.locator("g.markmap-highlight rect");
+  await expect(highlightRect).toHaveCount(0);
+  await expect(
+    mindmapPanel.getByText("拖拽平移，滚轮缩放，点击节点展开或收起", {
+      exact: true
+    })
+  ).toBeVisible();
+  expect(browserErrors).toEqual([]);
+});
+
+test("工作台链接输入框明确可编辑并只执行普通提取", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  let parseBody: unknown = null;
+  await installApiMocks(page);
+  await page.route("http://127.0.0.1:8000/api/parse", async (route) => {
+    parseBody = route.request().postDataJSON();
+    return json(route, summarizedDetail);
+  });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+
+  await expect(
+    page.getByRole("button", { name: "重新提取源内容", exact: true })
+  ).toHaveCount(0);
+  const urlInput = page.getByRole("textbox", { name: "公开媒体链接" });
+  const inputFrame = urlInput.locator("xpath=ancestor::form[1]");
+  await expect(inputFrame).toHaveCSS("border-top-width", "2px");
+  const inputFrameColor = await inputFrame.evaluate(
+    (element) => getComputedStyle(element).borderTopColor
+  );
+  await urlInput.focus();
+  await expect(urlInput).toHaveCSS("outline-style", "none");
+  await expect(inputFrame).toHaveCSS("border-top-color", inputFrameColor);
+  const inputSection = urlInput.locator("xpath=ancestor::section[1]");
+  await expect(inputSection).toHaveCSS("border-bottom-width", "0px");
+
+  const extractButton = page.getByRole("button", {
+    name: "提取内容",
+    exact: true
+  });
+  await expect(extractButton).toHaveCSS("background-color", "rgb(209, 75, 49)");
+  await expect(extractButton).toHaveCSS("box-shadow", "none");
+  await expect(extractButton.locator("svg")).toHaveCount(0);
+  const [inputFrameBox, extractButtonBox] = await Promise.all([
+    inputFrame.boundingBox(),
+    extractButton.boundingBox()
+  ]);
+  expect(inputFrameBox).not.toBeNull();
+  expect(extractButtonBox).not.toBeNull();
+  expect(extractButtonBox!.x).toBeGreaterThan(inputFrameBox!.x);
+  expect(
+    Math.abs(
+      extractButtonBox!.x +
+        extractButtonBox!.width -
+        (inputFrameBox!.x + inputFrameBox!.width)
+    )
+  ).toBeLessThanOrEqual(2);
+
+  await extractButton.click();
+  await expect.poll(() => parseBody).not.toBeNull();
+  expect(parseBody).toEqual({ url: summarizedItem.source_url });
   expect(browserErrors).toEqual([]);
 });

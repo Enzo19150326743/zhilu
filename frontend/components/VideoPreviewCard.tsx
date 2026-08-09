@@ -115,12 +115,6 @@ export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
 
   return (
     <section className="min-w-0">
-      <div className="mb-3 flex items-center gap-3">
-        <span className="mono text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-          来源 / SOURCE
-        </span>
-        <span className="h-px flex-1 bg-[var(--line)]" aria-hidden="true" />
-      </div>
       <div className={getCoverFrameClass(video)}>
         {thumbnailUrl && !imageFailed ? (
           <>
@@ -162,7 +156,7 @@ export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
                 key={row.label}
               >
                 <Icon className="h-3.5 w-3.5 text-[var(--accent)]" aria-hidden="true" />
-                <span className="mono text-[10px] uppercase tracking-[0.08em] text-[var(--muted)]">
+                <span className="text-[10px] font-medium text-[var(--muted)]">
                   {row.label}
                 </span>
                 <span

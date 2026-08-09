@@ -115,11 +115,6 @@ export interface CorrectionTermLibraryResponse {
   terms: CorrectionTermItem[];
 }
 
-export interface CorrectionTermMutationResponse {
-  success: true;
-  message: string;
-}
-
 export interface TranscriptAsrMeta {
   engine: string;
   model: string;
@@ -301,7 +296,6 @@ export interface SummarizeResponse {
   is_ai_generated: boolean;
   model: string;
   fallback_reason?: string | null;
-  is_cached?: boolean;
 }
 
 export type QaMode = "fast" | "thinking";

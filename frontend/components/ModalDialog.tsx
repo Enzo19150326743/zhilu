@@ -4,11 +4,13 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 type ModalDialogSize = "compact" | "wide";
+type ModalDialogHeaderMode = "close-only" | "standard";
 
 interface ModalDialogProps {
   children: ReactNode;
   description?: string;
   footer?: ReactNode;
+  headerMode?: ModalDialogHeaderMode;
   isBusy?: boolean;
   isOpen: boolean;
   size?: ModalDialogSize;
@@ -33,6 +35,7 @@ export function ModalDialog({
   children,
   description,
   footer,
+  headerMode = "standard",
   isBusy = false,
   isOpen,
   size = "compact",
@@ -134,6 +137,19 @@ export function ModalDialog({
     return null;
   }
 
+  const closeButton = (
+    <button
+      aria-label={`关闭${title}`}
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] border-2 border-[var(--line-ink)] text-[var(--muted)] transition-colors hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
+      data-dialog-initial-focus
+      disabled={isBusy}
+      type="button"
+      onClick={onClose}
+    >
+      <X className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ink)]/45 px-4 py-6 backdrop-blur-sm"
@@ -144,7 +160,9 @@ export function ModalDialog({
       }}
     >
       <section
-        aria-describedby={description ? descriptionId : undefined}
+        aria-describedby={
+          headerMode === "standard" && description ? descriptionId : undefined
+        }
         aria-labelledby={titleId}
         aria-modal="true"
         className={`flex max-h-[88dvh] w-full ${SIZE_CLASS_NAMES[size]} flex-col overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] shadow-[8px_8px_0_0_var(--ink)]`}
@@ -152,33 +170,39 @@ export function ModalDialog({
         role="dialog"
         tabIndex={-1}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b-2 border-[var(--line-ink)] px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="font-editorial text-lg font-semibold text-[var(--ink)]" id={titleId}>
+        {headerMode === "close-only" ? (
+          <div className="flex shrink-0 justify-end px-4 pt-4">
+            <h2 className="sr-only" id={titleId}>
               {title}
             </h2>
-            {description ? (
-              <p
-                className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]"
-                id={descriptionId}
-              >
-                {description}
-              </p>
-            ) : null}
+            {closeButton}
           </div>
-          <button
-            aria-label={`关闭${title}`}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] border-2 border-[var(--line-ink)] text-[var(--muted)] transition-colors hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
-            data-dialog-initial-focus
-            disabled={isBusy}
-            type="button"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
+        ) : (
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b-2 border-[var(--line-ink)] px-5 py-4">
+            <div className="min-w-0">
+              <h2 className="font-editorial text-lg font-semibold text-[var(--ink)]" id={titleId}>
+                {title}
+              </h2>
+              {description ? (
+                <p
+                  className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]"
+                  id={descriptionId}
+                >
+                  {description}
+                </p>
+              ) : null}
+            </div>
+            {closeButton}
+          </div>
+        )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto px-5 pb-4 ${
+            headerMode === "close-only" ? "pt-2" : "pt-4"
+          }`}
+        >
+          {children}
+        </div>
 
         {footer ? (
           <div className="flex shrink-0 justify-end gap-2 border-t-2 border-[var(--line-ink)] bg-[var(--paper)] px-5 py-4">

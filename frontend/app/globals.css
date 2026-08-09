@@ -24,6 +24,12 @@
   --shadow-hard-md: 4px 4px 0 0 var(--ink);
   --shadow-hard-lg: 6px 6px 0 0 var(--ink);
   --shadow-hard-accent: 3px 3px 0 0 var(--accent);
+  --font-ui:
+    "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC",
+    "Noto Sans CJK SC", sans-serif;
+  --font-editorial:
+    "Source Han Serif SC", "Noto Serif CJK SC", "STZhongsong", "Songti SC",
+    STSong, SimSun, serif;
   background: var(--paper);
 }
 
@@ -43,13 +49,8 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--paper);
-  font-family:
-    "Noto Sans SC",
-    "Noto Sans CJK SC",
-    "Source Han Sans SC",
-    "Microsoft YaHei UI",
-    "Microsoft YaHei",
-    sans-serif;
+  font-family: var(--font-ui);
+  font-feature-settings: "kern" 1;
   text-rendering: optimizeLegibility;
 }
 
@@ -67,20 +68,24 @@ a:focus-visible {
   outline-offset: 3px;
 }
 
+input.focus-subtle:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 ::selection {
   color: var(--ink);
   background: rgba(209, 75, 49, 0.2);
 }
 
 .font-editorial {
-  font-family:
-    "Noto Serif SC",
-    "Noto Serif CJK SC",
-    "Source Han Serif SC",
-    "Songti SC",
-    STSong,
-    SimSun,
-    serif;
+  font-family: var(--font-editorial);
+}
+
+.font-display {
+  font-family: var(--font-ui);
+  font-weight: 800;
+  letter-spacing: -0.045em;
 }
 
 .mono {

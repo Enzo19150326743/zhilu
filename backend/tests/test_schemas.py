@@ -2,10 +2,18 @@ import unittest
 
 from pydantic import ValidationError
 
-from app.schemas import QaRequest, SummarizeRequest, TranscribeRequest
+from app.schemas import ParseRequest, QaRequest, SummarizeRequest, TranscribeRequest
 
 
 class SummarizeRequestSchemaTests(unittest.TestCase):
+    def test_parse_request_only_contains_url(self) -> None:
+        request = ParseRequest(url="https://example.com/video")
+
+        self.assertEqual(
+            request.model_dump(),
+            {"url": "https://example.com/video"},
+        )
+
     def test_long_video_title_is_normalized_before_validation(self) -> None:
         request = SummarizeRequest(
             transcript_plain_text="有效转写稿",

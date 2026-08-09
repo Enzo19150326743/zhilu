@@ -34,7 +34,6 @@ export function useSummaryWorkflow({
   const [summaryErrorMessage, setSummaryErrorMessage] = useState<string | null>(
     null
   );
-  const [summaryNotice, setSummaryNotice] = useState<string | null>(null);
   const [summaryTasks, setSummaryTasks] = useState<SummaryTask[]>([]);
   const [summaryGenerationMeta, setSummaryGenerationMeta] =
     useState<SummaryGenerationMeta | null>(null);
@@ -75,9 +74,6 @@ export function useSummaryWorkflow({
         (task) => task.sourceUrl === taskSourceUrl && task.status === "running"
       )
     ) {
-      if (isTaskSourceActive(taskSourceUrl)) {
-        setSummaryNotice("该链接已经在后台生成总结，请等待当前任务完成。");
-      }
       return;
     }
 
@@ -96,7 +92,6 @@ export function useSummaryWorkflow({
     ]);
     if (isTaskSourceActive(taskSourceUrl)) {
       setSummaryErrorMessage(null);
-      setSummaryNotice(null);
     }
 
     try {
@@ -157,9 +152,7 @@ export function useSummaryWorkflow({
           isAiGenerated: response.is_ai_generated,
           model: response.model
         });
-        if (response.is_ai_generated || response.model === "local-fallback") {
-          setSummaryNotice(taskMessage);
-        } else {
+        if (!response.is_ai_generated && response.model !== "local-fallback") {
           setSummaryErrorMessage(taskMessage);
         }
         setActiveTab("summary");
@@ -191,10 +184,8 @@ export function useSummaryWorkflow({
     runSummaryForDetail,
     setSummaryErrorMessage,
     setSummaryGenerationMeta,
-    setSummaryNotice,
     summaryErrorMessage,
     summaryGenerationMeta,
-    summaryNotice,
     summaryTasks
   };
 }

@@ -97,6 +97,46 @@ export function buildDefaultSpeakers(
   return [];
 }
 
+export function updateSpeakersForProgramStructure(
+  currentProgramStructure: string,
+  currentSpeakers: TranscribeSpeakerProfile[],
+  nextProgramStructure: string
+): TranscribeSpeakerProfile[] {
+  const currentDefaults = buildDefaultSpeakers(currentProgramStructure);
+  const nextDefaults = buildDefaultSpeakers(nextProgramStructure);
+  const isStillUsingDefaults =
+    currentSpeakers.length === currentDefaults.length &&
+    currentSpeakers.every((speaker, index) =>
+      areSpeakerProfilesEqual(speaker, currentDefaults[index])
+    );
+
+  if (isStillUsingDefaults) {
+    return nextDefaults;
+  }
+
+  // 已经填写的姓名和身份属于用户输入，节目结构切换不能静默覆盖它们。
+  const preservedSpeakers = currentSpeakers.map((speaker) => ({ ...speaker }));
+  if (preservedSpeakers.length >= nextDefaults.length) {
+    return preservedSpeakers;
+  }
+
+  return [
+    ...preservedSpeakers,
+    ...nextDefaults.slice(preservedSpeakers.length)
+  ];
+}
+
+function areSpeakerProfilesEqual(
+  left: TranscribeSpeakerProfile | undefined,
+  right: TranscribeSpeakerProfile | undefined
+): boolean {
+  return (
+    (left?.name ?? "") === (right?.name ?? "") &&
+    (left?.role ?? "") === (right?.role ?? "") &&
+    (left?.description ?? "") === (right?.description ?? "")
+  );
+}
+
 export function addEmptySpeaker(
   speakers: TranscribeSpeakerProfile[]
 ): TranscribeSpeakerProfile[] {

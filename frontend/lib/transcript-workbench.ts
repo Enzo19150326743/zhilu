@@ -148,13 +148,13 @@ export function getTextSourceHint(
     return "这是节目页公开发布的 shownotes 原文，不是完整音频对话稿。";
   }
   if (textSourceType === "asr_transcript") {
-    const engineLabel = transcript
-      ? getTranscriptVariantLabel(inferTranscriptVariantKey(transcript))
-      : "ASR";
     if (transcript?.asr_meta?.correction_status === "corrected") {
-      return `当前默认展示校对稿，可切换查看 ${engineLabel} 原始识别稿。`;
+      return null;
     }
     if (transcript?.asr_meta?.correction_status === "failed") {
+      const engineLabel = getTranscriptVariantLabel(
+        inferTranscriptVariantKey(transcript)
+      );
       return `自动校对未成功，当前已回退展示 ${engineLabel} 原始识别稿。`;
     }
     return null;

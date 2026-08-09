@@ -16,7 +16,6 @@ interface SummaryTabProps {
   summary: VideoSummary | null;
   summaryDisplayState: SummaryDisplayState;
   summaryErrorMessage: string | null;
-  summaryNotice: string | null;
   summaryGenerationMeta: SummaryGenerationMeta | null;
   transcribeErrorMessage: string | null;
   textSourceType?: string | null;
@@ -36,26 +35,56 @@ interface SummaryEmptyStateProps {
 }
 
 interface SummarySectionHeadingProps {
-  index: string;
-  label: string;
   title: string;
 }
 
-function SummarySectionHeading({
-  index,
-  label,
-  title
-}: SummarySectionHeadingProps) {
+function SummarySectionHeading({ title }: SummarySectionHeadingProps) {
   return (
-    <div>
-      <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent)]">
-        {index} / {label}
-      </p>
-      <h3 className="font-editorial mt-1 text-xl font-semibold text-[var(--ink)]">
+    <div className="flex items-center gap-3 lg:block">
+      <span className="block h-1 w-6 bg-[var(--accent)] lg:mb-3" aria-hidden="true" />
+      <h3 className="font-editorial text-xl font-semibold text-[var(--ink)]">
         {title}
       </h3>
     </div>
   );
+}
+
+function getTopicIdentity(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("zh-CN")
+    .replace(/[\s·_\-/]+/gu, "");
+}
+
+function getTopicTags(summary: VideoSummary): string[] {
+  const seenTopicIdentities = new Set<string>();
+  const topicTags: string[] = [];
+
+  for (const topic of [...(summary.topics ?? []), ...(summary.content_keywords ?? [])]) {
+    const normalizedTopic = topic.trim();
+    const identity = getTopicIdentity(normalizedTopic);
+    const isNearDuplicate = Array.from(seenTopicIdentities).some(
+      (savedIdentity) =>
+        Math.abs(savedIdentity.length - identity.length) <= 3 &&
+        (savedIdentity.includes(identity) || identity.includes(savedIdentity))
+    );
+    if (
+      !normalizedTopic ||
+      !identity ||
+      seenTopicIdentities.has(identity) ||
+      isNearDuplicate
+    ) {
+      continue;
+    }
+
+    seenTopicIdentities.add(identity);
+    topicTags.push(normalizedTopic);
+    if (topicTags.length === 6) {
+      break;
+    }
+  }
+
+  return topicTags;
 }
 
 function SummaryEmptyState({
@@ -117,7 +146,7 @@ function SummaryEmptyState({
     <section className="shadow-hard-md relative min-h-[300px] overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper)] px-6 py-8 sm:px-8 sm:py-10">
       <div className="relative flex min-h-[220px] flex-col justify-between">
         <div>
-          <span className="shadow-hard-sm mono inline-flex min-h-8 items-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-3 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--paper-raised)]">
+          <span className="shadow-hard-sm inline-flex min-h-8 items-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--paper-raised)]">
             {isShownotesSource ? "已读取 shownotes" : "内容已提取"}
           </span>
           <h3 className="font-editorial mt-8 text-balance text-3xl font-bold tracking-normal text-[var(--ink)] sm:text-4xl">
@@ -159,7 +188,6 @@ export function SummaryTab({
   summary,
   summaryDisplayState,
   summaryErrorMessage,
-  summaryNotice,
   summaryGenerationMeta,
   transcribeErrorMessage,
   textSourceType,
@@ -195,11 +223,6 @@ export function SummaryTab({
           </div>
         ) : null}
 
-        {summaryNotice ? (
-          <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#e9f2ea] px-3 py-2 text-sm text-[#2f5d3a]">
-            {summaryNotice}
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -212,9 +235,7 @@ export function SummaryTab({
     );
   }
 
-  const topicTags = Array.from(
-    new Set([...(summary.topics ?? []), ...(summary.content_keywords ?? [])])
-  ).filter(Boolean);
+  const topicTags = getTopicTags(summary);
   const applicationClues =
     summary.application_clues?.length
       ? summary.application_clues
@@ -222,7 +243,7 @@ export function SummaryTab({
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 border-b-2 border-[var(--line-ink)] pb-5 sm:flex-row sm:items-center sm:justify-between">
+      <section className="border-b-2 border-[var(--line-ink)] pb-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <h3 className="font-editorial text-lg font-semibold text-[var(--ink)]">结构化总结</h3>
@@ -242,28 +263,6 @@ export function SummaryTab({
                   : "基础摘要"}
             </span>
           </div>
-          <p className="mt-1.5 max-w-xl text-xs leading-5 text-[var(--muted)]">
-            一份可以继续编辑、摘录和导出的媒体知识提纲。
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button
-            className="ink-block inline-flex min-h-11 items-center justify-center gap-2 rounded-[2px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!canSummarize || isSummarizing}
-            type="button"
-            onClick={onSummarize}
-          >
-            {isSummarizing ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <FileText className="h-4 w-4" aria-hidden="true" />
-            )}
-            {isSummarizing
-              ? "生成中"
-              : summaryDisplayState === "generated"
-                ? "重新生成知识稿"
-                : "生成知识稿"}
-          </button>
         </div>
       </section>
 
@@ -328,12 +327,6 @@ export function SummaryTab({
         </div>
       ) : null}
 
-      {summaryNotice ? (
-        <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#e9f2ea] px-3 py-2 text-sm text-[#2f5d3a]">
-          {summaryNotice}
-        </div>
-      ) : null}
-
       <section className="flex gap-4 px-1 py-2">
         <span aria-hidden="true" className="w-[5px] shrink-0 bg-[var(--accent)]" />
         <p className="font-editorial text-pretty text-lg font-medium leading-8 text-[var(--ink)] sm:text-[19px] sm:leading-[32px]">
@@ -355,7 +348,7 @@ export function SummaryTab({
       ) : null}
 
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
-        <SummarySectionHeading index="02" label="观点" title="核心观点" />
+        <SummarySectionHeading title="核心观点" />
         <ol className="border-t border-[var(--line-strong)]">
           {summary.key_points.map((point, index) => (
             <li
@@ -375,11 +368,7 @@ export function SummaryTab({
 
       {summary.structured_analysis_markdown.trim() ? (
         <section className="grid gap-5 border-y border-[var(--line-strong)] py-6 lg:grid-cols-[140px_1fr] lg:gap-8">
-          <SummarySectionHeading
-            index="03"
-            label="深度笔记"
-            title="结构化分析"
-          />
+          <SummarySectionHeading title="结构化分析" />
           <SafeMarkdown markdown={summary.structured_analysis_markdown} />
         </section>
       ) : null}
@@ -408,7 +397,7 @@ export function SummaryTab({
       ) : null}
 
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
-        <SummarySectionHeading index="04" label="行动" title="可行动建议" />
+        <SummarySectionHeading title="可行动建议" />
         <ol className="grid border-t border-[var(--line-strong)] sm:grid-cols-2">
           {applicationClues.map((item, index) => (
             <li

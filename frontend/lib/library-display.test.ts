@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getFeaturedLibraryItems,
+  getLibraryDisplayTitle,
   getLibraryStatusLabel,
   getPlatformLabel,
   isLibraryItemSummarized,
@@ -53,7 +54,7 @@ test("档案状态沿用 shownotes、总结和文本可用性语义", () => {
     getLibraryStatusLabel(
       createLibraryItem({ summary_status: "ai_generated" })
     ),
-    "智能总结"
+    "已总结"
   );
   assert.equal(
     getLibraryStatusLabel(
@@ -66,6 +67,17 @@ test("档案状态沿用 shownotes、总结和文本可用性语义", () => {
     getLibraryStatusLabel(createLibraryItem({ has_transcript: false })),
     "需转写"
   );
+});
+
+test("档案标题去掉正文式话题并优先保留第一句", () => {
+  assert.equal(
+    getLibraryDisplayTitle(
+      "君子豹变：所有向外找原因的人，都在原地烂下去。 后续是很长的正文说明，需要留在详情里而不是档案列表中。 #个人成长 #观点"
+    ),
+    "君子豹变：所有向外找原因的人，都在原地烂下去。"
+  );
+  assert.equal(getLibraryDisplayTitle("  普通标题  "), "普通标题");
+  assert.equal(getLibraryDisplayTitle("   "), "未命名内容");
 });
 
 test("无逐字稿的旧总结不会同时出现在已总结和需转写", () => {

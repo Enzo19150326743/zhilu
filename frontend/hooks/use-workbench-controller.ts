@@ -105,10 +105,8 @@ export function useWorkbenchController() {
     runSummaryForDetail,
     setSummaryErrorMessage,
     setSummaryGenerationMeta,
-    setSummaryNotice,
     summaryErrorMessage,
     summaryGenerationMeta,
-    summaryNotice,
     summaryTasks
   } = useSummaryWorkflow({
     activeSourceUrl,
@@ -138,8 +136,7 @@ export function useWorkbenchController() {
     setDetail,
     setErrorMessage,
     setSummaryErrorMessage,
-    setSummaryGenerationMeta,
-    setSummaryNotice
+    setSummaryGenerationMeta
   });
   const {
     asrStatus,
@@ -175,6 +172,7 @@ export function useWorkbenchController() {
     activeDetail &&
       isParseResponse(activeDetail) &&
       !activeDetail.is_placeholder &&
+      !hasFullTranscript &&
       !isCurrentDetailSummarizing &&
       !isCurrentDetailTranscribing
   );
@@ -186,7 +184,7 @@ export function useWorkbenchController() {
         : "empty"
       : "demo";
 
-  const handleAnalyze = async (forceRefresh = false) => {
+  const handleAnalyze = async () => {
     const trimmedUrl = url.trim();
 
     if (!trimmedUrl) {
@@ -199,14 +197,12 @@ export function useWorkbenchController() {
       (task) => task.sourceUrl === trimmedUrl && task.status === "running"
     );
     if (runningSameUrlTask) {
-      setSummaryNotice("该链接已经在后台解析，请等待当前任务完成。");
       return;
     }
 
     const taskId = `${Date.now()}-parse`;
     setErrorMessage(null);
     setSummaryErrorMessage(null);
-    setSummaryNotice(null);
     setSummaryGenerationMeta(null);
     setLoadingDemoId(null);
     setParseTasks((currentTasks) => [
@@ -214,7 +210,7 @@ export function useWorkbenchController() {
         id: taskId,
         kind: "parse",
         sourceUrl: trimmedUrl,
-        title: forceRefresh ? `重新解析：${trimmedUrl}` : trimmedUrl,
+        title: trimmedUrl,
         status: "running",
         startedAt: Date.now()
       },
@@ -222,7 +218,7 @@ export function useWorkbenchController() {
     ]);
 
     try {
-      const response = await apiClient.parseVideo(trimmedUrl, forceRefresh);
+      const response = await apiClient.parseVideo(trimmedUrl);
       const shouldAutoSummarize = shouldAutoSummarizeDetail(response);
       const taskMessage = shouldAutoSummarize
         ? response.is_from_cache
@@ -299,7 +295,6 @@ export function useWorkbenchController() {
     setStatus("loading");
     setErrorMessage(null);
     setSummaryErrorMessage(null);
-    setSummaryNotice(null);
     setSummaryGenerationMeta(null);
     setLoadingDemoId(demoId);
     setLoadingLibraryVideoId(null);
@@ -327,7 +322,6 @@ export function useWorkbenchController() {
     setUrl("");
     setErrorMessage(null);
     setSummaryErrorMessage(null);
-    setSummaryNotice(null);
     setSummaryGenerationMeta(null);
     setActiveTab("summary");
     setStatus("idle");
@@ -338,7 +332,6 @@ export function useWorkbenchController() {
     setStatus("loading");
     setErrorMessage(null);
     setSummaryErrorMessage(null);
-    setSummaryNotice(null);
     setLoadingDemoId(null);
     setLoadingLibraryVideoId(item.video_id);
     setActiveDemoId(null);
@@ -490,7 +483,6 @@ export function useWorkbenchController() {
           summaryDisplayState,
           summaryErrorMessage: activeSummaryErrorMessage,
           summaryGenerationMeta,
-          summaryNotice,
           textSourceType: getTextSourceType(activeDetail.video),
           transcribeErrorMessage: activeTranscribeErrorMessage,
           transcript: activeDetail.transcript ?? null,
@@ -504,7 +496,6 @@ export function useWorkbenchController() {
           onTranscribe: handleTranscribeRequest
         },
         detail: activeDetail,
-        libraryProps: libraryViewProps,
         urlInputProps: {
           errorMessage,
           isParsing,
@@ -533,16 +524,10 @@ export function useWorkbenchController() {
     transcribeSettingsDialogProps: {
       asrEngine: pendingAsrEngine,
       cloudAvailable: asrStatus?.cloud_available ?? false,
-      cloudModel: asrStatus?.cloud_model ?? null,
-      whisperModel: asrStatus?.whisper_model ?? null,
       sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,
-      sensevoiceMessage: asrStatus?.sensevoice_message ?? null,
-      sensevoiceModel: asrStatus?.sensevoice_model ?? null,
       correctionAvailable: asrStatus?.correction_available ?? false,
-      correctionMessage: asrStatus?.correction_message ?? null,
       isOpen: isTranscribeSettingsOpen,
       isTranscribing: isCurrentDetailTranscribing,
-      mediaTitle: activeDetail?.video.title ?? null,
       settings: pendingTranscribeSettings,
       onChange: setPendingTranscribeSettings,
       onChangeAsrEngine: setPendingAsrEngine,

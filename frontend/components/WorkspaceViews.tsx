@@ -20,7 +20,7 @@ export function HomeWorkspace({
   return (
     <>
       <LandingHero {...heroProps} />
-      <RecentLibrary {...libraryProps} variant="home" />
+      <RecentLibrary {...libraryProps} />
     </>
   );
 }
@@ -28,21 +28,19 @@ export function HomeWorkspace({
 interface WorkbenchWorkspaceProps {
   aiTabsProps: ComponentProps<typeof AiTabs>;
   detail: DemoDetail | ParseResponse;
-  libraryProps: ComponentProps<typeof RecentLibrary>;
   urlInputProps: ComponentProps<typeof UrlInput>;
 }
 
 export function WorkbenchWorkspace({
   aiTabsProps,
   detail,
-  libraryProps,
   urlInputProps
 }: WorkbenchWorkspaceProps) {
   return (
     <>
       <UrlInput {...urlInputProps} />
       <section className="mx-auto grid min-w-0 max-w-[90rem] grid-cols-[minmax(0,1fr)] gap-8 px-4 pb-14 pt-6 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:px-10">
-        <div className="contents lg:block">
+        <aside className="contents lg:sticky lg:top-[6.25rem] lg:block lg:self-start">
           <VideoPreviewCard video={detail.video} />
           {isParseResponse(detail) ? (
             <div className="order-3 lg:mt-5">
@@ -54,13 +52,12 @@ export function WorkbenchWorkspace({
               />
             </div>
           ) : null}
-        </div>
+        </aside>
 
         <div className="order-2 min-w-0 lg:order-none">
           <AiTabs {...aiTabsProps} />
         </div>
       </section>
-      <RecentLibrary {...libraryProps} variant="workbench" />
     </>
   );
 }

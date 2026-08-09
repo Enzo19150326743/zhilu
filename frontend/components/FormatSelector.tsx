@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
   Download,
   Loader2
 } from "lucide-react";
@@ -68,7 +69,7 @@ function getFormatHint(
   ) {
     return formatDiagnostics.has_cookie_config
       ? `B 站登录态本次最高返回 ${maxHeight}p；清晰度以当前账号和视频实际权限为准。`
-      : `当前未启用 B 站登录态，平台本次最高返回 ${maxHeight}p；配置本地 Cookie 后请重新提取。`;
+      : `当前未启用 B 站登录态，平台本次最高返回 ${maxHeight}p。`;
   }
 
   if (maxHeight > 0 && maxHeight < 720) {
@@ -151,9 +152,18 @@ export function FormatSelector({
   const [downloadStates, setDownloadStates] = useState<
     Record<string, FormatDownloadState>
   >({});
+  const [showAdvancedFormats, setShowAdvancedFormats] = useState(false);
   const isAnyDownloading = Object.values(downloadStates).some(
     (state) => state.status === "downloading"
   );
+  const audioFormat = displayFormats.find((format) => format.vcodec === "none");
+  const compactFormats = audioFormat ? [audioFormat] : [];
+  const advancedFormats = displayFormats.filter(
+    (format) => format.format_id !== audioFormat?.format_id
+  );
+  const visibleFormats = showAdvancedFormats
+    ? [...compactFormats, ...advancedFormats]
+    : compactFormats;
 
   const handleDownload = async (
     formatId: string,
@@ -205,12 +215,7 @@ export function FormatSelector({
 
   return (
     <section className="min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[13px] font-semibold text-[var(--ink-soft)]">辅助保存</p>
-        <span className="mono text-[9px] uppercase tracking-[0.16em] text-[var(--muted)]">
-          LOCAL SAVE
-        </span>
-      </div>
+      <p className="text-[13px] font-semibold text-[var(--ink-soft)]">辅助保存</p>
       <p className="mt-2 text-[11px] leading-[17px] text-[var(--muted)]">
         {getFormatHint(displayFormats, isFromCache, formatDiagnostics)}
       </p>
@@ -250,7 +255,7 @@ export function FormatSelector({
           </div>
         ) : null}
         {displayFormats.length > 0 ? (
-          displayFormats.map((format) => {
+          visibleFormats.map((format) => {
             const downloadState: FormatDownloadState = downloadStates[
               format.format_id
             ] ?? {
@@ -303,6 +308,23 @@ export function FormatSelector({
           </div>
         )}
       </div>
+      {advancedFormats.length > 0 ? (
+        <button
+          className="mt-3 flex min-h-9 w-full items-center justify-between border-t border-[var(--line-strong)] pt-3 text-xs font-medium text-[var(--muted-strong)] transition-colors hover:text-[var(--accent)]"
+          type="button"
+          onClick={() => setShowAdvancedFormats((current) => !current)}
+        >
+          <span>
+            {showAdvancedFormats
+              ? "收起可选格式"
+              : `查看其他 ${advancedFormats.length} 个格式`}
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={`h-4 w-4 transition-transform ${showAdvancedFormats ? "rotate-180" : ""}`}
+          />
+        </button>
+      ) : null}
     </section>
   );
 }
