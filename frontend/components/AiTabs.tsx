@@ -92,16 +92,15 @@ export function AiTabs({
   const visibleSummary = summaryDisplayState === "empty" ? null : summary;
 
   return (
-    <section className="min-w-0 rounded-[24px] bg-[var(--paper-raised)] p-4 shadow-[var(--shadow-paper)] sm:p-6">
-      <div className="mb-5 flex items-center gap-3">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
-          Knowledge draft
+    <section className="shadow-hard-lg min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4 sm:p-7">
+      <div className="mb-5 flex items-center justify-between gap-3 border-b-2 border-[var(--line-ink)] pb-4">
+        <span className="shadow-hard-sm mono inline-flex items-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--paper-raised)]">
+          KNOWLEDGE DRAFT
         </span>
-        <span className="h-px flex-1 bg-[var(--line-strong)]" />
       </div>
       <div
         aria-label="知识稿内容视图"
-        className="flex gap-1 overflow-x-auto border-b border-[var(--line-strong)] pb-0"
+        className="flex gap-6 overflow-x-auto"
         role="tablist"
       >
         {tabs.map((tab, tabIndex) => {
@@ -111,10 +110,10 @@ export function AiTabs({
           return (
             <button
               aria-selected={isActive}
-              className={`relative inline-flex min-h-11 shrink-0 items-center gap-2 px-3 text-sm font-medium transition-[color,background-color,scale] duration-150 active:scale-[0.96] ${
+              className={`group inline-flex shrink-0 flex-col gap-1.5 pb-1 text-sm transition-colors duration-150 ${
                 isActive
-                  ? "text-[var(--ink)]"
-                  : "text-[var(--muted)] hover:bg-[var(--paper-deep)] hover:text-[var(--ink)]"
+                  ? "font-semibold text-[var(--ink)]"
+                  : "font-normal text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
               key={tab.key}
               role="tab"
@@ -136,11 +135,18 @@ export function AiTabs({
                 tabButtons?.[nextIndex]?.focus();
               }}
             >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {tab.label}
-              {isActive ? (
-                <span className="absolute inset-x-2 bottom-0 h-0.5 bg-[var(--accent)]" />
-              ) : null}
+              <span className="inline-flex items-center gap-2">
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {tab.label}
+              </span>
+              <span
+                aria-hidden="true"
+                className={`h-[3px] w-full ${
+                  isActive
+                    ? "bg-[var(--accent)]"
+                    : "bg-transparent group-hover:bg-[var(--line-strong)]"
+                }`}
+              />
             </button>
           );
         })}

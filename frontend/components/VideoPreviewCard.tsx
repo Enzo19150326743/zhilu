@@ -19,14 +19,14 @@ function formatDuration(totalSeconds: number): string {
 
 function getCoverFrameClass(video: VideoInfo): string {
   return isPodcastMedia(video)
-    ? "relative aspect-square overflow-hidden rounded-[16px] bg-[var(--ink)]"
-    : "overflow-hidden rounded-[16px] bg-[var(--paper-deep)]";
+    ? "shadow-hard-md relative aspect-square overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--ink)]"
+    : "shadow-hard-md overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-deep)]";
 }
 
 function getCoverImageClass(video: VideoInfo): string {
   return isPodcastMedia(video)
-    ? "relative z-10 h-full w-full object-contain p-3 outline outline-1 -outline-offset-1 outline-white/10"
-    : "block h-auto w-full object-contain outline outline-1 -outline-offset-1 outline-black/10";
+    ? "relative z-10 h-full w-full object-contain p-3"
+    : "block h-auto w-full object-contain";
 }
 
 function getCoverFallbackClass(video: VideoInfo): string {
@@ -98,13 +98,13 @@ export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
 
   if (!video) {
     return (
-      <section className="min-w-0 rounded-[24px] border border-dashed border-[var(--line-strong)] bg-[var(--paper-raised)] p-5">
-        <div className="flex aspect-video items-center justify-center rounded-[16px] bg-[var(--paper-deep)] text-sm text-[var(--muted)]">
+      <section className="min-w-0 rounded-[2px] border-2 border-dashed border-[var(--line-strong)] bg-[var(--paper-raised)] p-5">
+        <div className="flex aspect-video items-center justify-center rounded-[2px] bg-[var(--paper-deep)] text-sm text-[var(--muted)]">
           粘贴链接或打开推荐内容后，这里会显示媒体预览。
         </div>
         <div className="mt-4 space-y-2">
-          <div className="h-4 w-3/4 rounded bg-zinc-100" />
-          <div className="h-3 w-1/2 rounded bg-zinc-100" />
+          <div className="h-4 w-3/4 bg-[var(--paper-deep)]" />
+          <div className="h-3 w-1/2 bg-[var(--paper-deep)]" />
         </div>
       </section>
     );
@@ -114,12 +114,12 @@ export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
   const infoRows = getInfoRows(video);
 
   return (
-    <section className="min-w-0 rounded-[24px] bg-[var(--paper-raised)] p-4 shadow-[var(--shadow-paper)]">
-      <div className="mb-4 flex items-center gap-3">
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent)]">
-          Source file
+    <section className="min-w-0">
+      <div className="mb-3 flex items-center gap-3">
+        <span className="mono text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
+          来源 / SOURCE
         </span>
-        <span className="h-px flex-1 bg-[var(--line-strong)]" />
+        <span className="h-px flex-1 bg-[var(--line)]" aria-hidden="true" />
       </div>
       <div className={getCoverFrameClass(video)}>
         {thumbnailUrl && !imageFailed ? (
@@ -143,30 +143,30 @@ export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
           </>
         ) : (
           <div className={getCoverFallbackClass(video)}>
-            <MonitorPlay className="h-8 w-8 text-zinc-400" aria-hidden="true" />
+            <MonitorPlay className="h-8 w-8 text-[var(--muted)]" aria-hidden="true" />
             <span>封面暂不可用</span>
           </div>
         )}
       </div>
       <div className="mt-4">
-        <p className="font-editorial text-lg font-semibold leading-7 text-[var(--ink)]">
+        <p className="font-editorial text-[17px] font-semibold leading-6 text-[var(--ink)]">
           {video.title}
         </p>
-        <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted-strong)]">
+        <div className="mt-4 grid gap-2.5 border-t-2 border-[var(--line-ink)] pt-4">
           {infoRows.map((row) => {
             const Icon = row.icon;
 
             return (
               <div
-                className="grid grid-cols-[18px_74px_1fr] items-center gap-2"
+                className="grid grid-cols-[16px_64px_1fr] items-center gap-2"
                 key={row.label}
               >
-                <Icon className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
-                <span className="text-xs font-medium text-[var(--muted)]">
+                <Icon className="h-3.5 w-3.5 text-[var(--accent)]" aria-hidden="true" />
+                <span className="mono text-[10px] uppercase tracking-[0.08em] text-[var(--muted)]">
                   {row.label}
                 </span>
                 <span
-                  className="min-w-0 truncate text-[var(--ink-soft)]"
+                  className="min-w-0 truncate text-xs text-[var(--ink-soft)]"
                   title={row.value}
                 >
                   {row.value}

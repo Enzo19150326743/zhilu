@@ -188,14 +188,14 @@ export function MindmapTab({
 
   if (summaryDisplayState === "empty") {
     return (
-      <div className="flex min-h-[300px] flex-col justify-center rounded-2xl bg-zinc-50 px-6 py-8 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.08)] sm:px-8">
-        <span className="inline-flex min-h-8 w-fit items-center rounded-full bg-white px-3 text-xs font-medium text-zinc-500 shadow-[0_8px_20px_rgba(24,24,27,0.06)]">
+      <div className="flex min-h-[300px] flex-col justify-center rounded-[2px] bg-[var(--paper)] px-6 py-8 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.08)] sm:px-8">
+        <span className="inline-flex min-h-8 w-fit items-center rounded-[2px] bg-[var(--paper-raised)] px-3 text-xs font-medium text-[var(--muted)] shadow-[0_8px_20px_rgba(24,24,27,0.06)]">
           等待总结
         </span>
-        <h3 className="mt-7 text-balance text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl">
+        <h3 className="mt-7 text-balance text-3xl font-semibold tracking-normal text-[var(--ink)] sm:text-4xl">
           未生成导图
         </h3>
-        <p className="mt-4 max-w-xl text-pretty text-sm leading-7 text-zinc-500 sm:text-base">
+        <p className="mt-4 max-w-xl text-pretty text-sm leading-7 text-[var(--muted)] sm:text-base">
           生成完整逐字稿并完成总结后，将自动整理为结构导图。
         </p>
       </div>
@@ -204,7 +204,7 @@ export function MindmapTab({
 
   if (!normalizedMarkdown) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-500">
+      <div className="rounded-[2px] border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-6 text-sm text-[var(--muted)]">
         暂无导图内容。
       </div>
     );
@@ -212,16 +212,16 @@ export function MindmapTab({
 
   return (
     <div className="space-y-4">
-      <section className="flex flex-col gap-3 border-b border-zinc-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-3 border-b border-[var(--line-strong)] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-950">
-            <GitFork className="h-4 w-4 text-blue-600" aria-hidden="true" />
+          <div className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+            <GitFork className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
             树状导图
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {metaItems.map((item) => (
               <span
-                className="inline-flex min-h-7 items-center rounded-full border border-zinc-200 bg-zinc-50 px-2.5 text-xs font-medium text-zinc-600"
+                className="inline-flex min-h-7 items-center rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] px-2.5 text-xs font-medium text-[var(--muted-strong)]"
                 key={item}
               >
                 {item}
@@ -231,17 +231,17 @@ export function MindmapTab({
         </div>
 
         {isShownotes ? (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+          <div className="rounded-[2px] border border-[var(--line-ink)] bg-[var(--accent-soft)] px-3 py-2 text-xs leading-5 text-[var(--ink)]">
             公开笔记不是完整音频逐字稿。
           </div>
         ) : null}
       </section>
 
-      <section className="relative overflow-hidden rounded-lg border border-zinc-200 bg-[#fbfbf8]">
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-lg border border-zinc-200 bg-white/95 p-1 shadow-sm backdrop-blur">
+      <section className="relative overflow-hidden rounded-[2px] border border-[var(--line-strong)] bg-[#fbfbf8]">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)]/95 p-1 shadow-sm backdrop-blur">
           <button
             aria-label="放大导图"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
             disabled={renderState !== "ready"}
             title="放大"
             type="button"
@@ -251,7 +251,7 @@ export function MindmapTab({
           </button>
           <button
             aria-label="缩小导图"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
             disabled={renderState !== "ready"}
             title="缩小"
             type="button"
@@ -261,7 +261,7 @@ export function MindmapTab({
           </button>
           <button
             aria-label="适应导图画布"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
             disabled={renderState !== "ready"}
             title="适应画布"
             type="button"
@@ -271,7 +271,7 @@ export function MindmapTab({
           </button>
           <button
             aria-label="重置导图视图"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] text-[var(--muted-strong)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)] disabled:opacity-40"
             disabled={renderState !== "ready"}
             title="重置视图"
             type="button"
@@ -288,21 +288,21 @@ export function MindmapTab({
         />
 
         {renderState === "ready" ? (
-          <div className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-md bg-white/90 px-2.5 py-1.5 text-[11px] text-zinc-500 shadow-sm backdrop-blur">
+          <div className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-[2px] bg-[var(--paper-raised)]/90 px-2.5 py-1.5 text-[11px] text-[var(--muted)] shadow-sm backdrop-blur">
             <Move className="h-3.5 w-3.5" aria-hidden="true" />
             拖拽画布平移 · 滚轮缩放 · 点击节点高亮或展开
           </div>
         ) : null}
 
         {renderState === "loading" ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-medium text-zinc-600 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--paper-raised)]/70 text-sm font-medium text-[var(--muted-strong)] backdrop-blur-sm">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
             正在整理导图
           </div>
         ) : null}
 
         {renderState === "error" && renderError ? (
-          <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm">
+          <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-[2px] border border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-xs text-[#7a4a1f] shadow-sm">
             <AlertCircle className="h-4 w-4" aria-hidden="true" />
             {renderError}
           </div>

@@ -1,0 +1,323 @@
+"use client";
+
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { ApiClientError, apiClient } from "@/lib/api";
+import { getTextSourceType } from "@/lib/media";
+import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
+import {
+  getDefaultTranscribeSettings,
+  normalizeTranscribeSettings
+} from "@/lib/transcribe-settings";
+import {
+  buildTranscribedDetail,
+  getRecommendedLocalAsrEngine,
+  isParseResponse,
+  isRecoverableTranscribeError
+} from "@/lib/workbench-detail";
+import type {
+  AsrEngine,
+  AsrStatusResponse,
+  DemoDetail,
+  ParseResponse,
+  TranscribeContextSettings,
+  TranscribeTask
+} from "@/lib/types";
+
+type WorkbenchTab = "summary" | "mindmap" | "qa" | "transcript";
+const TRANSCRIBE_RECOVERY_INTERVAL_MS = 5000;
+const TRANSCRIBE_RECOVERY_TIMEOUT_MS = 30 * 60 * 1000;
+
+interface UseTranscribeWorkflowOptions {
+  activeDetail: DemoDetail | ParseResponse | null;
+  activeSourceUrl: string | null;
+  isActiveSourceUrl: (sourceUrl: string) => boolean;
+  refreshLibraryItems: () => Promise<void>;
+  runSummaryForDetail: (detail: DemoDetail | ParseResponse) => Promise<void>;
+  setActiveTab: Dispatch<SetStateAction<WorkbenchTab>>;
+  setDetail: Dispatch<SetStateAction<DemoDetail | ParseResponse | null>>;
+  setErrorMessage: Dispatch<SetStateAction<string | null>>;
+  setSummaryErrorMessage: Dispatch<SetStateAction<string | null>>;
+  setSummaryGenerationMeta: Dispatch<
+    SetStateAction<{ isAiGenerated: boolean; model: string } | null>
+  >;
+  setSummaryNotice: Dispatch<SetStateAction<string | null>>;
+}
+
+export function useTranscribeWorkflow({
+  activeDetail,
+  activeSourceUrl,
+  isActiveSourceUrl,
+  refreshLibraryItems,
+  runSummaryForDetail,
+  setActiveTab,
+  setDetail,
+  setErrorMessage,
+  setSummaryErrorMessage,
+  setSummaryGenerationMeta,
+  setSummaryNotice
+}: UseTranscribeWorkflowOptions) {
+  const [transcribeTasks, setTranscribeTasks] = useState<TranscribeTask[]>([]);
+  const [isTranscribeSettingsOpen, setIsTranscribeSettingsOpen] = useState(false);
+  const [asrStatus, setAsrStatus] = useState<AsrStatusResponse | null>(null);
+  const [pendingAsrEngine, setPendingAsrEngine] =
+    useState<AsrEngine>("local_whisper");
+  const [pendingTranscribeSettings, setPendingTranscribeSettings] =
+    useState<TranscribeContextSettings>(() => getDefaultTranscribeSettings(null));
+
+  useEffect(() => {
+    apiClient
+      .getAsrStatus()
+      .then((response) => {
+        setAsrStatus(response);
+        setPendingAsrEngine(getRecommendedLocalAsrEngine(response));
+      })
+      .catch(() => setAsrStatus(null));
+  }, []);
+
+  const activeTranscribeTask = activeSourceUrl
+    ? (transcribeTasks.find((task) => task.sourceUrl === activeSourceUrl) ?? null)
+    : null;
+
+  const waitForRecoveredTranscribeDetail = async (
+    videoId: string,
+    sourceUrl: string,
+    transcriptVariantKey: AsrEngine,
+    previousVariantJson: string | null
+  ): Promise<ParseResponse | null> =>
+    pollForRecoveredValue({
+      fetchValue: () => apiClient.getLibraryDetail(videoId),
+      intervalMs: TRANSCRIBE_RECOVERY_INTERVAL_MS,
+      isRecovered: (detail) => {
+        const recoveredVariant = detail.transcript_variants?.[transcriptVariantKey];
+        return Boolean(
+          detail.source_url === sourceUrl &&
+            getTextSourceType(detail.video) === "asr_transcript" &&
+            recoveredVariant?.plain_text.trim() &&
+            JSON.stringify(recoveredVariant) !== previousVariantJson
+        );
+      },
+      timeoutMs: TRANSCRIBE_RECOVERY_TIMEOUT_MS
+    });
+
+  const applyTranscribeSuccess = (
+    taskId: string,
+    taskSourceUrl: string,
+    updatedDetail: ParseResponse,
+    successMessage: string,
+    continueWithSummary: boolean
+  ) => {
+    setTranscribeTasks((currentTasks) =>
+      currentTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              finishedAt: Date.now(),
+              message: successMessage,
+              status: "success"
+            }
+          : task
+      )
+    );
+    setDetail((currentDetail) => {
+      if (
+        !currentDetail ||
+        !isParseResponse(currentDetail) ||
+        currentDetail.source_url !== taskSourceUrl
+      ) {
+        return currentDetail;
+      }
+      return updatedDetail;
+    });
+
+    if (isActiveSourceUrl(taskSourceUrl)) {
+      setSummaryGenerationMeta(null);
+      setSummaryNotice(successMessage);
+      setActiveTab(continueWithSummary ? "summary" : "transcript");
+    }
+    void refreshLibraryItems();
+    if (continueWithSummary) {
+      void runSummaryForDetail(updatedDetail);
+    }
+  };
+
+  const handleTranscribeRequest = (settings?: TranscribeContextSettings) => {
+    if (!activeDetail || !isParseResponse(activeDetail)) {
+      setErrorMessage("当前记录无法生成转写稿，请先解析公开视频链接。");
+      return;
+    }
+    if (
+      transcribeTasks.some(
+        (task) =>
+          task.sourceUrl === activeDetail.source_url && task.status === "running"
+      )
+    ) {
+      setSummaryNotice("该链接已经在后台生成转写稿，请等待当前任务完成。");
+      return;
+    }
+
+    setPendingTranscribeSettings(
+      normalizeTranscribeSettings(
+        settings,
+        getDefaultTranscribeSettings(activeDetail.video)
+      )
+    );
+    // 云端仍需用户明确选择；本地模型按后端能力状态选择推荐项。
+    setPendingAsrEngine(getRecommendedLocalAsrEngine(asrStatus));
+    setIsTranscribeSettingsOpen(true);
+  };
+
+  const startTranscribe = async (
+    settings?: TranscribeContextSettings,
+    asrEngine: AsrEngine = "local_whisper"
+  ) => {
+    if (!activeDetail || !isParseResponse(activeDetail)) {
+      setErrorMessage("当前记录无法生成转写稿，请先解析公开视频链接。");
+      return;
+    }
+
+    const taskSourceUrl = activeDetail.source_url;
+    const taskVideoId = activeDetail.video.video_id;
+    const taskTitle = activeDetail.video.title || "未命名内容";
+    const isRetranscription = Boolean(activeDetail.transcript?.plain_text.trim());
+    const previousVariant = activeDetail.transcript_variants?.[asrEngine] ?? null;
+    const previousVariantJson = previousVariant
+      ? JSON.stringify(previousVariant)
+      : null;
+
+    if (
+      transcribeTasks.some(
+        (task) => task.sourceUrl === taskSourceUrl && task.status === "running"
+      )
+    ) {
+      setSummaryNotice("该链接已经在后台生成转写稿，请等待当前任务完成。");
+      return;
+    }
+
+    const taskId = `${taskVideoId}-${Date.now()}`;
+    setTranscribeTasks((currentTasks) => [
+      {
+        id: taskId,
+        sourceUrl: taskSourceUrl,
+        videoId: taskVideoId,
+        title: taskTitle,
+        status: "running",
+        startedAt: Date.now(),
+        asrEngine,
+        contextSettings: settings
+      },
+      ...currentTasks.filter((task) => task.sourceUrl !== taskSourceUrl)
+    ]);
+    setSummaryErrorMessage(null);
+    setSummaryNotice(null);
+
+    try {
+      const response = await apiClient.transcribeVideo({
+        asr_engine: asrEngine,
+        context_settings: settings ?? null,
+        url: taskSourceUrl,
+        video_id: taskVideoId
+      });
+      const successMessage = isRetranscription
+        ? `${response.message} 已保留旧版本，可在内容文本中切换或并排对比。`
+        : `${response.message} 正在继续生成总结。`;
+      applyTranscribeSuccess(
+        taskId,
+        taskSourceUrl,
+        buildTranscribedDetail(
+          activeDetail,
+          response.transcript,
+          response.transcript_variant_key
+        ),
+        successMessage,
+        !isRetranscription
+      );
+    } catch (error) {
+      if (isRecoverableTranscribeError(error)) {
+        setTranscribeTasks((currentTasks) =>
+          currentTasks.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  message:
+                    error instanceof ApiClientError && error.errorCode === "TIMEOUT"
+                      ? "请求等待超时，后台仍在处理，正在同步结果。"
+                      : "连接中断，后台可能仍在处理，正在同步结果。",
+                  status: "running"
+                }
+              : task
+          )
+        );
+        const recoveredDetail = await waitForRecoveredTranscribeDetail(
+          taskVideoId,
+          taskSourceUrl,
+          asrEngine,
+          previousVariantJson
+        );
+        if (recoveredDetail) {
+          applyTranscribeSuccess(
+            taskId,
+            taskSourceUrl,
+            recoveredDetail,
+            isRetranscription
+              ? "逐字稿已从本地历史恢复，可在内容文本中对比版本。"
+              : "逐字稿已生成，已从本地历史恢复结果。",
+            !isRetranscription
+          );
+          return;
+        }
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : "转写稿生成失败，请稍后重试。";
+      setTranscribeTasks((currentTasks) =>
+        currentTasks.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                errorMessage,
+                finishedAt: Date.now(),
+                status: "error"
+              }
+            : task
+        )
+      );
+    }
+  };
+
+  const handleConfirmTranscribeSettings = () => {
+    setIsTranscribeSettingsOpen(false);
+    void startTranscribe(pendingTranscribeSettings, pendingAsrEngine);
+  };
+
+  const handleRetryTranscribeLocally = (taskId: string) => {
+    const task = transcribeTasks.find((item) => item.id === taskId);
+    if (
+      !task ||
+      task.asrEngine !== "fun_asr_flash" ||
+      task.sourceUrl !== activeSourceUrl
+    ) {
+      return;
+    }
+    void startTranscribe(
+      task.contextSettings,
+      getRecommendedLocalAsrEngine(asrStatus)
+    );
+  };
+
+  return {
+    activeTranscribeTask,
+    handleConfirmTranscribeSettings,
+    handleRetryTranscribeLocally,
+    handleTranscribeRequest,
+    setIsTranscribeSettingsOpen,
+    setPendingAsrEngine,
+    setPendingTranscribeSettings,
+    transcribeSettingsDialogState: {
+      asrStatus,
+      isOpen: isTranscribeSettingsOpen,
+      pendingAsrEngine,
+      pendingTranscribeSettings
+    },
+    transcribeTasks
+  };
+}

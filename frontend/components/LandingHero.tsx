@@ -1,9 +1,7 @@
 import {
-  ArrowUpRight,
   Link2,
   Loader2,
-  Search,
-  ShieldCheck
+  Search
 } from "lucide-react";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import type { DemoItem } from "@/lib/types";
@@ -22,23 +20,19 @@ interface LandingHeroProps {
 const workflowItems = [
   {
     number: "01",
-    title: "接收链接",
-    description: "从视频或播客开始"
+    title: "接收链接"
   },
   {
     number: "02",
-    title: "取得文本",
-    description: "字幕、Shownotes 或转写"
+    title: "取得文本"
   },
   {
     number: "03",
-    title: "提炼内容",
-    description: "摘要、要点与摘录"
+    title: "提炼内容"
   },
   {
     number: "04",
-    title: "本地沉淀",
-    description: "形成可编辑的 Markdown 知识稿"
+    title: "本地沉淀"
   }
 ];
 
@@ -61,14 +55,14 @@ function RecommendationDeck({
 }: RecommendationDeckProps) {
   return (
     <div className="editorial-enter editorial-enter-delay-2 min-w-0">
-      <div className="mb-5 flex items-center gap-4 border-b border-[var(--line-strong)] pb-3">
-        <h2 className="font-editorial text-2xl font-semibold text-[var(--ink)] sm:text-3xl">
+      <div className="mb-2">
+        <h2 className="font-editorial text-[28px] font-bold leading-tight text-[var(--ink)]">
           推荐内容
         </h2>
-        <span className="h-px flex-1 bg-[var(--accent)]/30" aria-hidden="true" />
       </div>
+      <div className="border-t-2 border-[var(--line-ink)]" aria-hidden="true" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="divide-y divide-[var(--line-ink)]">
         {items.slice(0, 3).map((item, index) => {
           const isLoading = loadingItemId === item.demo_id;
           const fallbackThumbnail =
@@ -77,16 +71,33 @@ function RecommendationDeck({
 
           return (
             <button
-              className="archive-sheet group flex h-[330px] min-w-0 flex-col overflow-hidden rounded-[22px] bg-[var(--paper-raised)] text-left transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-1 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60"
+              className="group flex w-full min-w-0 items-center gap-5 py-5 text-left transition-[background-color] duration-150 hover:bg-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-60 sm:gap-7"
               disabled={loadingItemId !== null}
               key={item.demo_id}
               type="button"
               onClick={() => onOpenItem(item.demo_id)}
             >
-              <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-[var(--paper-deep)]">
+              <span className="mono w-8 shrink-0 text-[13px] font-medium text-[var(--accent)]">
+                0{index + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="font-editorial block truncate text-lg font-semibold leading-7 text-[var(--ink)] transition-colors group-hover:text-[var(--accent)] sm:text-[22px] sm:leading-[30px]">
+                  {item.title}
+                </span>
+                <span className="mt-2 block truncate text-xs leading-[18px] text-[var(--muted)]">
+                  {item.description}
+                </span>
+              </span>
+              {isLoading ? (
+                <Loader2
+                  className="h-5 w-5 shrink-0 animate-spin text-[var(--accent)]"
+                  aria-hidden="true"
+                />
+              ) : null}
+              <span className="shadow-hard-sm hidden aspect-video w-[168px] shrink-0 overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--ink)] sm:block">
                 <img
                   alt={`${item.title} 媒体封面`}
-                  className="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-black/10 transition-transform duration-300 ease-out group-hover:scale-[1.025]"
+                  className="h-full w-full object-contain"
                   referrerPolicy="no-referrer"
                   src={thumbnailUrl || fallbackThumbnail}
                   onError={(event) => {
@@ -94,34 +105,12 @@ function RecommendationDeck({
                     event.currentTarget.src = fallbackThumbnail;
                   }}
                 />
-                <span className="absolute left-3 top-3 inline-flex min-h-7 items-center bg-[rgba(24,23,19,0.86)] px-2.5 text-[10px] font-bold tracking-[0.16em] text-white backdrop-blur-md">
-                  推荐 / 0{index + 1}
-                </span>
-              </div>
-
-              <div className="flex min-h-0 flex-1 flex-col p-4">
-                <p className="line-clamp-2 text-base font-semibold leading-6 text-[var(--ink)]">
-                  {item.title}
-                </p>
-                <div className="mt-auto flex items-end justify-between gap-3 border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
-                  <span className="line-clamp-1">{item.description}</span>
-                  {isLoading ? (
-                    <Loader2
-                      className="h-4 w-4 shrink-0 animate-spin text-[var(--accent)]"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <ArrowUpRight
-                      className="h-4 w-4 shrink-0 text-[var(--accent)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                      aria-hidden="true"
-                    />
-                  )}
-                </div>
-              </div>
+              </span>
             </button>
           );
         })}
       </div>
+      <div className="border-t border-[var(--line-ink)]" aria-hidden="true" />
     </div>
   );
 }
@@ -137,49 +126,42 @@ export function LandingHero({
   onLoadDemo
 }: LandingHeroProps) {
   return (
-    <section className="relative overflow-hidden border-b border-[var(--line)] bg-[var(--paper)]">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,transparent_0,transparent_calc(100%-1px),rgba(38,35,29,0.055)_calc(100%-1px)),linear-gradient(to_bottom,transparent_0,transparent_calc(100%-1px),rgba(38,35,29,0.045)_calc(100%-1px))] bg-[size:88px_88px] opacity-60"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-32 top-24 h-72 w-72 rounded-full bg-[var(--accent-soft)] blur-3xl"
-      />
+    <>
+      <section className="bg-[var(--paper)]">
+        <div className="mx-auto max-w-[90rem] px-4 pb-12 pt-8 sm:px-6 lg:px-10 lg:pb-14 lg:pt-10">
+          <div className="flex items-start gap-9">
+            <div className="min-w-0 flex-1">
+              <div className="editorial-enter">
+                <span className="shadow-hard-sm mono inline-block rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-3.5 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--paper-raised)]">
+                  FEATURE · 从链接到知识稿
+                </span>
+              </div>
 
-      <div className="relative mx-auto max-w-[90rem] px-4 py-12 sm:px-6 sm:py-14 lg:px-10 lg:py-14">
-        <div className="editorial-enter flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
-          <span className="h-px w-10 bg-current" />
-          知录 · 本地 Markdown 知识工作台
-        </div>
+              <h1 className="editorial-enter editorial-enter-delay-1 mt-7 text-balance text-[clamp(2.6rem,6vw,5.25rem)] font-bold leading-[1.12] tracking-[-0.01em] text-[var(--ink)]">
+                <span className="font-editorial block">看见的，听见的，</span>
+                <span className="font-editorial mt-2 block">
+                  <span className="shadow-hard-md inline-block rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-1 text-[var(--paper-raised)]">
+                    都变成你的知识。
+                  </span>
+                </span>
+              </h1>
 
-        <h1 className="font-editorial editorial-enter editorial-enter-delay-1 mt-7 text-balance text-[clamp(3.2rem,5.2vw,4.75rem)] font-semibold leading-[0.94] tracking-[-0.06em] text-[var(--ink)] lg:whitespace-nowrap">
-          看见的，听见的，
-          <span className="text-[var(--accent)]">都变成你的知识。</span>
-        </h1>
+              <p className="editorial-enter editorial-enter-delay-2 mt-7 max-w-3xl whitespace-nowrap text-[15px] leading-[26px] text-[var(--ink-soft)]">
+                从公开视频与播客取得文本，整理为摘要、导图与摘录，导出可继续编辑的本地 Markdown 知识稿。
+              </p>
 
-        <div className="mt-10 grid items-start gap-12 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] lg:gap-14">
-          <div className="min-w-0">
-            <p className="editorial-enter editorial-enter-delay-2 max-w-xl text-pretty text-base leading-8 text-[var(--muted-strong)] sm:text-lg">
-              从视频与播客取得文本，整理成摘要、导图与摘录，沉淀为保存在本地、可继续编辑的 Markdown 知识稿。
-            </p>
-
-            <div className="editorial-enter editorial-enter-delay-3 mt-7">
-              <div className="link-intake rounded-[24px] bg-[var(--paper-raised)] p-2">
-                <label className="block px-3 pb-2 pt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
-                  公开媒体链接
-                </label>
-                <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="editorial-enter editorial-enter-delay-2 mt-9 max-w-[672px]">
+                <div className="shadow-hard-sm flex min-h-[52px] min-w-0 items-stretch rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)]">
                   <div className="relative min-w-0 flex-1">
                     <Link2
-                      className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--muted)]"
+                      className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--muted)]"
                       aria-hidden="true"
                     />
                     <input
                       aria-label="公开媒体链接"
-                      className="min-h-14 w-full rounded-[16px] border border-[var(--line-strong)] bg-[var(--paper)] pl-12 pr-4 text-sm text-[var(--ink)] outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-[var(--muted)] hover:border-[var(--ink-soft)] focus:border-[var(--accent)] focus:bg-white focus:shadow-[0_0_0_3px_var(--accent-soft)] disabled:cursor-not-allowed sm:text-base"
+                      className="font-editorial min-h-[52px] w-full border-0 bg-transparent pl-11 pr-3 text-lg text-[var(--ink)] outline-none placeholder:text-[#a39a87] focus-visible:outline-none disabled:cursor-not-allowed"
                       inputMode="url"
-                      placeholder="粘贴 B 站 / 小宇宙 / 抖音公开链接"
+                      placeholder="粘贴 B 站 / 小宇宙 / 抖音公开链接…"
                       type="url"
                       value={url}
                       onChange={(event) => onChangeUrl(event.target.value)}
@@ -191,7 +173,7 @@ export function LandingHero({
                     />
                   </div>
                   <button
-                    className="inline-flex min-h-14 shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[var(--ink)] pl-5 pr-[18px] text-sm font-semibold text-[var(--paper-raised)] transition-[background-color,scale] duration-150 ease-out hover:bg-[var(--accent)] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-[var(--ink)] sm:min-w-36"
+                    className="inline-flex min-h-[52px] shrink-0 items-center justify-center gap-2 border-l-2 border-[var(--line-ink)] bg-[var(--accent-light)] px-4 text-[15px] font-semibold text-[var(--paper-raised)] transition-colors duration-150 hover:bg-[var(--accent)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-100"
                     disabled={isParsing || !url.trim()}
                     type="button"
                     onClick={() => onAnalyze(false)}
@@ -204,58 +186,48 @@ export function LandingHero({
                     {isParsing ? "提取中" : "生成知识稿"}
                   </button>
                 </div>
-              </div>
 
-              {errorMessage ? (
-                <div className="mt-4 border-l-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--ink)]">
-                  {errorMessage}
-                </div>
-              ) : null}
-
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--muted)]">
-                <span>B 站</span>
-                <span aria-hidden="true">/</span>
-                <span>小宇宙</span>
-                <span aria-hidden="true">/</span>
-                <span>抖音</span>
-                <span className="inline-flex items-center gap-1.5 text-[var(--muted-strong)]">
-                  <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                  结果保存在本地
-                </span>
-              </div>
-            </div>
-
-            <div className="editorial-enter editorial-enter-delay-3 mt-8 grid border-y border-[var(--line-strong)] sm:grid-cols-2">
-              {workflowItems.map((item, index) => (
-                <div
-                  className={`grid min-h-24 grid-cols-[40px_1fr] gap-3 py-4 ${
-                    index % 2 === 0
-                      ? "sm:pr-4"
-                      : "border-t border-[var(--line)] sm:border-l sm:border-t-0 sm:pl-4"
-                  } ${index >= 2 ? "border-t border-[var(--line)]" : ""}`}
-                  key={item.number}
-                >
-                  <span className="font-editorial text-xl text-[var(--accent)]">
-                    {item.number}
-                  </span>
-                  <div>
-                    <p className="font-semibold text-[var(--ink)]">{item.title}</p>
-                    <p className="mt-1 text-sm leading-5 text-[var(--muted)]">
-                      {item.description}
-                    </p>
+                {errorMessage ? (
+                  <div className="shadow-hard-sm mt-4 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--ink)]">
+                    {errorMessage}
                   </div>
-                </div>
-              ))}
+                ) : null}
+              </div>
             </div>
           </div>
+        </div>
 
+        <div className="mx-auto max-w-[90rem] px-4 pb-6 pt-10 sm:px-6 lg:px-10">
+          <div className="grid grid-cols-1 gap-[2px] border-y-2 border-[var(--line-ink)] bg-[var(--line-ink)] sm:grid-cols-2 lg:grid-cols-4">
+            {workflowItems.map((item) => (
+              <div className="bg-[var(--paper)] px-6 py-6" key={item.number}>
+                <p
+                  className={`font-editorial text-[28px] font-bold leading-none ${
+                    item.number === "01"
+                      ? "text-[var(--accent)]"
+                      : "text-[var(--ink)]"
+                  }`}
+                >
+                  {item.number}
+                </p>
+                <p className="mt-3 text-sm font-semibold text-[var(--ink)]">
+                  {item.title}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--paper)]">
+        <div className="mx-auto max-w-[90rem] px-4 pb-16 pt-10 sm:px-6 lg:px-10">
           <RecommendationDeck
             items={demos}
             loadingItemId={loadingDemoId}
             onOpenItem={onLoadDemo}
           />
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

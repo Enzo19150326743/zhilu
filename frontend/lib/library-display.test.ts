@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   getFeaturedLibraryItems,
   getLibraryStatusLabel,
-  getPlatformLabel
+  getPlatformLabel,
+  isLibraryItemSummarized,
+  matchesLibraryFilter
 } from "./library-display";
 import type { LibraryItem } from "./types";
 
@@ -62,8 +64,31 @@ test("档案状态沿用 shownotes、总结和文本可用性语义", () => {
   assert.equal(getLibraryStatusLabel(createLibraryItem()), "可总结");
   assert.equal(
     getLibraryStatusLabel(createLibraryItem({ has_transcript: false })),
-    "无文本"
+    "需转写"
   );
+});
+
+test("无逐字稿的旧总结不会同时出现在已总结和需转写", () => {
+  const staleSummaryItem = createLibraryItem({
+    has_transcript: false,
+    summary_status: "ai_generated"
+  });
+
+  assert.equal(isLibraryItemSummarized(staleSummaryItem), false);
+  assert.equal(getLibraryStatusLabel(staleSummaryItem), "需转写");
+  assert.equal(matchesLibraryFilter(staleSummaryItem, "summarized"), false);
+  assert.equal(matchesLibraryFilter(staleSummaryItem, "noTranscript"), true);
+});
+
+test("shownotes 即使带旧总结也只归入需转写", () => {
+  const shownotesItem = createLibraryItem({
+    summary_status: "local_fallback",
+    text_source_type: "shownotes"
+  });
+
+  assert.equal(isLibraryItemSummarized(shownotesItem), false);
+  assert.equal(matchesLibraryFilter(shownotesItem, "summarized"), false);
+  assert.equal(matchesLibraryFilter(shownotesItem, "noTranscript"), true);
 });
 
 test("平台名称使用面向用户的中文标签", () => {

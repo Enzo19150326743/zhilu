@@ -46,14 +46,14 @@ function getTaskStatusLabel(task: WorkbenchTask): string {
 
 function getTaskIcon(task: WorkbenchTask) {
   if (task.status === "success") {
-    return <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />;
+    return <CheckCircle2 className="h-4 w-4 text-[#2f5d3a]" aria-hidden="true" />;
   }
 
   if (task.status === "error") {
-    return <CircleAlert className="h-4 w-4 text-amber-700" aria-hidden="true" />;
+    return <CircleAlert className="h-4 w-4 text-[#7a4a1f]" aria-hidden="true" />;
   }
 
-  return <Loader2 className="h-4 w-4 animate-spin text-blue-600" aria-hidden="true" />;
+  return <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" aria-hidden="true" />;
 }
 
 export function TranscribeTaskToasts({
@@ -72,30 +72,30 @@ export function TranscribeTaskToasts({
     <div className="fixed bottom-4 right-4 z-50 w-[min(calc(100vw-2rem),380px)] space-y-2">
       {visibleTasks.map((task) => (
         <section
-          className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
+          className="rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] p-3 shadow-lg"
           key={task.id}
         >
           <div className="flex items-start gap-3">
             <div className="mt-0.5">{getTaskIcon(task)}</div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-zinc-950">
+              <p className="text-sm font-semibold text-[var(--ink)]">
                 {getTaskStatusLabel(task)}
               </p>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-600">
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted-strong)]">
                 {task.title}
               </p>
               {task.status === "running" ? (
-                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
                   可以继续解析或打开其他链接，当前任务会在后台继续处理。
                 </p>
               ) : null}
               {task.status === "success" && task.message ? (
-                <p className="mt-1 text-xs leading-5 text-emerald-700">
+                <p className="mt-1 text-xs leading-5 text-[#2f5d3a]">
                   {task.message}
                 </p>
               ) : null}
               {task.status === "error" && task.errorMessage ? (
-                <p className="mt-1 text-xs leading-5 text-amber-800">
+                <p className="mt-1 text-xs leading-5 text-[#7a4a1f]">
                   {task.errorMessage}
                 </p>
               ) : null}
@@ -105,7 +105,7 @@ export function TranscribeTaskToasts({
               task.sourceUrl === activeSourceUrl &&
               onRetryLocally ? (
                 <button
-                  className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-lg bg-zinc-950 px-2.5 text-xs font-semibold text-white transition hover:bg-blue-600"
+                  className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-[2px] bg-[var(--ink)] px-2.5 text-xs font-semibold text-[var(--paper)] transition hover:bg-[var(--accent-deep)]"
                   type="button"
                   onClick={() => onRetryLocally(task.id)}
                 >
@@ -116,7 +116,7 @@ export function TranscribeTaskToasts({
             </div>
             <button
               aria-label="隐藏任务提示"
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-950"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[2px] text-[var(--muted)] transition hover:bg-[var(--paper-deep)] hover:text-[var(--ink)]"
               title="仅隐藏提示，后台任务会继续处理"
               type="button"
               onClick={() => onDismiss(task.id)}

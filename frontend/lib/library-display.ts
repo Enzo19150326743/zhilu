@@ -5,7 +5,7 @@ export function isShownotesLibraryItem(item: LibraryItem): boolean {
 }
 
 export function isLibraryItemSummarized(item: LibraryItem): boolean {
-  if (isShownotesLibraryItem(item)) {
+  if (!item.has_transcript || isShownotesLibraryItem(item)) {
     return false;
   }
 
@@ -16,7 +16,7 @@ export function isLibraryItemSummarized(item: LibraryItem): boolean {
 }
 
 export function getLibraryStatusLabel(item: LibraryItem): string {
-  if (isShownotesLibraryItem(item)) {
+  if (!item.has_transcript || isShownotesLibraryItem(item)) {
     return "需转写";
   }
 
@@ -28,7 +28,7 @@ export function getLibraryStatusLabel(item: LibraryItem): string {
     return "基础摘要";
   }
 
-  return item.has_transcript ? "可总结" : "无文本";
+  return "可总结";
 }
 
 export function getPlatformLabel(platform: string): string {

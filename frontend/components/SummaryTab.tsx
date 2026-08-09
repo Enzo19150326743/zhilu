@@ -1,4 +1,4 @@
-import { ArrowUpRight, FileAudio, Loader2, Sparkles } from "lucide-react";
+import { FileAudio, FileText, Loader2 } from "lucide-react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import type {
   SummaryDisplayState,
@@ -97,7 +97,7 @@ function SummaryEmptyState({
       : canSummarize
         ? {
             disabled: isSummarizing,
-            icon: Sparkles,
+            icon: FileText,
             isRunning: isSummarizing,
             label: isSummarizing ? "生成中" : "生成总结",
             onClick: onSummarize
@@ -111,27 +111,26 @@ function SummaryEmptyState({
               onClick: onTranscribe
             }
           : null;
-  const ActionIcon = action?.icon ?? Sparkles;
+  const ActionIcon = action?.icon ?? FileText;
 
   return (
-    <section className="relative min-h-[300px] overflow-hidden rounded-2xl bg-zinc-950 px-6 py-8 text-white shadow-[0_24px_70px_rgba(24,24,27,0.22)] sm:px-8 sm:py-10">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:44px_44px] opacity-35" />
+    <section className="shadow-hard-md relative min-h-[300px] overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper)] px-6 py-8 sm:px-8 sm:py-10">
       <div className="relative flex min-h-[220px] flex-col justify-between">
         <div>
-          <span className="inline-flex min-h-8 items-center rounded-full border border-white/10 bg-white/10 px-3 text-xs font-medium text-zinc-300">
+          <span className="shadow-hard-sm mono inline-flex min-h-8 items-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-3 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--paper-raised)]">
             {isShownotesSource ? "已读取 shownotes" : "内容已提取"}
           </span>
-          <h3 className="mt-8 text-balance text-3xl font-semibold tracking-normal text-white sm:text-4xl">
+          <h3 className="font-editorial mt-8 text-balance text-3xl font-bold tracking-normal text-[var(--ink)] sm:text-4xl">
             {title}
           </h3>
-          <p className="mt-4 max-w-xl text-pretty text-sm leading-7 text-zinc-300 sm:text-base">
+          <p className="mt-4 max-w-xl text-pretty text-sm leading-7 text-[var(--ink-soft)] sm:text-base">
             {description}
           </p>
         </div>
 
         {action ? (
           <button
-            className="mt-8 inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-zinc-950 shadow-[0_14px_34px_rgba(0,0,0,0.25)] transition-[background-color,transform] hover:bg-zinc-100 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-65 disabled:hover:bg-white"
+            className="ink-block mt-8 inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-[2px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-65"
             disabled={action.disabled}
             type="button"
             onClick={action.onClick}
@@ -185,19 +184,19 @@ export function SummaryTab({
         />
 
         {transcribeErrorMessage ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
             {transcribeErrorMessage}
           </div>
         ) : null}
 
         {summaryErrorMessage ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
             {summaryErrorMessage}
           </div>
         ) : null}
 
         {summaryNotice ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#e9f2ea] px-3 py-2 text-sm text-[#2f5d3a]">
             {summaryNotice}
           </div>
         ) : null}
@@ -207,7 +206,7 @@ export function SummaryTab({
 
   if (!summary) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-500">
+      <div className="rounded-[2px] border border-dashed border-[var(--line-strong)] bg-[var(--paper-deep)] p-6 text-sm text-[var(--muted)]">
         暂无总结内容。
       </div>
     );
@@ -223,35 +222,33 @@ export function SummaryTab({
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 border-y border-[var(--line-strong)] py-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-4 border-b-2 border-[var(--line-ink)] pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[var(--accent)]" aria-hidden="true" />
-            <h3 className="text-sm font-semibold text-[var(--ink)]">结构化总结</h3>
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-editorial text-lg font-semibold text-[var(--ink)]">结构化总结</h3>
+            <span
+              className={`mono inline-flex items-center rounded-[2px] border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] ${
+                summaryGenerationMeta
+                  ? summaryGenerationMeta.isAiGenerated
+                    ? "border-[var(--line-ink)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                    : "border-[var(--line-ink)] bg-[#f7ead9] text-[#7a4a1f]"
+                  : "border-[var(--line-strong)] text-[var(--muted)]"
+              }`}
+            >
+              {summaryDisplayState === "demo"
+                ? "推荐摘要"
+                : summaryGenerationMeta?.isAiGenerated
+                  ? "AI 生成"
+                  : "基础摘要"}
+            </span>
           </div>
           <p className="mt-1.5 max-w-xl text-xs leading-5 text-[var(--muted)]">
             一份可以继续编辑、摘录和导出的媒体知识提纲。
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <span
-            className={`inline-flex min-h-8 items-center gap-2 text-xs font-medium ${
-              summaryGenerationMeta
-                ? summaryGenerationMeta.isAiGenerated
-                  ? "text-sky-700"
-                  : "text-amber-800"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            <span className="h-px w-5 bg-current opacity-50" aria-hidden="true" />
-            {summaryDisplayState === "demo"
-              ? "推荐摘要"
-              : summaryGenerationMeta?.isAiGenerated
-                ? "智能总结已生成"
-                : "基础摘要已生成"}
-          </span>
           <button
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--ink)] px-4 text-sm font-semibold text-white transition-[background-color,scale] duration-150 hover:bg-[var(--accent)] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--ink)]"
+            className="ink-block inline-flex min-h-11 items-center justify-center gap-2 rounded-[2px] bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!canSummarize || isSummarizing}
             type="button"
             onClick={onSummarize}
@@ -259,27 +256,27 @@ export function SummaryTab({
             {isSummarizing ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <FileText className="h-4 w-4" aria-hidden="true" />
             )}
             {isSummarizing
               ? "生成中"
               : summaryDisplayState === "generated"
-                ? "重新生成底稿"
-                : "生成知识底稿"}
+                ? "重新生成知识稿"
+                : "生成知识稿"}
           </button>
         </div>
       </section>
 
       {!hasTranscript ? (
-        <div className="border-l-2 border-amber-400 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-900">
+        <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-4 py-3 text-sm leading-6 text-[#7a4a1f]">
           <div>
             <p className="font-medium">当前没有可用于总结的内容文本。</p>
-            <p className="mt-1 text-amber-800">
+            <p className="mt-1">
               可以先生成转写稿，再整理总结、摘录和导图。
             </p>
             {canTranscribe ? (
               <button
-                className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-zinc-950"
+                className="ink-block mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-3 text-sm font-semibold text-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isTranscribing}
                 type="button"
                 onClick={onTranscribe}
@@ -287,7 +284,7 @@ export function SummaryTab({
                 {isTranscribing ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  <FileAudio className="h-4 w-4" aria-hidden="true" />
                 )}
                 {isTranscribing ? "生成中" : "生成转写稿"}
               </button>
@@ -297,19 +294,19 @@ export function SummaryTab({
       ) : null}
 
       {transcribeErrorMessage ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
           {transcribeErrorMessage}
         </div>
       ) : null}
 
       {isPodcast && isShownotes ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm leading-6 text-blue-900">
+        <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent-soft)] px-3 py-3 text-sm leading-6 text-[var(--ink)]">
           <p>
             当前只有 shownotes 原文，不是完整音频对话稿；必须先生成转写稿，才能继续总结、摘录和导图。
           </p>
           {canTranscribe ? (
             <button
-              className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-zinc-950 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-zinc-950"
+              className="ink-block mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-3 text-sm font-semibold text-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isTranscribing}
               type="button"
               onClick={onTranscribe}
@@ -317,7 +314,7 @@ export function SummaryTab({
               {isTranscribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                <FileAudio className="h-4 w-4" aria-hidden="true" />
               )}
               {isTranscribing ? "生成中" : "生成转写稿"}
             </button>
@@ -326,29 +323,29 @@ export function SummaryTab({
       ) : null}
 
       {summaryErrorMessage ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
           {summaryErrorMessage}
         </div>
       ) : null}
 
       {summaryNotice ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#e9f2ea] px-3 py-2 text-sm text-[#2f5d3a]">
           {summaryNotice}
         </div>
       ) : null}
 
-      <section className="grid gap-5 bg-[var(--paper-deep)]/55 px-5 py-6 lg:grid-cols-[140px_1fr] lg:gap-8 sm:px-6 sm:py-7">
-        <SummarySectionHeading index="01" label="摘要" title="一句话摘要" />
-        <p className="font-editorial text-pretty text-lg font-semibold leading-8 text-[var(--ink)] sm:text-xl sm:leading-9">
+      <section className="flex gap-4 px-1 py-2">
+        <span aria-hidden="true" className="w-[5px] shrink-0 bg-[var(--accent)]" />
+        <p className="font-editorial text-pretty text-lg font-medium leading-8 text-[var(--ink)] sm:text-[19px] sm:leading-[32px]">
           {summary.tldr}
         </p>
       </section>
 
       {topicTags.length > 0 ? (
-        <section className="flex flex-wrap gap-2 border-b border-[var(--line)] pb-5">
+        <section className="flex flex-wrap gap-2 border-b border-[var(--line-ink)] pb-5">
           {topicTags.map((topic) => (
             <span
-              className="inline-flex min-h-7 items-center rounded-full border border-[var(--line-strong)] bg-white px-2.5 text-xs font-medium text-[var(--ink-soft)]"
+              className="inline-flex min-h-7 items-center rounded-[2px] border-[1.5px] border-[var(--line-ink)] bg-transparent px-2.5 text-xs font-normal text-[var(--ink)]"
               key={topic}
             >
               {topic}
@@ -365,7 +362,7 @@ export function SummaryTab({
               className="grid grid-cols-[46px_1fr] gap-3 border-b border-[var(--line)] py-4 sm:grid-cols-[58px_1fr] sm:py-5"
               key={point}
             >
-              <span className="font-editorial tabular-nums text-xl text-[var(--accent)]">
+              <span className="font-editorial tabular-nums text-lg font-bold leading-7 text-[var(--accent)]">
                 {String(index + 1).padStart(2, "0")}
               </span>
               <p className="text-pretty text-sm leading-7 text-[var(--ink-soft)] sm:text-[15px]">
@@ -389,7 +386,7 @@ export function SummaryTab({
 
       {summary.timeline.length > 0 ? (
         <section>
-          <h3 className="text-sm font-semibold text-zinc-950">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">
             {isShownotes ? "笔记线索" : "结构线索"}
           </h3>
           <div className="mt-3 border-y border-[var(--line-strong)]">
@@ -415,28 +412,24 @@ export function SummaryTab({
         <ol className="grid border-t border-[var(--line-strong)] sm:grid-cols-2">
           {applicationClues.map((item, index) => (
             <li
-              className="group grid min-h-24 grid-cols-[34px_1fr_auto] gap-3 border-b border-[var(--line)] py-4 sm:odd:pr-5 sm:even:border-l sm:even:pl-5"
+              className="grid min-h-24 grid-cols-[34px_1fr] gap-3 border-b border-[var(--line)] py-4 sm:odd:pr-5 sm:even:border-l sm:even:pl-5"
               key={item}
             >
-              <span className="font-editorial tabular-nums text-base text-[var(--accent)]">
+              <span className="font-editorial tabular-nums text-base font-bold text-[var(--accent)]">
                 {String(index + 1).padStart(2, "0")}
               </span>
               <p className="text-pretty text-sm leading-6 text-[var(--ink-soft)]">
                 {item}
               </p>
-              <ArrowUpRight
-                className="mt-0.5 h-4 w-4 text-[var(--muted)] transition-[color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--accent)]"
-                aria-hidden="true"
-              />
             </li>
           ))}
         </ol>
       </section>
 
       {summary.content_boundaries?.length ? (
-        <section className="border-l-2 border-amber-400 bg-amber-50/70 px-4 py-4">
-          <h3 className="text-sm font-semibold text-amber-950">内容边界与待核实项</h3>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-6 text-amber-900">
+        <section className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-4 py-4">
+          <h3 className="text-sm font-semibold text-[#6b3f1a]">内容边界与待核实项</h3>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-6 text-[#7a4a1f]">
             {summary.content_boundaries.map((item) => (
               <li key={item}>{item}</li>
             ))}

@@ -4,21 +4,26 @@
 
 :root {
   color-scheme: light;
-  --paper: #f4f0e7;
-  --paper-raised: #fffdf8;
-  --paper-deep: #eae3d6;
-  --ink: #24211c;
-  --ink-soft: #514b42;
-  --muted: #81796d;
-  --muted-strong: #625b51;
-  --accent: #c94f35;
-  --accent-soft: rgba(201, 79, 53, 0.11);
-  --line: rgba(55, 49, 41, 0.12);
-  --line-strong: rgba(55, 49, 41, 0.2);
-  --shadow-paper:
-    0 0 0 1px rgba(55, 49, 41, 0.07),
-    0 2px 5px rgba(55, 49, 41, 0.05),
-    0 20px 55px rgba(55, 49, 41, 0.08);
+  /* V3「编辑部粗野」token：暖纸 + 墨色 + 朱红 */
+  --paper: #f4f0e6;
+  --paper-raised: #fcfaf4;
+  --paper-deep: #eae4d6;
+  --ink: #211d17;
+  --ink-soft: #4a4438;
+  --muted: #857c6b;
+  --muted-strong: #625b4f;
+  --accent: #d14b31;
+  --accent-light: color-mix(in srgb, var(--accent) 72%, white);
+  --accent-deep: #b03a24;
+  --accent-soft: rgba(209, 75, 49, 0.1);
+  --line: #e2daca;
+  --line-strong: #cfc5b0;
+  --line-ink: #211d17;
+  /* 硬偏移阴影（新粗野签名） */
+  --shadow-hard-sm: 3px 3px 0 0 var(--ink);
+  --shadow-hard-md: 4px 4px 0 0 var(--ink);
+  --shadow-hard-lg: 6px 6px 0 0 var(--ink);
+  --shadow-hard-accent: 3px 3px 0 0 var(--accent);
   background: var(--paper);
 }
 
@@ -37,10 +42,9 @@ body {
   min-height: 100vh;
   margin: 0;
   color: var(--ink);
-  background:
-    radial-gradient(circle at 12% 8%, rgba(201, 79, 53, 0.065), transparent 24rem),
-    var(--paper);
+  background: var(--paper);
   font-family:
+    "Noto Sans SC",
     "Noto Sans CJK SC",
     "Source Han Sans SC",
     "Microsoft YaHei UI",
@@ -65,11 +69,12 @@ a:focus-visible {
 
 ::selection {
   color: var(--ink);
-  background: rgba(201, 79, 53, 0.2);
+  background: rgba(209, 75, 49, 0.2);
 }
 
 .font-editorial {
   font-family:
+    "Noto Serif SC",
     "Noto Serif CJK SC",
     "Source Han Serif SC",
     "Songti SC",
@@ -98,35 +103,75 @@ a:focus-visible {
   text-wrap: pretty;
 }
 
+/* 硬阴影工具类 */
+.shadow-hard-sm {
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.shadow-hard-md {
+  box-shadow: var(--shadow-hard-md);
+}
+
+.shadow-hard-lg {
+  box-shadow: var(--shadow-hard-lg);
+}
+
+.shadow-hard-accent {
+  box-shadow: var(--shadow-hard-accent);
+}
+
+/* 可交互墨框块：hover 时硬影收敛、块体下压，模拟"按下" */
+.ink-block {
+  border: 2px solid var(--line-ink);
+  box-shadow: var(--shadow-hard-sm);
+  transition:
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.ink-block:hover {
+  box-shadow: 1px 1px 0 0 var(--ink);
+  transform: translate(2px, 2px);
+}
+
+.ink-block:active {
+  box-shadow: 0 0 0 0 var(--ink);
+  transform: translate(3px, 3px);
+}
+
+/* 兼容旧类名：档案/输入卡片统一为墨框硬影 */
 .link-intake,
 .library-surface,
-.archive-row {
-  box-shadow: var(--shadow-paper);
+.archive-row,
+.archive-sheet {
+  border: 2px solid var(--line-ink);
+  box-shadow: var(--shadow-hard-sm);
 }
 
 .archive-sheet {
-  box-shadow:
-    0 0 0 1px rgba(55, 49, 41, 0.08),
-    0 10px 28px rgba(55, 49, 41, 0.08);
+  transition:
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .archive-sheet:hover {
-  box-shadow:
-    0 0 0 1px rgba(201, 79, 53, 0.24),
-    0 16px 42px rgba(55, 49, 41, 0.12);
+  box-shadow: 1px 1px 0 0 var(--ink);
+  transform: translate(2px, 2px);
 }
 
 .archive-skeleton {
   background:
     linear-gradient(
       100deg,
-      rgba(255, 253, 248, 0.72) 20%,
+      rgba(252, 250, 244, 0.72) 20%,
       rgba(255, 255, 255, 0.98) 40%,
-      rgba(255, 253, 248, 0.72) 60%
+      rgba(252, 250, 244, 0.72) 60%
     ),
     var(--paper-deep);
   background-size: 200% 100%;
-  box-shadow: var(--shadow-paper);
+  border: 2px solid var(--line-ink);
+  box-shadow: var(--shadow-hard-sm);
   animation: archive-shimmer 1.6s ease-in-out infinite;
 }
 
@@ -155,8 +200,8 @@ a:focus-visible {
 }
 
 .transcript-excerpt-text::selection {
-  color: #5b2519;
-  background: rgba(201, 79, 53, 0.22);
+  color: var(--ink);
+  background: rgba(209, 75, 49, 0.22);
 }
 
 @keyframes editorial-enter {

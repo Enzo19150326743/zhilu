@@ -78,22 +78,22 @@ export function TranscribeSettingsPanel({
 
   const content = (
     <div className={isAlwaysOpen ? "space-y-4" : "mt-3 space-y-4"}>
-      <p className="text-xs leading-5 text-zinc-500">
+      <p className="text-xs leading-5 text-[var(--muted)]">
         用于改善标点、断句和访谈稿整理。不确定说话人时，系统不会强行标注。
       </p>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-zinc-500">节目结构</p>
+        <p className="text-xs font-medium text-[var(--muted)]">节目结构</p>
         <div className="grid gap-2 sm:grid-cols-4">
           {PROGRAM_STRUCTURE_OPTIONS.map((option) => {
             const isSelected = normalizedSettings.program_structure === option.value;
 
             return (
               <button
-                className={`min-h-9 rounded-lg border px-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`min-h-9 rounded-[2px] border px-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                   isSelected
-                    ? "border-zinc-950 bg-zinc-950 text-white"
-                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:text-zinc-950"
+                    ? "border-[var(--line-ink)] bg-[var(--ink)] text-[var(--paper)]"
+                    : "border-[var(--line-strong)] bg-[var(--paper-raised)] text-[var(--ink-soft)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]"
                 }`}
                 disabled={disabled}
                 key={option.value}
@@ -108,13 +108,13 @@ export function TranscribeSettingsPanel({
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-zinc-500">内容标签</p>
+        <p className="text-xs font-medium text-[var(--muted)]">内容标签</p>
         <div className="flex flex-wrap gap-2">
           <button
-            className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            className={`inline-flex h-8 items-center rounded-[2px] border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
               normalizedSettings.content_tags.length === 0
-                ? "border-zinc-950 bg-zinc-950 text-white"
-                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950"
+                ? "border-[var(--line-ink)] bg-[var(--ink)] text-[var(--paper)]"
+                : "border-[var(--line-strong)] bg-[var(--paper-raised)] text-[var(--muted-strong)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]"
             }`}
             disabled={disabled}
             type="button"
@@ -127,10 +127,10 @@ export function TranscribeSettingsPanel({
 
             return (
               <button
-                className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`inline-flex h-8 items-center rounded-[2px] border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                   isSelected
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950"
+                    ? "border-[var(--line-ink)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                    : "border-[var(--line-strong)] bg-[var(--paper-raised)] text-[var(--muted-strong)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]"
                 }`}
                 disabled={disabled}
                 key={option.value}
@@ -161,12 +161,12 @@ export function TranscribeSettingsPanel({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <p className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500">
+          <p className="inline-flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
             <Users className="h-3.5 w-3.5" />
             说话人
           </p>
           <button
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-2.5 text-xs font-medium text-[var(--ink-soft)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={
               disabled || normalizedSettings.speakers.length >= maxSpeakerCount
             }
@@ -187,11 +187,11 @@ export function TranscribeSettingsPanel({
           <div className="grid gap-2">
             {normalizedSettings.speakers.map((speaker, index) => (
               <div
-                className="grid gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.4fr)_36px]"
+                className="grid gap-2 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] p-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.4fr)_36px]"
                 key={`speaker-${index}`}
               >
                 <input
-                  className="h-9 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  className="h-9 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-2.5 text-sm text-[var(--ink-soft)] outline-none transition focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)]"
                   disabled={disabled}
                   maxLength={80}
                   placeholder="名称"
@@ -201,7 +201,7 @@ export function TranscribeSettingsPanel({
                   }
                 />
                 <input
-                  className="h-9 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  className="h-9 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-2.5 text-sm text-[var(--ink-soft)] outline-none transition focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)]"
                   disabled={disabled}
                   maxLength={80}
                   placeholder="身份"
@@ -211,7 +211,7 @@ export function TranscribeSettingsPanel({
                   }
                 />
                 <input
-                  className="h-9 rounded-md border border-zinc-200 bg-white px-2.5 text-sm text-zinc-800 outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  className="h-9 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-2.5 text-sm text-[var(--ink-soft)] outline-none transition focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)]"
                   disabled={disabled}
                   maxLength={300}
                   placeholder="职责或立场"
@@ -222,7 +222,7 @@ export function TranscribeSettingsPanel({
                 />
                 <button
                   aria-label={`删除说话人 ${index + 1}`}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-9 items-center justify-center rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] text-[var(--muted)] transition-colors hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={disabled}
                   type="button"
                   onClick={() => removeSpeaker(index)}
@@ -233,7 +233,7 @@ export function TranscribeSettingsPanel({
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-sm text-zinc-500">
+          <div className="rounded-[2px] border border-dashed border-[var(--line-strong)] bg-[var(--paper)] px-3 py-3 text-sm text-[var(--muted)]">
             可不填写，系统会按内容自动整理。
           </div>
         )}
@@ -246,13 +246,13 @@ export function TranscribeSettingsPanel({
   }
 
   return (
-    <details className="group border-t border-zinc-200 pt-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-zinc-950">
+    <details className="group border-t border-[var(--line-strong)] pt-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[var(--ink)]">
         <span className="inline-flex items-center gap-2">
-          <Settings2 className="h-4 w-4 text-zinc-500" />
+          <Settings2 className="h-4 w-4 text-[var(--muted)]" />
           转写设置
         </span>
-        <ChevronDown className="h-4 w-4 text-zinc-500 transition-transform group-open:rotate-180" />
+        <ChevronDown className="h-4 w-4 text-[var(--muted)] transition-transform group-open:rotate-180" />
       </summary>
       {content}
     </details>

@@ -5,7 +5,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Download,
-  HardDrive,
   Loader2
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
@@ -59,7 +58,7 @@ function getFormatHint(
   }
 
   if (isFromCache && maxHeight > 0) {
-    return `当前展示本地历史缓存，最高 ${maxHeight}p；如需刷新平台最新可用格式，请点上方“重新提取”。`;
+    return "";
   }
 
   if (
@@ -80,7 +79,7 @@ function getFormatHint(
     return `当前平台公开格式最高 ${maxHeight}p；标记为“仅视频”的格式保存时会合并最佳音频。`;
   }
 
-  return "这里用于把当前媒体保存到本地，不影响总结、摘录和知识稿生成。";
+  return "下载仅为辅助保存能力，请确保你拥有相应内容的访问和处理权限。";
 }
 
 function isVideoOnly(format: VideoFormat): boolean {
@@ -89,33 +88,33 @@ function isVideoOnly(format: VideoFormat): boolean {
 
 function getDownloadButtonClassName(status: DownloadStatus): string {
   const baseClassName =
-    "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-[background-color,border-color,color,scale] duration-150 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] border-2 border-[var(--line-ink)] transition-[box-shadow,transform,background-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-60";
 
   if (status === "success") {
-    return `${baseClassName} border-emerald-200 bg-emerald-50 text-emerald-700`;
+    return `${baseClassName} bg-[#e9f2ea] text-[#2f5d3a]`;
   }
 
   if (status === "error") {
-    return `${baseClassName} border-rose-200 bg-rose-50 text-rose-700`;
+    return `${baseClassName} bg-[var(--accent-soft)] text-[var(--accent)]`;
   }
 
-  return `${baseClassName} border-[var(--line-strong)] bg-[var(--paper-raised)] text-[var(--muted-strong)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]`;
+  return `${baseClassName} bg-[var(--paper-raised)] text-[var(--ink)] shadow-[2px_2px_0_0_var(--ink)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_var(--ink)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none`;
 }
 
 function getDownloadIcon(status: DownloadStatus) {
   if (status === "downloading") {
-    return <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />;
+    return <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />;
   }
 
   if (status === "success") {
-    return <CheckCircle2 className="h-4 w-4" aria-hidden="true" />;
+    return <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />;
   }
 
   if (status === "error") {
-    return <AlertCircle className="h-4 w-4" aria-hidden="true" />;
+    return <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />;
   }
 
-  return <Download className="h-4 w-4" aria-hidden="true" />;
+  return <Download className="h-3.5 w-3.5" aria-hidden="true" />;
 }
 
 function getDownloadTitle(
@@ -205,33 +204,30 @@ export function FormatSelector({
   };
 
   return (
-    <section className="min-w-0 rounded-[24px] bg-[var(--paper-raised)] p-4 shadow-[var(--shadow-paper)]">
+    <section className="min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent)]">
-            Local download
-          </p>
-          <h2 className="font-editorial mt-1 text-lg font-semibold text-[var(--ink)]">本地下载</h2>
-          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-            {getFormatHint(displayFormats, isFromCache, formatDiagnostics)}
-          </p>
-        </div>
-        <HardDrive className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
+        <p className="text-[13px] font-semibold text-[var(--ink-soft)]">辅助保存</p>
+        <span className="mono text-[9px] uppercase tracking-[0.16em] text-[var(--muted)]">
+          LOCAL SAVE
+        </span>
       </div>
+      <p className="mt-2 text-[11px] leading-[17px] text-[var(--muted)]">
+        {getFormatHint(displayFormats, isFromCache, formatDiagnostics)}
+      </p>
 
-      <div className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
+      <div className="mt-3 max-h-[24rem] space-y-2 overflow-y-auto overscroll-contain">
         {sourceUrl && displayFormats.length > 0 ? (
-          <div className="flex items-start justify-between gap-3 rounded-[16px] bg-[var(--paper-deep)]/70 px-3 py-3">
+          <div className="flex items-start justify-between gap-3 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] px-3 py-2.5">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--ink)]">
-                下载最高画质
+              <p className="truncate text-[13px] font-medium text-[var(--ink)]">
+                最佳可用格式
               </p>
-              <p className="mt-1 truncate text-xs text-[var(--muted)]">
-                自动选择当前平台返回的最高画质，并在需要时合并最佳音频
+              <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">
+                自动选择最高画质，需要时合并最佳音频
               </p>
               {downloadStates.best?.message ? (
                 <p
-                    className="mt-2 truncate text-xs text-[var(--muted)]"
+                  className="mt-1.5 truncate text-[11px] text-[var(--muted)]"
                   title={downloadStates.best.filePath}
                 >
                   {downloadStates.best.message}
@@ -267,20 +263,20 @@ export function FormatSelector({
 
             return (
               <div
-                className="flex items-start justify-between gap-3 rounded-[16px] bg-[var(--paper-deep)]/70 px-3 py-3"
+                className="flex items-start justify-between gap-3 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] px-3 py-2.5"
                 key={format.format_id}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[var(--ink)]">
+                  <p className="truncate text-[13px] font-medium text-[var(--ink)]">
                     {format.label}
                   </p>
-                  <p className="mt-1 truncate text-xs text-[var(--muted)]">
+                  <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">
                     {format.ext.toUpperCase()} · {format.resolution} ·{" "}
                     {formatFilesize(format.filesize)}
                   </p>
                   {downloadState.message ? (
                     <p
-                      className="mt-2 truncate text-xs text-[var(--muted)]"
+                      className="mt-1.5 truncate text-[11px] text-[var(--muted)]"
                       title={downloadState.filePath}
                     >
                       {downloadState.message}
@@ -302,7 +298,7 @@ export function FormatSelector({
             );
           })
         ) : (
-          <div className="rounded-[16px] border border-dashed border-[var(--line-strong)] bg-[var(--paper-deep)]/60 px-3 py-6 text-center text-sm text-[var(--muted)]">
+          <div className="rounded-[2px] border border-dashed border-[var(--line-strong)] px-3 py-5 text-center text-[13px] text-[var(--muted)]">
             暂无格式数据。
           </div>
         )}
