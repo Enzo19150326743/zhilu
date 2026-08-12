@@ -62,3 +62,7 @@ docs/project-context.md
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# AI 工具本地会话数据
+.workbuddy/
+docs/superpowers/

@@ -16,11 +16,11 @@ import {
   formatLibraryUpdatedAt,
   getLibraryDisplayTitle,
   getLibraryStatusLabel,
-  getPlatformLabel,
   matchesLibraryFilter
 } from "@/lib/library-display";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import { isPodcastMedia } from "@/lib/media";
+import { getPlatformLabel } from "@/lib/platform-display";
 
 interface RecentLibraryProps {
   activeVideoId?: string | null;
@@ -34,6 +34,7 @@ interface RecentLibraryProps {
   isRefreshing: boolean;
   items: LibraryItem[];
   loadingVideoId: string | null;
+  processingVideoIds: ReadonlySet<string>;
   stats: LibraryStatsResponse | null;
   onChangeFilter: (filter: LibraryFilter) => void;
   onClearAll: () => void;
@@ -84,6 +85,7 @@ export function RecentLibrary({
   isRefreshing,
   items,
   loadingVideoId,
+  processingVideoIds,
   stats,
   onChangeFilter,
   onClearAll,
@@ -274,7 +276,10 @@ export function RecentLibrary({
                         className="h-3.5 w-3.5 animate-spin text-[var(--accent)]"
                       />
                     ) : (
-                      getLibraryStatusLabel(item)
+                      getLibraryStatusLabel(
+                        item,
+                        processingVideoIds.has(item.video_id)
+                      )
                     )}
                   </span>
                   <span className="hidden truncate text-[11px] text-[var(--muted)] sm:block">
@@ -288,10 +293,11 @@ export function RecentLibrary({
                       onClick={() => onCopySourceUrl(item)}
                     />
                     <IconActionButton
+                      ariaLabel={`删除《${getLibraryDisplayTitle(item.title)}》`}
                       disabled={!canUseActions || isDeleting}
                       icon={isDeleting ? Loader2 : Trash2}
                       isSpinning={isDeleting}
-                      label={`删除《${getLibraryDisplayTitle(item.title)}》`}
+                      label="删除档案"
                       tone="danger"
                       onClick={() => onDeleteItem(item)}
                     />

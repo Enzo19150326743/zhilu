@@ -383,12 +383,9 @@ export interface SummaryTask {
   errorMessage?: string;
 }
 
-export interface DownloadResponse {
-  success: true;
+export interface BrowserDownloadResponse {
+  blob: Blob;
   filename: string;
-  file_path: string;
-  format_selector: string;
-  message: string;
 }
 
 export interface NoteDraftUpdateRequest {

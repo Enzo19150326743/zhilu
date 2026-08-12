@@ -4,7 +4,6 @@ import type {
   NoteDraft,
   SummaryDisplayState,
   SummaryGenerationMeta,
-  TranscribeContextSettings,
   TranscriptPayload,
   VideoSummary
 } from "@/lib/types";
@@ -37,13 +36,12 @@ interface AiTabsProps {
   textSourceType?: string | null;
   sourceUrl?: string | null;
   videoAuthor?: string | null;
-  videoPlatform?: string | null;
   videoTitle?: string | null;
   onChangeTab: (tab: TabKey) => void;
   onQaComplete?: () => void;
   onSaveNoteDraft: (sourceUrl: string, noteDraft: NoteDraft) => Promise<NoteDraft>;
   onSummarize: () => void;
-  onTranscribe: (settings?: TranscribeContextSettings) => void;
+  onTranscribe: () => void;
 }
 
 const tabs: Array<{
@@ -79,7 +77,6 @@ export function AiTabs({
   textSourceType,
   sourceUrl,
   videoAuthor,
-  videoPlatform,
   videoTitle,
   onChangeTab,
   onQaComplete,
@@ -170,14 +167,21 @@ export function AiTabs({
         ) : null}
         {activeTab === "mindmap" ? (
           <MindmapTab
+            canTranscribe={canTranscribe}
+            hasTranscript={hasTranscript}
+            isTranscribing={isTranscribing}
             mindmapMarkdown={mindmapMarkdown}
             mindmapMeta={mindmapMeta}
             summaryDisplayState={summaryDisplayState}
+            textSourceType={textSourceType}
+            transcribeErrorMessage={transcribeErrorMessage}
+            onTranscribe={onTranscribe}
           />
         ) : null}
         {activeTab === "qa" ? (
           <QaTab
             canTranscribe={canTranscribe}
+            hasTranscript={hasTranscript}
             isTranscribing={isTranscribing}
             mediaType={mediaType}
             sourceUrl={sourceUrl}
@@ -205,7 +209,6 @@ export function AiTabs({
             transcript={transcript}
             transcriptVariants={transcriptVariants}
             activeTranscriptVariant={activeTranscriptVariant}
-            videoPlatform={videoPlatform}
             videoTitle={videoTitle}
             onSaveNoteDraft={onSaveNoteDraft}
             onTranscribe={onTranscribe}

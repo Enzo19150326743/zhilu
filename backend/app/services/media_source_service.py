@@ -11,6 +11,10 @@ from app.services.xiaoyuzhou_service import (
     is_xiaoyuzhou_url,
     parse_xiaoyuzhou_episode,
 )
+from app.services.xiaohongshu_service import (
+    is_xiaohongshu_url,
+    parse_xiaohongshu_video,
+)
 from app.services.ytdlp_service import extract_video_metadata
 
 logger = logging.getLogger(__name__)
@@ -115,10 +119,25 @@ class BilibiliVideoSourceAdapter:
             return extract_video_metadata(source_url)
 
 
+class XiaohongshuVideoSourceAdapter:
+    """小红书公开视频输入源适配器。"""
+
+    source_name = "xiaohongshu_video"
+
+    def can_handle(self, source_url: str) -> bool:
+        """只接管当前正式支持的小红书公开视频页面。"""
+        return is_xiaohongshu_url(source_url)
+
+    def parse(self, source_url: str) -> ParseResponse:
+        """复用 yt-dlp 视频能力并补齐公开作者昵称。"""
+        return parse_xiaohongshu_video(source_url)
+
+
 MEDIA_SOURCE_ADAPTERS: list[MediaSourceAdapter] = [
     DouyinVideoSourceAdapter(),
     XiaoyuzhouEpisodeSourceAdapter(),
     BilibiliVideoSourceAdapter(),
+    XiaohongshuVideoSourceAdapter(),
     YtdlpVideoSourceAdapter(),
 ]
 

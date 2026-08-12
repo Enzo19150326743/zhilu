@@ -15,6 +15,7 @@ export default function HomePage() {
     activeDetail,
     confirmDialogProps,
     homeWorkspaceProps,
+    isHomeWorkspaceReady,
     onHomeClick,
     transcribeSettingsDialogProps,
     transcribeTaskToastsProps,
@@ -26,8 +27,13 @@ export default function HomePage() {
       <Header onHomeClick={onHomeClick} />
       {activeDetail && workbenchWorkspaceProps ? (
         <WorkbenchWorkspace {...workbenchWorkspaceProps} />
-      ) : (
+      ) : isHomeWorkspaceReady ? (
         <HomeWorkspace {...homeWorkspaceProps} />
+      ) : (
+        <section
+          aria-label="正在准备首页内容"
+          className="min-h-[calc(100vh-96px)] bg-[var(--paper)]"
+        />
       )}
       <ConfirmDialog {...confirmDialogProps} />
       <TranscribeSettingsDialog {...transcribeSettingsDialogProps} />

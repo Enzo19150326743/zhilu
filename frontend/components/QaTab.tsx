@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CircleAlert,
   Gauge,
   Lightbulb,
   Loader2,
@@ -16,9 +15,11 @@ import type {
   TranscriptPayload,
   VideoSummary
 } from "@/lib/types";
+import { TranscribeRequiredState } from "./TranscribeRequiredState";
 
 interface QaTabProps {
   canTranscribe: boolean;
+  hasTranscript: boolean;
   isTranscribing: boolean;
   mediaType?: string | null;
   sourceUrl?: string | null;
@@ -92,6 +93,7 @@ function getQaErrorMessage(error: unknown): string {
 
 export function QaTab({
   canTranscribe,
+  hasTranscript,
   isTranscribing,
   mediaType,
   sourceUrl,
@@ -111,7 +113,7 @@ export function QaTab({
   const [isAsking, setIsAsking] = useState(false);
   const activeModeDetail =
     qaModes.find((mode) => mode.key === activeMode) ?? qaModes[0];
-  const hasContentText = Boolean(transcript?.plain_text.trim());
+  const hasContentText = hasTranscript && Boolean(transcript?.plain_text.trim());
   const isShownotes = textSourceType === "shownotes";
   const canAsk = hasContentText && !isShownotes;
 
@@ -160,6 +162,29 @@ export function QaTab({
     }
   };
 
+  if (!canAsk) {
+    return (
+      <div className="space-y-4">
+        <TranscribeRequiredState
+          canTranscribe={canTranscribe}
+          description={
+            isShownotes
+              ? "当前只有 shownotes，需要先生成完整转写稿，再基于音频内容问答。"
+              : "需要先生成转写稿，再继续进行内容问答。"
+          }
+          isTranscribing={isTranscribing}
+          title="暂不能进行内容问答"
+          onTranscribe={onTranscribe}
+        />
+        {transcribeErrorMessage ? (
+          <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
+            {transcribeErrorMessage}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] p-3">
@@ -198,44 +223,6 @@ export function QaTab({
           {activeModeDetail.description}
         </p>
       </section>
-
-      {!canAsk ? (
-        <div className="rounded-[2px] border border-[var(--line-ink)] bg-[#f7ead9] px-3 py-3 text-sm leading-6 text-[#7a4a1f]">
-          <div className="flex gap-2">
-            <CircleAlert
-              className="mt-0.5 h-4 w-4 shrink-0 text-[#7a4a1f]"
-              aria-hidden="true"
-            />
-            <div>
-              <p className="font-medium">
-                {isShownotes
-                  ? "当前只有 shownotes 原文。"
-                  : "当前没有可用于问答的内容文本。"}
-              </p>
-              <p className="mt-1 text-[#7a4a1f]">
-                {isShownotes
-                  ? "必须先生成转写稿，才能基于完整逐字稿进行内容问答。"
-                  : "可先生成转写稿，再继续提问。"}
-              </p>
-              {canTranscribe ? (
-                <button
-                  className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-3 text-sm font-semibold text-[var(--paper)] transition-colors hover:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--ink)]"
-                  disabled={isTranscribing}
-                  type="button"
-                  onClick={onTranscribe}
-                >
-                  {isTranscribing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <SendHorizontal className="h-4 w-4" aria-hidden="true" />
-                  )}
-                  {isTranscribing ? "生成中" : "生成转写稿"}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {transcribeErrorMessage ? (
         <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">

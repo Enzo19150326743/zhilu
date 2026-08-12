@@ -34,9 +34,9 @@ export function UrlInput({
             <input
               className="focus-subtle h-full min-h-[54px] w-full border-0 bg-transparent pl-11 pr-4 text-base text-[var(--ink)] outline-none placeholder:text-[#8f8675] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
               inputMode="url"
-              type="url"
+              type="text"
               value={value}
-              placeholder="粘贴公开媒体链接，例如 B 站 / 小宇宙 / 抖音…"
+              placeholder="粘贴公开媒体链接，例如 B 站 / 小红书 / 小宇宙 / 抖音…"
               onChange={(event) => onChange(event.target.value)}
             />
           </label>

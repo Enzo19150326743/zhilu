@@ -5,6 +5,7 @@ import { Clock3, MonitorPlay, Radio, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import { isPodcastMedia } from "@/lib/media";
+import { getPlatformLabel } from "@/lib/platform-display";
 import type { VideoInfo } from "@/lib/types";
 
 interface VideoPreviewCardProps {
@@ -20,37 +21,19 @@ function formatDuration(totalSeconds: number): string {
 function getCoverFrameClass(video: VideoInfo): string {
   return isPodcastMedia(video)
     ? "shadow-hard-md relative aspect-square overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--ink)]"
-    : "shadow-hard-md overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-deep)]";
+    : "shadow-hard-md relative aspect-[4/3] overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-deep)]";
 }
 
 function getCoverImageClass(video: VideoInfo): string {
   return isPodcastMedia(video)
     ? "relative z-10 h-full w-full object-contain p-3"
-    : "block h-auto w-full object-contain";
+    : "relative z-10 h-full w-full object-contain";
 }
 
 function getCoverFallbackClass(video: VideoInfo): string {
   return isPodcastMedia(video)
     ? "flex h-full w-full flex-col items-center justify-center gap-2 bg-[var(--paper-deep)] px-4 text-center text-sm text-[var(--muted)]"
-    : "flex aspect-video w-full flex-col items-center justify-center gap-2 bg-[var(--paper-deep)] px-4 text-center text-sm text-[var(--muted)]";
-}
-
-function getPlatformLabel(platform: string): string {
-  const normalizedPlatform = platform.toLowerCase();
-  if (normalizedPlatform === "bilibili") {
-    return "B 站";
-  }
-  if (normalizedPlatform === "xiaoyuzhou") {
-    return "小宇宙";
-  }
-  if (normalizedPlatform === "douyin") {
-    return "抖音";
-  }
-  if (normalizedPlatform === "demo") {
-    return "推荐";
-  }
-
-  return platform || "未知来源";
+    : "flex h-full w-full flex-col items-center justify-center gap-2 bg-[var(--paper-deep)] px-4 text-center text-sm text-[var(--muted)]";
 }
 
 function getInfoRows(video: VideoInfo): Array<{
@@ -114,19 +97,17 @@ export function VideoPreviewCard({ video }: VideoPreviewCardProps) {
   const infoRows = getInfoRows(video);
 
   return (
-    <section className="min-w-0">
-      <div className={getCoverFrameClass(video)}>
+    <section className="mx-auto w-full min-w-0 max-w-[420px] lg:mx-0 lg:max-w-none">
+      <div className={getCoverFrameClass(video)} data-testid="media-cover-frame">
         {thumbnailUrl && !imageFailed ? (
           <>
-            {isPodcastMedia(video) ? (
-              <img
-                alt=""
-                aria-hidden="true"
-                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-xl"
-                referrerPolicy="no-referrer"
-                src={thumbnailUrl}
-              />
-            ) : null}
+            <img
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-xl"
+              referrerPolicy="no-referrer"
+              src={thumbnailUrl}
+            />
             <img
               alt={`${video.title} 封面`}
               className={getCoverImageClass(video)}

@@ -1,4 +1,5 @@
 import { ArrowUpRight, Link2, Loader2, Search } from "lucide-react";
+import SplitText from "@/components/SplitText";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import type { DemoItem } from "@/lib/types";
 
@@ -107,20 +108,55 @@ export function LandingHero({
     <section className="border-b-2 border-[var(--line-ink)] bg-[var(--paper)]">
       <div className="mx-auto grid max-w-[90rem] gap-9 px-4 pb-10 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(330px,0.75fr)] lg:items-start lg:gap-12 lg:px-10 lg:pb-11 lg:pt-9">
         <div className="min-w-0">
-          <h1 className="editorial-enter font-display text-balance text-[clamp(2.7rem,5.3vw,4.8rem)] leading-[1.07] text-[var(--ink)]">
-            <span className="block">看见的，听见的，</span>
+          <h1 className="font-display text-balance text-[clamp(2.7rem,5.3vw,4.8rem)] leading-[1.07] text-[var(--ink)]">
+            <span className="block">
+              <SplitText
+                tag="span"
+                text="看见的，"
+                className="mr-[0.16em]"
+                delay={45}
+                duration={0.82}
+                ease="power3.out"
+                splitType="words"
+                from={{ opacity: 0, y: 36 }}
+                to={{ opacity: 1, y: 0 }}
+                rootMargin="0px"
+                textAlign="left"
+              />
+              <SplitText
+                tag="span"
+                text="听见的，"
+                delay={45}
+                duration={0.82}
+                ease="power3.out"
+                splitType="words"
+                from={{ opacity: 0, y: 36 }}
+                to={{ opacity: 1, y: 0 }}
+                rootMargin="0px"
+                startDelay={0.16}
+                textAlign="left"
+              />
+            </span>
             <span className="mt-2 block">
               <span className="shadow-hard-md inline-block border-2 border-[var(--line-ink)] bg-[var(--accent)] px-2 pb-1 text-[var(--paper-raised)]">
-                都变成你的知识。
+                <SplitText
+                  tag="span"
+                  text="都变成你的知识。"
+                  delay={45}
+                  duration={0.82}
+                  ease="power3.out"
+                  splitType="words"
+                  from={{ opacity: 0, y: 36 }}
+                  to={{ opacity: 1, y: 0 }}
+                  rootMargin="0px"
+                  startDelay={0.32}
+                  textAlign="left"
+                />
               </span>
             </span>
           </h1>
 
-          <p className="editorial-enter editorial-enter-delay-1 mt-5 max-w-[62ch] text-pretty text-[15px] leading-7 text-[var(--ink-soft)]">
-            从公开视频与播客取得文本，整理成摘要、导图和可继续编辑的 Markdown 知识稿。
-          </p>
-
-          <div className="editorial-enter editorial-enter-delay-2 mt-6 max-w-[760px]">
+          <div className="editorial-enter editorial-enter-delay-1 mt-5 max-w-[760px]">
             <div className="shadow-hard-md flex min-h-[54px] min-w-0 items-stretch border-2 border-[var(--line-ink)] bg-[var(--paper-raised)]">
               <div className="relative min-w-0 flex-1">
                 <Link2
@@ -131,8 +167,8 @@ export function LandingHero({
                   aria-label="公开媒体链接"
                   className="min-h-[54px] w-full border-0 bg-transparent pl-11 pr-3 text-base text-[var(--ink)] outline-none placeholder:text-[#9b927f] focus-visible:outline-none disabled:cursor-not-allowed"
                   inputMode="url"
-                  placeholder="粘贴 B 站、小宇宙或抖音公开链接"
-                  type="url"
+                  placeholder="粘贴 B 站、小红书、小宇宙或抖音公开链接"
+                  type="text"
                   value={url}
                   onChange={(event) => onChangeUrl(event.target.value)}
                   onKeyDown={(event) => {

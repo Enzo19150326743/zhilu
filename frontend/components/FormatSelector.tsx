@@ -24,7 +24,6 @@ type DownloadStatus = "idle" | "downloading" | "success" | "error";
 interface FormatDownloadState {
   status: DownloadStatus;
   message?: string;
-  filePath?: string;
 }
 
 function formatFilesize(filesize: number | null): string {
@@ -77,10 +76,10 @@ function getFormatHint(
   }
 
   if (maxHeight >= 720) {
-    return `当前平台公开格式最高 ${maxHeight}p；标记为“仅视频”的格式保存时会合并最佳音频。`;
+    return `当前平台公开格式最高 ${maxHeight}p；标记为“仅视频”的格式下载时会合并最佳音频。`;
   }
 
-  return "下载仅为辅助保存能力，请确保你拥有相应内容的访问和处理权限。";
+  return "文件将通过浏览器下载，请确保你拥有相应内容的访问和处理权限。";
 }
 
 function isVideoOnly(format: VideoFormat): boolean {
@@ -128,18 +127,29 @@ function getDownloadTitle(
   }
 
   if (state.status === "downloading") {
-    return "正在下载到本地目录";
+    return "正在下载...";
   }
 
   if (state.status === "success") {
-    return state.filePath ?? "下载完成";
+    return "下载成功";
   }
 
   if (state.status === "error") {
     return state.message ?? "下载失败";
   }
 
-  return isVideoOnly(format) ? "下载并合并音频" : "下载到本地目录";
+  return isVideoOnly(format) ? "下载并合并音频" : "通过浏览器下载";
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string): void {
+  const downloadUrl = URL.createObjectURL(blob);
+  const downloadLink = document.createElement("a");
+  downloadLink.href = downloadUrl;
+  downloadLink.download = filename;
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+  URL.revokeObjectURL(downloadUrl);
 }
 
 export function FormatSelector({
@@ -178,12 +188,7 @@ export function FormatSelector({
       ...currentStates,
       [stateKey]: {
         status: "downloading",
-        message:
-          formatId === "best"
-            ? "正在自动选择最佳可用格式..."
-            : mergeWithAudio
-              ? "正在下载并合并音频..."
-              : "正在下载..."
+        message: "正在下载..."
       }
     }));
 
@@ -193,11 +198,11 @@ export function FormatSelector({
         formatId,
         mergeWithAudio
       );
+      triggerBrowserDownload(response.blob, response.filename);
       setDownloadStates((currentStates) => ({
         ...currentStates,
         [stateKey]: {
-          filePath: response.file_path,
-          message: `已保存：${response.filename}`,
+          message: "下载成功",
           status: "success"
         }
       }));
@@ -215,7 +220,7 @@ export function FormatSelector({
 
   return (
     <section className="min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4">
-      <p className="text-[13px] font-semibold text-[var(--ink-soft)]">辅助保存</p>
+      <p className="text-[13px] font-semibold text-[var(--ink-soft)]">辅助下载</p>
       <p className="mt-2 text-[11px] leading-[17px] text-[var(--muted)]">
         {getFormatHint(displayFormats, isFromCache, formatDiagnostics)}
       </p>
@@ -233,7 +238,7 @@ export function FormatSelector({
               {downloadStates.best?.message ? (
                 <p
                   className="mt-1.5 truncate text-[11px] text-[var(--muted)]"
-                  title={downloadStates.best.filePath}
+                  title={downloadStates.best.message}
                 >
                   {downloadStates.best.message}
                 </p>
@@ -282,7 +287,7 @@ export function FormatSelector({
                   {downloadState.message ? (
                     <p
                       className="mt-1.5 truncate text-[11px] text-[var(--muted)]"
-                      title={downloadState.filePath}
+                      title={downloadState.message}
                     >
                       {downloadState.message}
                     </p>

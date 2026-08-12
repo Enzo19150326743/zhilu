@@ -11,12 +11,19 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { IconActionButton } from "./IconActionButton";
+import { TranscribeRequiredState } from "./TranscribeRequiredState";
 import type { MindmapMeta, SummaryDisplayState } from "@/lib/types";
 
 interface MindmapTabProps {
+  canTranscribe: boolean;
+  hasTranscript: boolean;
+  isTranscribing: boolean;
   mindmapMarkdown: string | null;
   mindmapMeta?: MindmapMeta | null;
   summaryDisplayState: SummaryDisplayState;
+  textSourceType?: string | null;
+  transcribeErrorMessage: string | null;
+  onTranscribe: () => void;
 }
 
 type RenderState = "idle" | "loading" | "ready" | "error";
@@ -27,9 +34,15 @@ interface MarkmapInstance {
 }
 
 export function MindmapTab({
+  canTranscribe,
+  hasTranscript,
+  isTranscribing,
   mindmapMarkdown,
   mindmapMeta,
-  summaryDisplayState
+  summaryDisplayState,
+  textSourceType,
+  transcribeErrorMessage,
+  onTranscribe
 }: MindmapTabProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const markmapRef = useRef<MarkmapInstance | null>(null);
@@ -38,6 +51,7 @@ export function MindmapTab({
   const [isExpanded, setIsExpanded] = useState(false);
   const normalizedMarkdown = mindmapMarkdown?.trim() ?? "";
   const isShownotes = mindmapMeta?.text_source_type === "shownotes";
+  const needsTranscription = !hasTranscript || textSourceType === "shownotes";
 
   useEffect(() => {
     if (!normalizedMarkdown || !svgRef.current) {
@@ -134,6 +148,25 @@ export function MindmapTab({
   };
 
   if (summaryDisplayState === "empty") {
+    if (needsTranscription) {
+      return (
+        <div className="space-y-4">
+          <TranscribeRequiredState
+            canTranscribe={canTranscribe}
+            description="需要先生成转写稿，完成后会继续整理总结和结构导图。"
+            isTranscribing={isTranscribing}
+            title="未生成导图"
+            onTranscribe={onTranscribe}
+          />
+          {transcribeErrorMessage ? (
+            <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
+              {transcribeErrorMessage}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-[300px] flex-col justify-center rounded-[2px] bg-[var(--paper)] px-6 py-8 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.08)] sm:px-8">
         <span className="inline-flex min-h-8 w-fit items-center rounded-[2px] bg-[var(--paper-raised)] px-3 text-xs font-medium text-[var(--muted)] shadow-[0_8px_20px_rgba(24,24,27,0.06)]">

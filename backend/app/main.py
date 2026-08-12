@@ -14,7 +14,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.background import BackgroundTask
 
 from app.demo_data import get_demo_by_id, load_demo_seed
 from app.schemas import (
@@ -77,6 +78,7 @@ from app.services.douyin_service import (
     download_douyin_video,
     is_douyin_url,
 )
+from app.services.xiaohongshu_service import is_xiaohongshu_url
 from app.services.fun_asr_service import (
     DEFAULT_FUN_ASR_MODEL,
     is_fun_asr_configured,
@@ -159,6 +161,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -780,6 +783,60 @@ def delete_library_history_item(video_id: str) -> LibraryDeleteResponse:
     return LibraryDeleteResponse(deleted_video_id=video_id)
 
 
+def _merge_refreshed_xiaohongshu_detail(
+    cached_detail: ParseResponse,
+    refreshed_detail: ParseResponse,
+) -> ParseResponse:
+    """刷新平台元数据时保留用户已经生成的转写、总结和摘录。"""
+    refreshed_author = refreshed_detail.video.author.strip()
+    keep_cached_author = refreshed_author.lower() in {
+        "",
+        "unknown",
+        "未知",
+        "未知作者",
+    }
+    page_metadata_refreshed = bool(refreshed_detail.transcription_source_url)
+    merged_video = refreshed_detail.video.model_copy(
+        update={
+            "author": (
+                cached_detail.video.author
+                if keep_cached_author
+                else refreshed_detail.video.author
+            ),
+            "has_transcript": cached_detail.video.has_transcript,
+            "media_type": (
+                cached_detail.video.media_type or refreshed_detail.video.media_type
+            ),
+            "text_source_type": (
+                cached_detail.video.text_source_type
+                if cached_detail.video.has_transcript
+                else refreshed_detail.video.text_source_type
+            ),
+            # 页面补取失败时 yt-dlp 可能再次给出 WB_PRV，不能覆盖已有封面。
+            "thumbnail": (
+                refreshed_detail.video.thumbnail
+                if page_metadata_refreshed
+                else cached_detail.video.thumbnail
+            ),
+        }
+    )
+    return refreshed_detail.model_copy(
+        update={
+            "video": merged_video,
+            "transcript": cached_detail.transcript,
+            "transcript_variants": cached_detail.transcript_variants,
+            "active_transcript_variant": cached_detail.active_transcript_variant,
+            "summary": cached_detail.summary,
+            "mindmap_markdown": cached_detail.mindmap_markdown,
+            "mindmap_meta": cached_detail.mindmap_meta,
+            "note_draft": cached_detail.note_draft,
+            "is_placeholder": cached_detail.is_placeholder,
+            "library_summary_status": cached_detail.library_summary_status,
+            "library_summary_model": cached_detail.library_summary_model,
+        }
+    )
+
+
 @app.post("/api/parse", response_model=ParseResponse)
 def parse_video(request: Request, parse_request: ParseRequest) -> ParseResponse:
     """
@@ -792,11 +849,16 @@ def parse_video(request: Request, parse_request: ParseRequest) -> ParseResponse:
         cached_detail = None
         logger.warning("library cache lookup failed: %s", error.__class__.__name__)
 
-    if cached_detail is not None:
+    if cached_detail is not None and not is_xiaohongshu_url(video_url):
         return cached_detail
 
     enforce_rate_limit(request, "parse", PARSE_RATE_LIMIT_PER_HOUR)
     parse_response = parse_media_source(video_url)
+    if cached_detail is not None:
+        parse_response = _merge_refreshed_xiaohongshu_detail(
+            cached_detail,
+            parse_response,
+        )
     try:
         upsert_library_item(parse_response)
     except (sqlite3.Error, OSError, ValueError) as error:
@@ -1006,7 +1068,11 @@ def _resolve_transcription_source(
         return bilibili_source.audio_url, bilibili_source.http_headers
 
     hostname = urlparse(source_url).hostname or ""
-    if not hostname.endswith("xiaoyuzhoufm.com") and not is_douyin_url(source_url):
+    if (
+        not hostname.endswith("xiaoyuzhoufm.com")
+        and not is_douyin_url(source_url)
+        and not is_xiaohongshu_url(source_url)
+    ):
         return source_url, None
 
     try:
@@ -1017,11 +1083,19 @@ def _resolve_transcription_source(
     return parse_response.transcription_source_url or source_url, None
 
 
-@app.post("/api/download", response_model=DownloadResponse)
-def download_video(download_request: DownloadRequest) -> DownloadResponse:
-    """
-    下载用户选择的公开视频格式到本地受控目录。
-    """
+def _remove_completed_download(file_path: Path) -> None:
+    """浏览器接收完文件后删除后端生成的临时下载文件。"""
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError as error:
+        logger.warning(
+            "failed to remove completed browser download: %s",
+            error.__class__.__name__,
+        )
+
+
+def _prepare_video_download(download_request: DownloadRequest) -> DownloadResponse:
+    """复用各平台下载实现，返回后端已准备好的文件信息。"""
     video_url = normalize_public_video_url(download_request.url)
     if is_bilibili_url(video_url):
         return download_bilibili_video_format(
@@ -1037,4 +1111,25 @@ def download_video(download_request: DownloadRequest) -> DownloadResponse:
         video_url=video_url,
         format_id=download_request.format_id,
         merge_with_audio=download_request.merge_with_audio,
+    )
+
+
+@app.post("/api/download", response_model=DownloadResponse)
+def download_video_legacy(download_request: DownloadRequest) -> DownloadResponse:
+    """保留旧 JSON 协议，避免已打开页面把媒体二进制误当作 JSON。"""
+    return _prepare_video_download(download_request)
+
+
+@app.post("/api/download/file", response_class=FileResponse)
+def download_video_file(download_request: DownloadRequest) -> FileResponse:
+    """
+    准备用户选择的公开视频格式，并作为浏览器附件下载返回。
+    """
+    download_result = _prepare_video_download(download_request)
+    download_path = Path(download_result.file_path)
+    return FileResponse(
+        path=download_path,
+        filename=download_result.filename,
+        media_type="application/octet-stream",
+        background=BackgroundTask(_remove_completed_download, download_path),
     )

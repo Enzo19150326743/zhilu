@@ -19,6 +19,7 @@ type WorkbenchTab = "summary" | "mindmap" | "qa" | "transcript";
 interface UseSummaryWorkflowOptions {
   activeSourceUrl: string | null;
   isTaskSourceActive: (sourceUrl: string) => boolean;
+  onProcessingFinished: (videoId: string) => void;
   refreshLibraryItems: () => Promise<void>;
   setActiveTab: Dispatch<SetStateAction<WorkbenchTab>>;
   setDetail: Dispatch<SetStateAction<DemoDetail | ParseResponse | null>>;
@@ -27,6 +28,7 @@ interface UseSummaryWorkflowOptions {
 export function useSummaryWorkflow({
   activeSourceUrl,
   isTaskSourceActive,
+  onProcessingFinished,
   refreshLibraryItems,
   setActiveTab,
   setDetail
@@ -157,7 +159,7 @@ export function useSummaryWorkflow({
         }
         setActiveTab("summary");
       }
-      void refreshLibraryItems();
+      await refreshLibraryItems();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "总结生成失败，请稍后重试。";
@@ -176,6 +178,9 @@ export function useSummaryWorkflow({
       if (isTaskSourceActive(taskSourceUrl)) {
         setSummaryErrorMessage(errorMessage);
       }
+      await refreshLibraryItems();
+    } finally {
+      onProcessingFinished(taskVideoId);
     }
   };
 

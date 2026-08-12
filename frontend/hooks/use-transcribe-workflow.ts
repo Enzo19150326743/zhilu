@@ -5,8 +5,7 @@ import { ApiClientError, apiClient } from "@/lib/api";
 import { getTextSourceType } from "@/lib/media";
 import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
 import {
-  getDefaultTranscribeSettings,
-  normalizeTranscribeSettings
+  getDefaultTranscribeSettings
 } from "@/lib/transcribe-settings";
 import {
   buildTranscribedDetail,
@@ -30,6 +29,12 @@ const TRANSCRIBE_RECOVERY_TIMEOUT_MS = 30 * 60 * 1000;
 interface UseTranscribeWorkflowOptions {
   activeDetail: DemoDetail | ParseResponse | null;
   activeSourceUrl: string | null;
+  beginProcessingWorkflow: (workflow: {
+    sourceUrl: string;
+    startedAt: number;
+    videoId: string;
+  }) => void;
+  finishProcessingWorkflow: (videoId: string) => void;
   isActiveSourceUrl: (sourceUrl: string) => boolean;
   refreshLibraryItems: () => Promise<void>;
   runSummaryForDetail: (detail: DemoDetail | ParseResponse) => Promise<void>;
@@ -45,6 +50,8 @@ interface UseTranscribeWorkflowOptions {
 export function useTranscribeWorkflow({
   activeDetail,
   activeSourceUrl,
+  beginProcessingWorkflow,
+  finishProcessingWorkflow,
   isActiveSourceUrl,
   refreshLibraryItems,
   runSummaryForDetail,
@@ -131,18 +138,22 @@ export function useTranscribeWorkflow({
       setSummaryGenerationMeta(null);
       setActiveTab(continueWithSummary ? "summary" : "transcript");
     }
-    void refreshLibraryItems();
     if (continueWithSummary) {
       void runSummaryForDetail(updatedDetail);
+    } else {
+      void refreshLibraryItems().finally(() => {
+        finishProcessingWorkflow(updatedDetail.video.video_id);
+      });
     }
   };
 
-  const handleTranscribeRequest = (settings?: TranscribeContextSettings) => {
+  const handleTranscribeRequest = () => {
     if (!activeDetail || !isParseResponse(activeDetail)) {
       setErrorMessage("当前记录无法生成转写稿，请先解析公开视频链接。");
       return;
     }
     if (
+      activeDetail.video.has_transcript &&
       getTextSourceType(activeDetail.video) !== "shownotes" &&
       activeDetail.transcript?.plain_text.trim()
     ) {
@@ -157,12 +168,7 @@ export function useTranscribeWorkflow({
       return;
     }
 
-    setPendingTranscribeSettings(
-      normalizeTranscribeSettings(
-        settings,
-        getDefaultTranscribeSettings(activeDetail.video)
-      )
-    );
+    setPendingTranscribeSettings(getDefaultTranscribeSettings(activeDetail.video));
     // 云端仍需用户明确选择；本地模型按后端能力状态选择推荐项。
     setPendingAsrEngine(getRecommendedLocalAsrEngine(asrStatus));
     setIsTranscribeSettingsOpen(true);
@@ -194,6 +200,11 @@ export function useTranscribeWorkflow({
     }
 
     const taskId = `${taskVideoId}-${Date.now()}`;
+    beginProcessingWorkflow({
+      sourceUrl: taskSourceUrl,
+      startedAt: Date.now(),
+      videoId: taskVideoId
+    });
     setTranscribeTasks((currentTasks) => [
       {
         id: taskId,
@@ -273,8 +284,9 @@ export function useTranscribeWorkflow({
                 status: "error"
               }
             : task
-        )
+          )
       );
+      finishProcessingWorkflow(taskVideoId);
     }
   };
 

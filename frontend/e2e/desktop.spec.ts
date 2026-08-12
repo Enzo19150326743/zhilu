@@ -1,4 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { LIBRARY_PROCESSING_STORAGE_KEY } from "../lib/library-processing";
+
+const verticalThumbnail = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="1000"><rect width="600" height="1000" fill="#d6c7a1"/></svg>'
+)}`;
 
 const summarizedItem = {
   author: "测试作者",
@@ -19,7 +24,7 @@ const needsTranscriptItem = {
   author: "测试作者",
   duration: 240,
   has_transcript: false,
-  platform: "bilibili",
+  platform: "xiaohongshu",
   source_url: "https://example.com/needs-transcript",
   summary_model: "deepseek-chat",
   summary_status: "ai_generated",
@@ -52,7 +57,7 @@ const needsTranscriptDetail = {
   success: true,
   summary: emptySummary,
   transcript: {
-    plain_text: "",
+    plain_text: "未检测到可用 VTT/SRT 字幕。",
     segments: []
   },
   transcript_variants: {},
@@ -68,6 +73,33 @@ const needsTranscriptDetail = {
     url: needsTranscriptItem.source_url,
     video_id: needsTranscriptItem.video_id
   }
+};
+
+const generatedTranscript = {
+  asr_meta: { correction_status: "corrected", engine: "sensevoice" },
+  plain_text: "这是刚刚生成的完整转写稿。",
+  segments: [{ start: 0, text: "这是刚刚生成的完整转写稿。" }]
+};
+
+const transcribedNeedsTranscriptDetail = {
+  ...needsTranscriptDetail,
+  active_transcript_variant: "sensevoice_small",
+  library_summary_model: null,
+  library_summary_status: "none",
+  transcript: generatedTranscript,
+  transcript_variants: { sensevoice_small: generatedTranscript },
+  video: {
+    ...needsTranscriptDetail.video,
+    has_transcript: true,
+    text_source_type: "asr_transcript"
+  }
+};
+
+const processedNeedsTranscriptItem = {
+  ...needsTranscriptItem,
+  has_transcript: true,
+  summary_status: "ai_generated",
+  text_source_type: "asr_transcript"
 };
 
 const summarizedDetail = {
@@ -100,6 +132,7 @@ const summarizedDetail = {
     has_transcript: true,
     source_url: summarizedItem.source_url,
     text_source_type: "asr_transcript",
+    thumbnail: verticalThumbnail,
     title: summarizedItem.title,
     url: summarizedItem.source_url,
     video_id: summarizedItem.video_id
@@ -226,6 +259,191 @@ test("最近档案先显示加载态，并保持已总结与需转写互斥", as
   await page.getByRole("button", { name: "需转写 1" }).click();
   await expect(page.getByRole("button", { name: "需转写演示", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "已总结演示", exact: true })).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
+test("转写总结期间最近档案显示处理中", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  let libraryPhase: "needs-transcript" | "transcribed" | "summarized" =
+    "needs-transcript";
+  let releaseTranscribe!: () => void;
+  let releaseSummary!: () => void;
+  const transcribeGate = new Promise<void>((resolve) => {
+    releaseTranscribe = resolve;
+  });
+  const summaryGate = new Promise<void>((resolve) => {
+    releaseSummary = resolve;
+  });
+
+  await installApiMocks(page);
+  await page.route("http://127.0.0.1:8000/api/library/recent**", (route) =>
+    json(route, {
+      items: [
+        libraryPhase === "summarized"
+          ? processedNeedsTranscriptItem
+          : libraryPhase === "transcribed"
+            ? {
+                ...needsTranscriptItem,
+                has_transcript: true,
+                summary_model: null,
+                summary_status: "none",
+                text_source_type: "asr_transcript"
+              }
+            : needsTranscriptItem,
+        summarizedItem
+      ],
+      success: true
+    })
+  );
+  await page.route("http://127.0.0.1:8000/api/transcribe", async (route) => {
+    await transcribeGate;
+    libraryPhase = "transcribed";
+    return json(route, {
+      message: "转写稿已生成。",
+      source_url: needsTranscriptItem.source_url,
+      success: true,
+      transcript: generatedTranscript,
+      transcript_variant_key: "sensevoice_small",
+      video_id: needsTranscriptItem.video_id
+    });
+  });
+  await page.route("http://127.0.0.1:8000/api/summarize", async (route) => {
+    await summaryGate;
+    libraryPhase = "summarized";
+    return json(route, {
+      is_ai_generated: true,
+      mindmap_markdown: "# 自动总结",
+      mindmap_meta: null,
+      model: "deepseek-chat",
+      success: true,
+      summary: {
+        ...emptySummary,
+        tldr: "自动总结已经完成。"
+      }
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "需转写演示", exact: true }).click();
+  await page.getByRole("button", { name: "生成转写稿", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "转写设置" })
+    .getByRole("button", { name: "开始转写", exact: true })
+    .click();
+  await page.locator('button[title="返回首页"]').click();
+
+  await expect(page.getByText("处理中", { exact: true })).toBeVisible();
+  releaseTranscribe();
+  await expect.poll(() => libraryPhase).toBe("transcribed");
+  await expect(page.getByText("处理中", { exact: true })).toBeVisible();
+  releaseSummary();
+  await expect(page.getByText("已总结", { exact: true })).toBeVisible();
+  await expect(page.getByText("处理中", { exact: true })).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
+test("刷新后恢复档案处理状态并继续总结", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  let isSummarized = false;
+  let summaryRequested = false;
+  let releaseSummary!: () => void;
+  const summaryGate = new Promise<void>((resolve) => {
+    releaseSummary = resolve;
+  });
+
+  await page.addInitScript(
+    ({ key, workflow }) => {
+      window.sessionStorage.setItem(key, JSON.stringify([workflow]));
+    },
+    {
+      key: LIBRARY_PROCESSING_STORAGE_KEY,
+      workflow: {
+        sourceUrl: needsTranscriptItem.source_url,
+        startedAt: Date.now(),
+        videoId: needsTranscriptItem.video_id
+      }
+    }
+  );
+  await installApiMocks(page);
+  await page.route("http://127.0.0.1:8000/api/library/recent**", (route) =>
+    json(route, {
+      items: [
+        isSummarized
+          ? processedNeedsTranscriptItem
+          : {
+              ...needsTranscriptItem,
+              has_transcript: true,
+              summary_model: null,
+              summary_status: "none",
+              text_source_type: "asr_transcript"
+            },
+        summarizedItem
+      ],
+      success: true
+    })
+  );
+  await page.route(
+    `http://127.0.0.1:8000/api/library/${needsTranscriptItem.video_id}`,
+    (route) => json(route, transcribedNeedsTranscriptDetail)
+  );
+  await page.route("http://127.0.0.1:8000/api/summarize", async (route) => {
+    summaryRequested = true;
+    await summaryGate;
+    isSummarized = true;
+    return json(route, {
+      is_ai_generated: true,
+      mindmap_markdown: "# 恢复后的自动总结",
+      mindmap_meta: null,
+      model: "deepseek-chat",
+      success: true,
+      summary: {
+        ...emptySummary,
+        tldr: "刷新恢复后总结已经完成。"
+      }
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByText("处理中", { exact: true })).toBeVisible();
+  await expect.poll(() => summaryRequested).toBe(true);
+  releaseSummary();
+
+  await expect(page.getByText("已总结", { exact: true })).toBeVisible();
+  await expect(page.getByText("处理中", { exact: true })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => window.sessionStorage.getItem(key),
+        LIBRARY_PROCESSING_STORAGE_KEY
+      )
+    )
+    .toBeNull();
+  expect(browserErrors).toEqual([]);
+});
+
+test("最近档案操作提示只在对应图标上悬停时显示", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  const itemButton = page.getByRole("button", {
+    name: "需转写演示",
+    exact: true
+  });
+  const deleteButton = page.getByRole("button", {
+    name: "删除《需转写演示》",
+    exact: true
+  });
+  const deleteTooltip = deleteButton.locator("..").getByRole("tooltip", {
+    name: "删除档案",
+    exact: true
+  });
+
+  await itemButton.hover();
+  await expect(deleteTooltip).toHaveCSS("opacity", "0");
+
+  await deleteButton.hover();
+  await expect(deleteTooltip).toHaveCSS("opacity", "1");
   expect(browserErrors).toEqual([]);
 });
 
@@ -362,6 +580,37 @@ test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({
   expect(browserErrors).toEqual([]);
 });
 
+test("小红书占位字幕不会阻断统一生成转写稿入口", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "需转写 1" }).click();
+  await page.getByRole("button", { name: "需转写演示", exact: true }).click();
+
+  for (const tabName of ["总结", "思维导图", "内容问答", "内容文本"]) {
+    await page.getByRole("tab", { name: tabName, exact: true }).click();
+    const activePanel = page.getByRole("tabpanel", {
+      name: `${tabName}内容`,
+      exact: true
+    });
+    const transcribeButton = activePanel.getByRole("button", {
+      name: "生成转写稿",
+      exact: true
+    });
+
+    await expect(transcribeButton).toHaveCount(1);
+    await expect(
+      activePanel.getByText("转写设置", { exact: true })
+    ).toHaveCount(0);
+    await transcribeButton.click();
+    await expect(page.getByRole("dialog", { name: "转写设置" })).toBeVisible();
+    await page.getByRole("button", { name: "关闭转写设置" }).click();
+  }
+
+  expect(browserErrors).toEqual([]);
+});
+
 test("资料库危险操作使用站内确认并可取消", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   let nativeDialogOpened = false;
@@ -375,12 +624,76 @@ test("资料库危险操作使用站内确认并可取消", async ({ page }) => 
   await page
     .getByRole("button", { name: "删除《需转写演示》", exact: true })
     .click();
-  await expect(page.getByRole("dialog", { name: "删除《需转写演示》？" })).toBeVisible();
+  const deleteDialog = page.getByRole("dialog", { name: "删除档案" });
+  await expect(deleteDialog).toBeVisible();
+  await expect(
+    deleteDialog.getByRole("heading", { name: "删除档案" })
+  ).toHaveClass(/\bsr-only\b/);
+  await expect(
+    deleteDialog.getByRole("button", { name: "关闭删除档案" })
+  ).toHaveCount(0);
+  await expect(
+    deleteDialog.getByText("删除这条档案？", { exact: true })
+  ).toBeVisible();
+  await expect(
+    deleteDialog.getByRole("button", { name: "删除", exact: true })
+  ).toBeVisible();
+  expect(
+    await deleteDialog.evaluate((element) => element.getBoundingClientRect().width)
+  ).toBeLessThanOrEqual(400);
   expect(nativeDialogOpened).toBe(false);
 
-  await page.getByRole("button", { name: "关闭删除《需转写演示》？" }).press("Escape");
+  const deleteCancelButton = deleteDialog.getByRole("button", {
+    name: "取消",
+    exact: true
+  });
+  await expect(deleteCancelButton).toBeFocused();
+  await deleteCancelButton.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "需转写演示", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "清空全部档案", exact: true }).click();
+  const clearDialog = page.getByRole("dialog", { name: "清空全部档案" });
+  await expect(clearDialog).toBeVisible();
+  await expect(
+    clearDialog.getByText("清空全部档案？此操作无法撤销。", { exact: true })
+  ).toBeVisible();
+  await expect(
+    clearDialog.getByRole("button", { name: "清空", exact: true })
+  ).toBeVisible();
+  await clearDialog.getByRole("button", { name: "取消", exact: true }).press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page
+    .getByRole("button", { name: "删除《需转写演示》", exact: true })
+    .click();
+  const mobileDialogBox = await page
+    .getByRole("dialog", { name: "删除档案" })
+    .boundingBox();
+  expect(mobileDialogBox).not.toBeNull();
+  expect(mobileDialogBox!.width).toBeLessThanOrEqual(328);
+  await page
+    .getByRole("dialog", { name: "删除档案" })
+    .getByRole("button", { name: "取消", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
+test("一句话总结使用顶部横向强调线", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+
+  const tldrRegion = page.getByRole("region", { name: "一句话总结" });
+  const accent = tldrRegion.locator('[data-summary-accent="true"]');
+  const accentBox = await accent.boundingBox();
+  expect(accentBox).not.toBeNull();
+  expect(accentBox!.width).toBeGreaterThan(accentBox!.height);
   expect(browserErrors).toEqual([]);
 });
 
@@ -517,6 +830,13 @@ test("工作台链接输入框明确可编辑并只执行普通提取", async ({
   });
   await page.goto("/");
 
+  await expect(
+    page.getByText(
+      "从公开视频与播客取得文本，整理成摘要、导图和可继续编辑的 Markdown 知识稿。",
+      { exact: true }
+    )
+  ).toHaveCount(0);
+
   await page.getByRole("button", { name: "已总结 1" }).click();
   await page.getByRole("button", { name: "已总结演示", exact: true }).click();
 
@@ -557,8 +877,42 @@ test("工作台链接输入框明确可编辑并只执行普通提取", async ({
     )
   ).toBeLessThanOrEqual(2);
 
+  const shareText =
+    "复制这段分享文案 😄 https://www.xiaohongshu.com/discovery/item/6a2761520000000008032277?source=webshare";
+  await urlInput.fill(shareText);
   await extractButton.click();
   await expect.poll(() => parseBody).not.toBeNull();
-  expect(parseBody).toEqual({ url: summarizedItem.source_url });
+  expect(parseBody).toEqual({ url: shareText });
+  expect(browserErrors).toEqual([]);
+});
+
+test("工作台视频封面使用克制固定画布并完整缩放", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+
+  const coverFrame = page.getByTestId("media-cover-frame");
+  const coverImage = coverFrame.getByRole("img", {
+    name: "已总结演示 封面",
+    exact: true
+  });
+  const backgroundImage = coverFrame.locator('img[aria-hidden="true"]');
+  const coverBox = await coverFrame.boundingBox();
+
+  expect(coverBox).not.toBeNull();
+  expect(coverBox!.width).toBeGreaterThanOrEqual(298);
+  expect(coverBox!.width).toBeLessThanOrEqual(302);
+  expect(coverBox!.height).toBeGreaterThanOrEqual(223);
+  expect(coverBox!.height).toBeLessThanOrEqual(227);
+  await expect(backgroundImage).toHaveCount(1);
+  await expect(backgroundImage).toHaveCSS("object-fit", "cover");
+  await expect(backgroundImage).toHaveCSS("opacity", "0.3");
+  await expect(coverImage).toHaveCSS("object-fit", "contain");
+  await expect(coverImage).toHaveCSS("opacity", "1");
+  await expect(coverImage).toHaveCSS("filter", "none");
+  await expect(coverImage).toHaveCSS("z-index", "10");
   expect(browserErrors).toEqual([]);
 });

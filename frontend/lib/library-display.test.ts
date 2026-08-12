@@ -4,10 +4,10 @@ import {
   getFeaturedLibraryItems,
   getLibraryDisplayTitle,
   getLibraryStatusLabel,
-  getPlatformLabel,
   isLibraryItemSummarized,
   matchesLibraryFilter
 } from "./library-display";
+import { getPlatformLabel } from "./platform-display";
 import type { LibraryItem } from "./types";
 
 function createLibraryItem(
@@ -69,6 +69,23 @@ test("档案状态沿用 shownotes、总结和文本可用性语义", () => {
   );
 });
 
+test("档案处理状态优先于尚未同步的持久化结果", () => {
+  assert.equal(
+    getLibraryStatusLabel(
+      createLibraryItem({ has_transcript: false }),
+      true
+    ),
+    "处理中"
+  );
+  assert.equal(
+    getLibraryStatusLabel(
+      createLibraryItem({ summary_status: "ai_generated" }),
+      true
+    ),
+    "处理中"
+  );
+});
+
 test("档案标题去掉正文式话题并优先保留第一句", () => {
   assert.equal(
     getLibraryDisplayTitle(
@@ -106,6 +123,7 @@ test("shownotes 即使带旧总结也只归入需转写", () => {
 test("平台名称使用面向用户的中文标签", () => {
   assert.equal(getPlatformLabel("bilibili"), "B 站");
   assert.equal(getPlatformLabel("xiaoyuzhou"), "小宇宙");
+  assert.equal(getPlatformLabel("xiaohongshu"), "小红书");
   assert.equal(getPlatformLabel("douyin"), "抖音");
   assert.equal(getPlatformLabel("demo"), "推荐");
   assert.equal(getPlatformLabel("custom"), "custom");

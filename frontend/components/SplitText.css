@@ -1,0 +1,18 @@
+.split-parent {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  visibility: hidden;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.split-word,
+.split-char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.split-line {
+  display: block;
+}

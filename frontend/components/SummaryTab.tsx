@@ -1,5 +1,6 @@
 import { FileAudio, FileText, Loader2 } from "lucide-react";
 import { SafeMarkdown } from "./SafeMarkdown";
+import { TranscribeRequiredState } from "./TranscribeRequiredState";
 import type {
   SummaryDisplayState,
   SummaryGenerationMeta,
@@ -25,13 +26,8 @@ interface SummaryTabProps {
 
 interface SummaryEmptyStateProps {
   canSummarize: boolean;
-  canTranscribe: boolean;
-  hasTranscript: boolean;
-  isShownotesSource: boolean;
   isSummarizing: boolean;
-  isTranscribing: boolean;
   onSummarize: () => void;
-  onTranscribe: () => void;
 }
 
 interface SummarySectionHeadingProps {
@@ -89,87 +85,41 @@ function getTopicTags(summary: VideoSummary): string[] {
 
 function SummaryEmptyState({
   canSummarize,
-  canTranscribe,
-  hasTranscript,
-  isShownotesSource,
   isSummarizing,
-  isTranscribing,
-  onSummarize,
-  onTranscribe
+  onSummarize
 }: SummaryEmptyStateProps) {
-  const canUseTranscribeAction = canTranscribe || isTranscribing;
-  const description = isShownotesSource
-    ? "当前只有节目页 shownotes 原文，不是完整音频对话稿。必须先生成转写稿，再基于完整逐字稿总结。"
-    : hasTranscript
-      ? isSummarizing
-        ? "内容文本已就绪，正在生成结构化总结。"
-        : "内容文本已就绪，可以生成结构化总结。"
-      : canUseTranscribeAction
-        ? isTranscribing
-          ? "正在生成转写稿，完成后会继续整理总结。"
-          : "需要先生成转写稿，再整理总结。"
-        : "当前内容暂时无法生成总结。";
-  const title = isShownotesSource
-    ? "未生成对话稿总结"
-    : isSummarizing
-      ? "正在生成总结"
-      : "未生成总结";
-  const action =
-    isShownotesSource && canUseTranscribeAction
-      ? {
-          disabled: isTranscribing,
-          icon: FileAudio,
-          isRunning: isTranscribing,
-          label: isTranscribing ? "生成中" : "生成转写稿",
-          onClick: onTranscribe
-        }
-      : canSummarize
-        ? {
-            disabled: isSummarizing,
-            icon: FileText,
-            isRunning: isSummarizing,
-            label: isSummarizing ? "生成中" : "生成总结",
-            onClick: onSummarize
-          }
-        : canUseTranscribeAction
-          ? {
-              disabled: isTranscribing,
-              icon: FileAudio,
-              isRunning: isTranscribing,
-              label: isTranscribing ? "生成中" : "生成转写稿",
-              onClick: onTranscribe
-            }
-          : null;
-  const ActionIcon = action?.icon ?? FileText;
+  const description = isSummarizing
+    ? "内容文本已就绪，正在生成结构化总结。"
+    : "内容文本已就绪，可以生成结构化总结。";
 
   return (
     <section className="shadow-hard-md relative min-h-[300px] overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper)] px-6 py-8 sm:px-8 sm:py-10">
       <div className="relative flex min-h-[220px] flex-col justify-between">
         <div>
           <span className="shadow-hard-sm inline-flex min-h-8 items-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--paper-raised)]">
-            {isShownotesSource ? "已读取 shownotes" : "内容已提取"}
+            内容已提取
           </span>
           <h3 className="font-editorial mt-8 text-balance text-3xl font-bold tracking-normal text-[var(--ink)] sm:text-4xl">
-            {title}
+            {isSummarizing ? "正在生成总结" : "未生成总结"}
           </h3>
           <p className="mt-4 max-w-xl text-pretty text-sm leading-7 text-[var(--ink-soft)] sm:text-base">
             {description}
           </p>
         </div>
 
-        {action ? (
+        {canSummarize ? (
           <button
             className="ink-block mt-8 inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-[2px] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--paper-raised)] disabled:cursor-not-allowed disabled:opacity-65"
-            disabled={action.disabled}
+            disabled={isSummarizing}
             type="button"
-            onClick={action.onClick}
+            onClick={onSummarize}
           >
-            {action.isRunning ? (
+            {isSummarizing ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
-              <ActionIcon className="h-4 w-4" aria-hidden="true" />
+              <FileText className="h-4 w-4" aria-hidden="true" />
             )}
-            {action.label}
+            {isSummarizing ? "生成中" : "生成总结"}
           </button>
         ) : null}
 
@@ -196,26 +146,40 @@ export function SummaryTab({
 }: SummaryTabProps) {
   const isShownotes = textSourceType === "shownotes";
   const isPodcast = mediaType === "podcast";
+  const needsTranscription = !hasTranscript || (isPodcast && isShownotes);
 
   if (summaryDisplayState === "empty") {
+    if (needsTranscription) {
+      return (
+        <div className="space-y-4">
+          <TranscribeRequiredState
+            canTranscribe={canTranscribe}
+            description={
+              isPodcast && isShownotes
+                ? "当前只有节目页 shownotes，需要先生成完整转写稿，再整理总结。"
+                : "需要先生成转写稿，再整理总结。"
+            }
+            isTranscribing={isTranscribing}
+            title={isPodcast && isShownotes ? "未生成对话稿总结" : "未生成总结"}
+            onTranscribe={onTranscribe}
+          />
+
+          {transcribeErrorMessage ? (
+            <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
+              {transcribeErrorMessage}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <SummaryEmptyState
           canSummarize={canSummarize}
-          canTranscribe={canTranscribe}
-          hasTranscript={hasTranscript}
-          isShownotesSource={isPodcast && isShownotes}
           isSummarizing={isSummarizing}
-          isTranscribing={isTranscribing}
           onSummarize={onSummarize}
-          onTranscribe={onTranscribe}
         />
-
-        {transcribeErrorMessage ? (
-          <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
-            {transcribeErrorMessage}
-          </div>
-        ) : null}
 
         {summaryErrorMessage ? (
           <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
@@ -327,8 +291,12 @@ export function SummaryTab({
         </div>
       ) : null}
 
-      <section className="flex gap-4 px-1 py-2">
-        <span aria-hidden="true" className="w-[5px] shrink-0 bg-[var(--accent)]" />
+      <section aria-label="一句话总结" className="space-y-4 px-1 py-2">
+        <span
+          aria-hidden="true"
+          className="block h-1 w-7 bg-[var(--accent)]"
+          data-summary-accent="true"
+        />
         <p className="font-editorial text-pretty text-lg font-medium leading-8 text-[var(--ink)] sm:text-[19px] sm:leading-[32px]">
           {summary.tldr}
         </p>

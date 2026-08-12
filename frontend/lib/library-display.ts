@@ -15,7 +15,14 @@ export function isLibraryItemSummarized(item: LibraryItem): boolean {
   );
 }
 
-export function getLibraryStatusLabel(item: LibraryItem): string {
+export function getLibraryStatusLabel(
+  item: LibraryItem,
+  isProcessing = false
+): string {
+  if (isProcessing) {
+    return "处理中";
+  }
+
   if (!item.has_transcript || isShownotesLibraryItem(item)) {
     return "需转写";
   }
@@ -56,24 +63,6 @@ export function getLibraryDisplayTitle(value: string): string {
   }
 
   return `${withoutHashtags.slice(0, 66).trimEnd()}…`;
-}
-
-export function getPlatformLabel(platform: string): string {
-  const normalizedPlatform = platform.toLowerCase();
-  if (normalizedPlatform === "bilibili") {
-    return "B 站";
-  }
-  if (normalizedPlatform === "xiaoyuzhou") {
-    return "小宇宙";
-  }
-  if (normalizedPlatform === "douyin") {
-    return "抖音";
-  }
-  if (normalizedPlatform === "demo") {
-    return "推荐";
-  }
-
-  return platform || "未知来源";
 }
 
 function getUpdatedTimestamp(item: LibraryItem): number {

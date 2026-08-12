@@ -3,8 +3,8 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
-type ModalDialogSize = "compact" | "wide";
-type ModalDialogHeaderMode = "close-only" | "standard";
+type ModalDialogSize = "confirmation" | "compact" | "wide";
+type ModalDialogHeaderMode = "hidden" | "close-only" | "standard";
 
 interface ModalDialogProps {
   children: ReactNode;
@@ -19,8 +19,15 @@ interface ModalDialogProps {
 }
 
 const SIZE_CLASS_NAMES: Record<ModalDialogSize, string> = {
+  confirmation: "max-w-sm",
   compact: "max-w-lg",
   wide: "max-w-4xl"
+};
+
+const SHADOW_CLASS_NAMES: Record<ModalDialogSize, string> = {
+  confirmation: "shadow-[4px_4px_0_0_var(--ink)]",
+  compact: "shadow-[8px_8px_0_0_var(--ink)]",
+  wide: "shadow-[8px_8px_0_0_var(--ink)]"
 };
 
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
@@ -137,6 +144,8 @@ export function ModalDialog({
     return null;
   }
 
+  const hasHiddenHeader = headerMode === "hidden";
+
   const closeButton = (
     <button
       aria-label={`关闭${title}`}
@@ -165,12 +174,16 @@ export function ModalDialog({
         }
         aria-labelledby={titleId}
         aria-modal="true"
-        className={`flex max-h-[88dvh] w-full ${SIZE_CLASS_NAMES[size]} flex-col overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] shadow-[8px_8px_0_0_var(--ink)]`}
+        className={`flex max-h-[88dvh] w-full ${SIZE_CLASS_NAMES[size]} ${SHADOW_CLASS_NAMES[size]} flex-col overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)]`}
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
       >
-        {headerMode === "close-only" ? (
+        {hasHiddenHeader ? (
+          <h2 className="sr-only" id={titleId}>
+            {title}
+          </h2>
+        ) : headerMode === "close-only" ? (
           <div className="flex shrink-0 justify-end px-4 pt-4">
             <h2 className="sr-only" id={titleId}>
               {title}
@@ -197,15 +210,25 @@ export function ModalDialog({
         )}
 
         <div
-          className={`min-h-0 flex-1 overflow-y-auto px-5 pb-4 ${
-            headerMode === "close-only" ? "pt-2" : "pt-4"
+          className={`min-h-0 flex-1 overflow-y-auto px-5 ${
+            hasHiddenHeader
+              ? "pb-2 pt-5"
+              : headerMode === "close-only"
+                ? "pb-4 pt-2"
+                : "pb-4 pt-4"
           }`}
         >
           {children}
         </div>
 
         {footer ? (
-          <div className="flex shrink-0 justify-end gap-2 border-t-2 border-[var(--line-ink)] bg-[var(--paper)] px-5 py-4">
+          <div
+            className={`flex shrink-0 justify-end gap-2 px-5 ${
+              hasHiddenHeader
+                ? "bg-[var(--paper-raised)] pb-5 pt-2"
+                : "border-t-2 border-[var(--line-ink)] bg-[var(--paper)] py-4"
+            }`}
+          >
             {footer}
           </div>
         ) : null}
@@ -241,6 +264,7 @@ export function ConfirmDialog({
         <>
           <button
             className="inline-flex h-10 items-center justify-center rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] px-4 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--paper-deep)] disabled:cursor-not-allowed disabled:opacity-60"
+            data-dialog-initial-focus
             disabled={isBusy}
             type="button"
             onClick={onClose}
@@ -259,10 +283,12 @@ export function ConfirmDialog({
       }
       isBusy={isBusy}
       isOpen={isOpen}
+      headerMode="hidden"
+      size="confirmation"
       title={title}
       onClose={onClose}
     >
-      <p className="text-sm leading-7 text-[var(--ink-soft)]">{description}</p>
+      <p className="text-base font-medium leading-7 text-[var(--ink)]">{description}</p>
       {errorMessage ? (
         <p className="mt-4 rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
           {errorMessage}

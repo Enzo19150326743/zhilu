@@ -1,10 +1,10 @@
 import type {
   ApiError,
   AsrStatusResponse,
+  BrowserDownloadResponse,
   CorrectionTermLibraryResponse,
   DemoDetail,
   DemoListResponse,
-  DownloadResponse,
   HealthResponse,
   LibraryClearResponse,
   LibraryDeleteResponse,
@@ -175,6 +175,92 @@ async function requestJson<T>(
   }
 }
 
+function getDownloadFilename(contentDisposition: string | null): string {
+  if (!contentDisposition) {
+    return "media-download";
+  }
+
+  const encodedFilename = contentDisposition.match(
+    /filename\*=utf-8''([^;]+)/i
+  )?.[1];
+  if (encodedFilename) {
+    try {
+      return decodeURIComponent(encodedFilename);
+    } catch {
+      return encodedFilename;
+    }
+  }
+
+  return (
+    contentDisposition.match(/filename="([^"]+)"/i)?.[1] ??
+    contentDisposition.match(/filename=([^;]+)/i)?.[1]?.trim() ??
+    "media-download"
+  );
+}
+
+async function requestBrowserDownload(
+  path: string,
+  body: unknown,
+  timeoutMs: number
+): Promise<BrowserDownloadResponse> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+      body: JSON.stringify(body),
+      headers: {
+        Accept: "application/octet-stream",
+        "Content-Type": "application/json"
+      },
+      method: "POST",
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const fallbackMessage = `请求失败：${response.status}`;
+      const errorPayload = (await response
+        .json()
+        .catch(() => null)) as ErrorPayload;
+      throw new ApiClientError(
+        getErrorMessage(errorPayload, fallbackMessage),
+        response.status,
+        getErrorCode(errorPayload)
+      );
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: getDownloadFilename(response.headers.get("Content-Disposition"))
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiClientError("下载超时，请稍后重试。", 0, "TIMEOUT");
+    }
+
+    if (error instanceof TypeError) {
+      const isBackendReachable = await checkBackendReachable();
+      if (isBackendReachable) {
+        throw new ApiClientError(
+          "后端服务当前可访问，但下载连接已中断，请稍后重试。",
+          0,
+          "REQUEST_INTERRUPTED"
+        );
+      }
+
+      throw new ApiClientError(
+        "无法连接后端服务，请确认后端已启动，并在更新代码后重启后端。",
+        0,
+        "NETWORK_ERROR"
+      );
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export const apiClient = {
   getHealth(): Promise<HealthResponse> {
     return requestJson<HealthResponse>("/api/health", { timeoutMs: 2500 });
@@ -280,15 +366,15 @@ export const apiClient = {
     url: string,
     formatId: string,
     mergeWithAudio: boolean
-  ): Promise<DownloadResponse> {
-    return requestJson<DownloadResponse>("/api/download", {
-      body: {
+  ): Promise<BrowserDownloadResponse> {
+    return requestBrowserDownload(
+      "/api/download/file",
+      {
         format_id: formatId,
         merge_with_audio: mergeWithAudio,
         url
       },
-      method: "POST",
-      timeoutMs: 600000
-    });
+      600000
+    );
   }
 };

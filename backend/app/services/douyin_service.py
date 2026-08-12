@@ -124,6 +124,10 @@ def _extract_douyin_video(source_url: str) -> DouyinMediaInfo:
 
         if video_id is None:
             video_id = extract_video_id(resolved_url, page_text)
+            if video_id is not None:
+                # “听视频”等页面只负责暴露原视频 ID，后续仍交给现有标准视频页解析链路。
+                page_url = f"https://www.iesdouyin.com/share/video/{video_id}/"
+                page_text = client.read_text(page_url, mobile=True)
         if video_id is None:
             raise _douyin_error(
                 "DOUYIN_VIDEO_ID_NOT_FOUND",

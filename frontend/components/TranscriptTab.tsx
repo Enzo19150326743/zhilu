@@ -15,16 +15,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranscriptNoteWorkflow } from "@/hooks/use-transcript-note-workflow";
 import type {
   NoteDraft,
-  TranscribeContextSettings,
   TranscriptPayload,
   VideoSummary
 } from "@/lib/types";
 import { TranscriptComparisonColumn } from "./TranscriptComparisonColumn";
 import { IconActionButton } from "./IconActionButton";
 import { TranscriptNoteWorkflow } from "./TranscriptNoteWorkflow";
-import { TranscribeSettingsPanel } from "./TranscribeSettingsPanel";
+import { TranscribeRequiredState } from "./TranscribeRequiredState";
 import {
-  buildInitialTranscribeSettings,
   downloadTextFile,
   formatTimestamp,
   getTextSourceHint,
@@ -50,10 +48,9 @@ interface TranscriptTabProps {
   transcript: TranscriptPayload | null;
   transcriptVariants: Record<string, TranscriptPayload>;
   activeTranscriptVariant?: string | null;
-  videoPlatform?: string | null;
   videoTitle?: string | null;
   onSaveNoteDraft: (sourceUrl: string, noteDraft: NoteDraft) => Promise<NoteDraft>;
-  onTranscribe: (settings?: TranscribeContextSettings) => void;
+  onTranscribe: () => void;
 }
 export function TranscriptTab({
   canTranscribe,
@@ -68,7 +65,6 @@ export function TranscriptTab({
   transcript,
   transcriptVariants,
   activeTranscriptVariant,
-  videoPlatform,
   videoTitle,
   onSaveNoteDraft,
   onTranscribe
@@ -81,10 +77,6 @@ export function TranscriptTab({
     useState<string>(activeTranscriptVariant ?? "");
   const [isComparingTranscripts, setIsComparingTranscripts] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
-  const [transcribeSettings, setTranscribeSettings] =
-    useState<TranscribeContextSettings>(() =>
-      buildInitialTranscribeSettings(videoPlatform, mediaType)
-    );
   const {
     candidateHighlights,
     draftEditStatuses,
@@ -164,10 +156,6 @@ export function TranscriptTab({
     transcriptVariantSignature
   ]);
 
-  useEffect(() => {
-    setTranscribeSettings(buildInitialTranscribeSettings(videoPlatform, mediaType));
-  }, [mediaType, sourceUrl, videoPlatform]);
-
   const handleCopy = async () => {
     if (!visibleTranscript) {
       return;
@@ -193,10 +181,6 @@ export function TranscriptTab({
     );
     setHasExported(true);
     window.setTimeout(() => setHasExported(false), 1600);
-  };
-
-  const handleTranscribeClick = () => {
-    onTranscribe(transcribeSettings);
   };
 
   const renderTopActions = (sourceKind: "shownotes" | "transcript") => {
@@ -275,38 +259,14 @@ export function TranscriptTab({
 
   if (!transcript || !hasTranscript) {
     return (
-      <div className="space-y-3 rounded-[2px] border border-dashed border-[var(--line-strong)] bg-[var(--paper)] p-6 text-sm text-[var(--muted-strong)]">
-        <div className="flex gap-3">
-          <FileAudio className="mt-0.5 h-5 w-5 shrink-0 text-[var(--muted)]" />
-          <div>
-            <p className="font-medium text-[var(--ink)]">当前没有可用内容文本。</p>
-            <p className="mt-1 leading-6">
-              未检测到平台字幕时，可以从公开媒体音频生成转写稿，再用于总结、摘录、导图和问答。
-            </p>
-          </div>
-        </div>
-        {canTranscribe ? (
-          <>
-            <TranscribeSettingsPanel
-              disabled={isTranscribing}
-              settings={transcribeSettings}
-              onChange={setTranscribeSettings}
-            />
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-3 text-sm font-semibold text-[var(--paper)] transition-colors hover:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--ink)]"
-              disabled={isTranscribing}
-              type="button"
-              onClick={handleTranscribeClick}
-            >
-              {isTranscribing ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <FileAudio className="h-4 w-4" aria-hidden="true" />
-              )}
-              {isTranscribing ? "生成中" : "生成转写稿"}
-            </button>
-          </>
-        ) : null}
+      <div className="space-y-4">
+        <TranscribeRequiredState
+          canTranscribe={canTranscribe}
+          description="未检测到平台字幕时，可以从公开媒体音频生成转写稿，再用于总结、摘录、导图和问答。"
+          isTranscribing={isTranscribing}
+          title="当前没有可用内容文本"
+          onTranscribe={onTranscribe}
+        />
         {transcribeErrorMessage ? (
           <div className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-3 py-2 text-sm text-[#7a4a1f]">
             {transcribeErrorMessage}
@@ -366,7 +326,7 @@ export function TranscriptTab({
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-[2px] bg-[var(--ink)] px-3 text-sm font-semibold text-[var(--paper)] transition-colors hover:bg-[var(--accent-deep)] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--ink)]"
                   disabled={isTranscribing}
                   type="button"
-                  onClick={handleTranscribeClick}
+                  onClick={onTranscribe}
                 >
                   {isTranscribing ? (
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -380,14 +340,6 @@ export function TranscriptTab({
             </div>
           </div>
         </section>
-
-        {isPodcast && canTranscribe ? (
-          <TranscribeSettingsPanel
-            disabled={isTranscribing}
-            settings={transcribeSettings}
-            onChange={setTranscribeSettings}
-          />
-        ) : null}
 
         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
           <article

@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLibraryProcessingWorkflows } from "@/hooks/use-library-processing-workflows";
 import { useLibraryWorkspace } from "@/hooks/use-library-workspace";
 import { useSummaryWorkflow } from "@/hooks/use-summary-workflow";
 import { useTranscribeWorkflow } from "@/hooks/use-transcribe-workflow";
 import { apiClient } from "@/lib/api";
+import { LIBRARY_PROCESSING_TIMEOUT_MS } from "@/lib/library-processing";
 import { getMediaType, getTextSourceType } from "@/lib/media";
+import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import { mockDemoDetails, mockDemos } from "@/lib/mock-data";
+import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
 import {
   getSummaryMetaFromDetail,
   isParseResponse,
@@ -25,9 +29,53 @@ import type {
 
 type TabKey = "summary" | "mindmap" | "qa" | "transcript";
 
+const RESTORED_WORKFLOW_POLL_INTERVAL_MS = 5000;
+const DEMO_COVER_PRELOAD_TIMEOUT_MS = 5000;
+
+function preloadDemoCover(thumbnail: string): Promise<void> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    let hasSettled = false;
+    const settle = () => {
+      if (hasSettled) {
+        return;
+      }
+      hasSettled = true;
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+    const timeoutId = window.setTimeout(
+      settle,
+      DEMO_COVER_PRELOAD_TIMEOUT_MS
+    );
+
+    image.onload = settle;
+    image.onerror = settle;
+    image.src = getDisplayThumbnailUrl(thumbnail);
+  });
+}
+
+function hasPersistedSummary(detail: ParseResponse): boolean {
+  return Boolean(
+    detail.video.has_transcript &&
+      getTextSourceType(detail.video) !== "shownotes" &&
+      (detail.library_summary_status === "ai_generated" ||
+        detail.library_summary_status === "local_fallback")
+  );
+}
+
 export function useWorkbenchController() {
-  const [demos, setDemos] = useState<DemoItem[]>(mockDemos);
+  const [demos, setDemos] = useState<DemoItem[]>([]);
+  const [areDemosReady, setAreDemosReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    beginProcessingWorkflow,
+    clearProcessingWorkflows,
+    finishProcessingWorkflow,
+    isHydrated: isProcessingWorkflowHydrated,
+    processingVideoIds,
+    restoredWorkflows
+  } = useLibraryProcessingWorkflows();
   const {
     actionError: libraryActionError,
     canLoadMore: canLoadMoreLibraryItems,
@@ -66,12 +114,35 @@ export function useWorkbenchController() {
   );
   const activeSourceUrlRef = useRef<string | null>(null);
   const inputUrlRef = useRef("");
+  const isControllerMountedRef = useRef(true);
+  const restoredRecoveryVideoIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    apiClient
-      .getDemos()
-      .then((response) => setDemos(response.demos))
-      .catch(() => setDemos(mockDemos));
+    let isCancelled = false;
+
+    void (async () => {
+      let nextDemos = mockDemos;
+      try {
+        const response = await apiClient.getDemos();
+        nextDemos = response.demos;
+      } catch {
+        nextDemos = mockDemos;
+      }
+
+      await Promise.all(
+        nextDemos.slice(0, 3).map((demo) => preloadDemoCover(demo.thumbnail))
+      );
+      if (isCancelled) {
+        return;
+      }
+
+      setDemos(nextDemos);
+      setAreDemosReady(true);
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const activeDetail =
@@ -111,6 +182,7 @@ export function useWorkbenchController() {
   } = useSummaryWorkflow({
     activeSourceUrl,
     isTaskSourceActive,
+    onProcessingFinished: finishProcessingWorkflow,
     refreshLibraryItems,
     setActiveTab,
     setDetail
@@ -128,6 +200,8 @@ export function useWorkbenchController() {
   } = useTranscribeWorkflow({
     activeDetail,
     activeSourceUrl,
+    beginProcessingWorkflow,
+    finishProcessingWorkflow,
     isActiveSourceUrl: (sourceUrl) =>
       activeSourceUrlRef.current === sourceUrl,
     refreshLibraryItems,
@@ -138,6 +212,75 @@ export function useWorkbenchController() {
     setSummaryErrorMessage,
     setSummaryGenerationMeta
   });
+  const runSummaryForDetailRef = useRef(runSummaryForDetail);
+
+  useEffect(() => {
+    runSummaryForDetailRef.current = runSummaryForDetail;
+  }, [runSummaryForDetail]);
+
+  useEffect(() => {
+    isControllerMountedRef.current = true;
+    return () => {
+      isControllerMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isProcessingWorkflowHydrated) {
+      return;
+    }
+
+    for (const workflow of restoredWorkflows) {
+      if (restoredRecoveryVideoIdsRef.current.has(workflow.videoId)) {
+        continue;
+      }
+      restoredRecoveryVideoIdsRef.current.add(workflow.videoId);
+
+      const remainingTimeoutMs = Math.max(
+        0,
+        LIBRARY_PROCESSING_TIMEOUT_MS - (Date.now() - workflow.startedAt)
+      );
+      if (remainingTimeoutMs === 0) {
+        finishProcessingWorkflow(workflow.videoId);
+        continue;
+      }
+
+      void (async () => {
+        const recoveredDetail = await pollForRecoveredValue({
+          fetchValue: () => apiClient.getLibraryDetail(workflow.videoId),
+          intervalMs: RESTORED_WORKFLOW_POLL_INTERVAL_MS,
+          isRecovered: (candidateDetail) =>
+            hasPersistedSummary(candidateDetail) ||
+            Boolean(
+              candidateDetail.video.has_transcript &&
+                getTextSourceType(candidateDetail.video) !== "shownotes" &&
+                candidateDetail.transcript?.plain_text.trim()
+            ),
+          timeoutMs: remainingTimeoutMs
+        });
+
+        if (!isControllerMountedRef.current) {
+          return;
+        }
+        if (!recoveredDetail) {
+          finishProcessingWorkflow(workflow.videoId);
+          return;
+        }
+        if (hasPersistedSummary(recoveredDetail)) {
+          await refreshLibraryItems();
+          finishProcessingWorkflow(workflow.videoId);
+          return;
+        }
+
+        await runSummaryForDetailRef.current(recoveredDetail);
+      })();
+    }
+  }, [
+    finishProcessingWorkflow,
+    isProcessingWorkflowHydrated,
+    refreshLibraryItems,
+    restoredWorkflows
+  ]);
   const {
     asrStatus,
     isOpen: isTranscribeSettingsOpen,
@@ -356,15 +499,19 @@ export function useWorkbenchController() {
 
   const handleConfirmLibraryAction = async () => {
     const confirmedAction = await confirmPendingLibraryAction();
-    if (
-      confirmedAction?.kind === "clear" &&
-      activeLibraryVideoId !== null
-    ) {
-      handleGoHome();
-    } else if (
-      confirmedAction?.kind === "delete" &&
-      confirmedAction.videoId === activeLibraryVideoId
-    ) {
+    if (!confirmedAction) {
+      return;
+    }
+    if (confirmedAction.kind === "clear") {
+      clearProcessingWorkflows();
+      if (activeLibraryVideoId !== null) {
+        handleGoHome();
+      }
+      return;
+    }
+
+    finishProcessingWorkflow(confirmedAction.videoId);
+    if (confirmedAction.videoId === activeLibraryVideoId) {
       handleGoHome();
     }
   };
@@ -421,12 +568,12 @@ export function useWorkbenchController() {
   );
   const pendingLibraryActionTitle =
     pendingLibraryAction?.kind === "delete"
-      ? `删除《${pendingLibraryAction.item.title}》？`
-      : "清空全部本地档案？";
+      ? "删除档案"
+      : "清空全部档案";
   const pendingLibraryActionDescription =
     pendingLibraryAction?.kind === "delete"
-      ? "这会删除该条本地历史记录，不会影响原媒体内容。"
-      : "这会删除全部本地历史记录；推荐内容和原媒体内容不会受到影响。";
+      ? "删除这条档案？"
+      : "清空全部档案？此操作无法撤销。";
   const libraryViewProps = {
     activeVideoId: activeLibraryVideoId,
     canLoadMore: canLoadMoreLibraryItems,
@@ -439,6 +586,7 @@ export function useWorkbenchController() {
     isRefreshing: isRefreshingLibrary,
     items: libraryItems,
     loadingVideoId: loadingLibraryVideoId,
+    processingVideoIds,
     stats: libraryStats,
     onChangeFilter: setLibraryFilter,
     onClearAll: handleClearLibraryItems,
@@ -488,7 +636,6 @@ export function useWorkbenchController() {
           transcript: activeDetail.transcript ?? null,
           transcriptVariants: activeDetail.transcript_variants ?? {},
           videoAuthor: activeDetail.video.author ?? null,
-          videoPlatform: activeDetail.video.platform ?? null,
           videoTitle: activeDetail.video.title ?? null,
           onChangeTab: setActiveTab,
           onSaveNoteDraft: handleSaveNoteDraft,
@@ -510,7 +657,7 @@ export function useWorkbenchController() {
     activeDetail,
     confirmDialogProps: {
       confirmLabel:
-        pendingLibraryAction?.kind === "delete" ? "确认删除" : "确认清空",
+        pendingLibraryAction?.kind === "delete" ? "删除" : "清空",
       description: pendingLibraryActionDescription,
       errorMessage: libraryActionError,
       isBusy: isLibraryActionBusy,
@@ -520,6 +667,7 @@ export function useWorkbenchController() {
       onConfirm: handleConfirmLibraryAction
     },
     homeWorkspaceProps,
+    isHomeWorkspaceReady: areDemosReady && !isLibraryLoading,
     onHomeClick: handleGoHome,
     transcribeSettingsDialogProps: {
       asrEngine: pendingAsrEngine,
