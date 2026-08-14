@@ -12,6 +12,26 @@ const INITIAL_LIBRARY_LIMIT = 8;
 const LIBRARY_LIMIT_STEP = 8;
 const MAX_LIBRARY_LIMIT = 50;
 
+function getFilteredTotal(
+  stats: LibraryStatsResponse | null,
+  filter: LibraryFilter,
+  fallbackCount: number
+): number {
+  if (!stats) {
+    return fallbackCount;
+  }
+  if (filter === "ready") {
+    return stats.ready_count;
+  }
+  if (filter === "summarized") {
+    return stats.summarized_count;
+  }
+  if (filter === "noTranscript") {
+    return stats.needs_transcript_count;
+  }
+  return stats.total_items;
+}
+
 export type PendingLibraryAction =
   | { kind: "clear" }
   | { item: LibraryItem; kind: "delete" };
@@ -30,8 +50,10 @@ export function useLibraryWorkspace({
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [stats, setStats] = useState<LibraryStatsResponse | null>(null);
   const [filter, setFilter] = useState<LibraryFilter>("all");
+  const filterRef = useRef<LibraryFilter>("all");
   const [limit, setLimit] = useState(INITIAL_LIBRARY_LIMIT);
   const limitRef = useRef(INITIAL_LIBRARY_LIMIT);
+  const refreshRequestIdRef = useRef(0);
   const [copiedVideoId, setCopiedVideoId] = useState<string | null>(null);
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
@@ -43,6 +65,8 @@ export function useLibraryWorkspace({
 
   const refresh = useCallback(
     async (showRefreshState = false, requestedLimit = limitRef.current) => {
+      const requestId = refreshRequestIdRef.current + 1;
+      refreshRequestIdRef.current = requestId;
       if (showRefreshState) {
         setIsRefreshing(true);
         onError(null);
@@ -50,18 +74,22 @@ export function useLibraryWorkspace({
 
       try {
         const [listResponse, statsResponse] = await Promise.all([
-          apiClient.getRecentLibraryItems(requestedLimit),
+          apiClient.getRecentLibraryItems(requestedLimit, filterRef.current),
           apiClient.getLibraryStats()
         ]);
-        setItems(listResponse.items);
-        setStats(statsResponse);
+        if (requestId === refreshRequestIdRef.current) {
+          setItems(listResponse.items);
+          setStats(statsResponse);
+        }
       } catch {
         if (showRefreshState) {
           onError("最近解析刷新失败，请确认后端服务已启动。");
         }
       } finally {
-        setIsLoading(false);
-        if (showRefreshState) {
+        if (requestId === refreshRequestIdRef.current) {
+          setIsLoading(false);
+        }
+        if (showRefreshState && requestId === refreshRequestIdRef.current) {
           setIsRefreshing(false);
         }
       }
@@ -82,6 +110,18 @@ export function useLibraryWorkspace({
     setLimit(nextLimit);
     limitRef.current = nextLimit;
     void refresh(true, nextLimit);
+  };
+
+  const changeFilter = (nextFilter: LibraryFilter) => {
+    if (nextFilter === filterRef.current) {
+      return;
+    }
+
+    filterRef.current = nextFilter;
+    setFilter(nextFilter);
+    setLimit(INITIAL_LIBRARY_LIMIT);
+    limitRef.current = INITIAL_LIBRARY_LIMIT;
+    void refresh(true, INITIAL_LIBRARY_LIMIT);
   };
 
   const copySourceUrl = async (item: LibraryItem) => {
@@ -157,6 +197,8 @@ export function useLibraryWorkspace({
       setStats({
         ai_summary_count: 0,
         fallback_summary_count: 0,
+        needs_transcript_count: 0,
+        ready_count: 0,
         no_transcript_count: 0,
         success: true,
         summarized_count: 0,
@@ -164,6 +206,7 @@ export function useLibraryWorkspace({
         with_transcript_count: 0
       });
       setFilter("all");
+      filterRef.current = "all";
       setCopiedVideoId(null);
       setPendingAction(null);
       return { kind: "clear" };
@@ -188,11 +231,11 @@ export function useLibraryWorkspace({
     setCopiedVideoId(null);
   };
 
-  const totalItems = stats?.total_items ?? items.length;
+  const filteredTotal = getFilteredTotal(stats, filter, items.length);
 
   return {
     actionError,
-    canLoadMore: totalItems > items.length && limit < MAX_LIBRARY_LIMIT,
+    canLoadMore: filteredTotal > items.length && limit < MAX_LIBRARY_LIMIT,
     cancelPendingAction,
     confirmPendingAction,
     copiedVideoId,
@@ -210,7 +253,7 @@ export function useLibraryWorkspace({
     requestClear,
     requestDelete,
     resetInteractionState,
-    setFilter,
+    setFilter: changeFilter,
     stats
   };
 }

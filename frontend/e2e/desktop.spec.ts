@@ -209,6 +209,8 @@ async function installApiMocks(page: Page, libraryDelayMs = 0) {
       return json(route, {
         ai_summary_count: 1,
         fallback_summary_count: 0,
+        needs_transcript_count: 0,
+        ready_count: 0,
         no_transcript_count: 1,
         success: true,
         summarized_count: 1,

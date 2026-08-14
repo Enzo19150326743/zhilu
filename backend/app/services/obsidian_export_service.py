@@ -27,6 +27,12 @@ MEDIA_CONTENT_TYPE_LABELS = {
     "video": "视频",
     "podcast": "播客",
 }
+PLATFORM_LABELS = {
+    "douyin": "抖音",
+    "xiaoyuzhou": "小宇宙",
+    "bilibili": "B 站",
+    "xiaohongshu": "小红书",
+}
 DEFAULT_EXPORT_SUBDIR = "知录知识稿"
 
 
@@ -72,44 +78,36 @@ def build_obsidian_markdown(
 ) -> str:
     video = detail.video
     summary = detail.summary
+    # NOTE: 只有用户确认过的摘录进入文档；未确认的 AI 候选摘录一律不导出。
     confirmed_highlights = _deduplicate_highlights(
         detail.note_draft.highlights if detail.note_draft else []
     )
-    candidate_highlights = _collect_candidate_highlights(
-        confirmed_highlights,
-        summary.highlights or [],
-    )
     frontmatter = _build_frontmatter(detail)
+    # NOTE: 结构化分析本身由 ## 一级小节组成（核心问题、论证、案例等），
+    # 直接平级输出，不再包裹“内容结构”标题；为空时不输出任何内容。
+    content_structure = _format_content_structure(detail)
     sections = [
         frontmatter,
         f"# {video.title}",
         "## 一句话摘要",
         summary.tldr,
-        "## 内容结构",
-        _format_content_structure(detail),
+    ]
+    if content_structure:
+        sections.append(content_structure)
+    sections.extend([
         "## 核心观点",
         _format_markdown_list(summary.key_points),
-        "## 可靠原文摘录",
+        "## 原文摘录",
         _format_highlights(
             confirmed_highlights,
-            callout_title="用户确认摘录",
-            empty_text="- 暂无用户确认摘录。",
+            callout_title="原文金句",
+            empty_text="- 暂无原文金句。",
         ),
-        "## 通用应用线索",
+        "## 可应用场景",
         _format_application_clues(detail),
         "## 内容边界与待核实信息",
         _format_content_boundaries(detail, include_full_text),
-    ]
-    if candidate_highlights:
-        sections[sections.index("## 通用应用线索"):sections.index("## 通用应用线索")] = [
-            "## AI 候选摘录（未确认）",
-            "以下内容由 AI 从原文中提取，尚未经过用户确认。",
-            _format_highlights(
-                candidate_highlights,
-                callout_title="AI 候选摘录",
-                empty_text="",
-            ),
-        ]
+    ])
 
     return "\n\n".join(section.strip() for section in sections if section.strip()) + "\n"
 
@@ -120,14 +118,14 @@ def _build_frontmatter(detail: ParseResponse) -> str:
         "草稿版本": UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
         "标题": video.title,
         "内容类型": _infer_content_type(detail),
-        "平台": video.platform,
+        "平台": PLATFORM_LABELS.get(video.platform, video.platform),
         "原始作者": video.author,
         "源链接": detail.source_url,
         "处理日期": datetime.now(UTC).date().isoformat(),
         "内容关键词": _infer_content_keywords(detail),
     }
     if video.duration > 0:
-        values["时长（秒）"] = video.duration
+        values["时长"] = _format_duration(video.duration)
 
     lines = ["---"]
     for key, value in values.items():
@@ -142,6 +140,16 @@ def _build_frontmatter(detail: ParseResponse) -> str:
     return "\n".join(lines)
 
 
+def _format_duration(duration_seconds: int) -> str:
+    """秒数转 hh:mm:ss；不足一小时时输出 mm:ss。"""
+    hours, remainder = divmod(max(duration_seconds, 0), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    return f"{minutes:02d}:{seconds:02d}"
+
+
 def _format_markdown_list(items: list[str]) -> str:
     if not items:
         return "- 暂无"
@@ -150,8 +158,8 @@ def _format_markdown_list(items: list[str]) -> str:
 
 
 def _format_content_structure(detail: ParseResponse) -> str:
-    structured_analysis = detail.summary.structured_analysis_markdown.strip()
-    return structured_analysis or _format_markdown_list(detail.summary.key_points)
+    """返回结构化分析 markdown（核心问题、论证、案例、反例等）；为空时返回空串。"""
+    return (detail.summary.structured_analysis_markdown or "").strip()
 
 
 def _format_application_clues(detail: ParseResponse) -> str:
@@ -197,17 +205,31 @@ def _format_highlights(
 
     blocks = []
     for highlight in highlights:
-        reason = f"\n- 摘录说明：{highlight.reason}" if highlight.reason else ""
         blocks.append(
             "\n".join(
                 [
                     _format_quote_callout(highlight.text, callout_title),
-                    reason,
+                    _format_highlight_reason(highlight),
                 ]
-            )
+            ).strip()
         )
 
     return "\n\n".join(blocks)
+
+
+def _format_highlight_reason(highlight: SummaryHighlight) -> str:
+    """
+    摘录说明与应用场景分行输出；手动摘录不需要摘录说明。
+    """
+    if highlight.source == "manual" or not highlight.reason:
+        return ""
+
+    reason = highlight.reason.strip()
+    parts = re.split(r"\s*可用场景：\s*", reason, maxsplit=1)
+    lines = [f"- 摘录说明：{parts[0].strip()}"]
+    if len(parts) == 2 and parts[1].strip():
+        lines.append(f"- 应用场景：{parts[1].strip()}")
+    return "\n".join(lines)
 
 
 def _deduplicate_highlights(
@@ -222,25 +244,6 @@ def _deduplicate_highlights(
         seen_texts.add(normalized_text)
         deduplicated_highlights.append(highlight)
     return deduplicated_highlights
-
-
-def _collect_candidate_highlights(
-    confirmed_highlights: list[SummaryHighlight],
-    candidate_highlights: list[SummaryHighlight],
-) -> list[SummaryHighlight]:
-    confirmed_texts = {
-        _normalize_highlight_text(highlight.text)
-        for highlight in confirmed_highlights
-    }
-    candidates: list[SummaryHighlight] = []
-    seen_texts = set(confirmed_texts)
-    for highlight in candidate_highlights:
-        normalized_text = _normalize_highlight_text(highlight.text)
-        if not normalized_text or normalized_text in seen_texts:
-            continue
-        seen_texts.add(normalized_text)
-        candidates.append(highlight)
-    return candidates
 
 
 def _normalize_highlight_text(text: str) -> str:

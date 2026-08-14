@@ -243,6 +243,8 @@ export interface LibraryStatsResponse {
   summarized_count: number;
   ai_summary_count: number;
   fallback_summary_count: number;
+  ready_count: number;
+  needs_transcript_count: number;
 }
 
 export interface LibraryDeleteResponse {

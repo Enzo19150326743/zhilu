@@ -212,6 +212,14 @@ class XiaohongshuServiceTests(unittest.TestCase):
         self.assertEqual(media_url, "https://video.example/refreshed.mp4")
         self.assertIsNone(headers)
 
+    def test_transcription_resolver_keeps_douyin_share_url_for_browser_download(self) -> None:
+        source_url = "https://v.douyin.com/example/"
+
+        media_url, headers = main._resolve_transcription_source(source_url)
+
+        self.assertEqual(media_url, source_url)
+        self.assertIsNone(headers)
+
     def test_metadata_refresh_preserves_existing_generated_content(self) -> None:
         source_url = (
             "https://www.xiaohongshu.com/explore/"

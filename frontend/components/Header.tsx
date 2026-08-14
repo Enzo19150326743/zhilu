@@ -1,4 +1,4 @@
-import { Github, Sparkles } from "lucide-react";
+import { Github } from "lucide-react";
 
 interface HeaderProps {
   onHomeClick: () => void;
@@ -16,10 +16,10 @@ export function Header({ onHomeClick }: HeaderProps) {
           onClick={onHomeClick}
           title="返回首页"
         >
-          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white">
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
-            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />
-          </div>
+          <div
+            aria-hidden="true"
+            className="h-11 w-11 shrink-0 rounded-2xl bg-zinc-950"
+          />
           <div className="flex min-w-0 items-center gap-2">
             <div className="min-w-0">
               <p className="font-editorial truncate text-base font-semibold text-[var(--ink)]">

@@ -21,6 +21,42 @@ from app.services import library_service
 
 
 class LibraryServiceTests(unittest.TestCase):
+    def test_recent_items_filter_uses_full_library_before_limit(self) -> None:
+        """筛选必须先作用于完整内容库，再按当前页面数量截取。"""
+        with self._temporary_library():
+            summarized = _build_parse_response(
+                media_type="video",
+                text_source_type="subtitle",
+            )
+            summarized.video.video_id = "summarized_001"
+            summarized.video.url = "https://example.com/summarized"
+            summarized.source_url = summarized.video.url
+            library_service.upsert_library_item(summarized)
+            with library_service._connect() as connection:
+                connection.execute(
+                    "UPDATE library_items SET summary_status = 'ai_generated' WHERE video_id = ?",
+                    (summarized.video.video_id,),
+                )
+
+            needs_transcript = _build_parse_response(
+                media_type="podcast",
+                text_source_type="shownotes",
+            )
+            needs_transcript.video.video_id = "shownotes_001"
+            needs_transcript.video.url = "https://example.com/shownotes"
+            needs_transcript.source_url = needs_transcript.video.url
+            library_service.upsert_library_item(needs_transcript)
+
+            items = library_service.list_recent_library_items(
+                limit=1,
+                library_filter="summarized",
+            )
+            stats = library_service.get_library_stats()
+
+        self.assertEqual([item.video_id for item in items], ["summarized_001"])
+        self.assertEqual(stats.summarized_count, 1)
+        self.assertEqual(stats.needs_transcript_count, 1)
+
     def test_recent_items_include_media_metadata_from_payload(self) -> None:
         """
         最近解析列表需要透传媒体类型，让前端不再只依赖 platform 判断展示语境。

@@ -15,8 +15,7 @@ import type {
 import {
   formatLibraryUpdatedAt,
   getLibraryDisplayTitle,
-  getLibraryStatusLabel,
-  matchesLibraryFilter
+  getLibraryStatusLabel
 } from "@/lib/library-display";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import { isPodcastMedia } from "@/lib/media";
@@ -95,35 +94,28 @@ export function RecentLibrary({
   onOpenItem,
   onRefresh
 }: RecentLibraryProps) {
-  const visibleItems = items.filter((item) => matchesLibraryFilter(item, filter));
-  const isBusy =
-    loadingVideoId !== null ||
-    deletingVideoId !== null ||
-    isLoading ||
-    isRefreshing ||
-    isClearing;
-  const canUseActions = !disabled && !isBusy;
+  const visibleItems = items;
+  const isCollectionBusy = isLoading || isClearing;
+  const canUseCollectionActions = !disabled && !isCollectionBusy;
   const totalItems = stats?.total_items ?? items.length;
   const allFilterOptions: Array<{
     count: number;
     key: LibraryFilter;
     label: string;
   }> = [
-    { count: items.length, key: "all", label: "全部" },
+    { count: stats?.total_items ?? items.length, key: "all", label: "全部" },
     {
-      count: items.filter((item) => matchesLibraryFilter(item, "ready")).length,
+      count: stats?.ready_count ?? 0,
       key: "ready",
       label: "可总结"
     },
     {
-      count: items.filter((item) => matchesLibraryFilter(item, "summarized"))
-        .length,
+      count: stats?.summarized_count ?? 0,
       key: "summarized",
       label: "已总结"
     },
     {
-      count: items.filter((item) => matchesLibraryFilter(item, "noTranscript"))
-        .length,
+      count: stats?.needs_transcript_count ?? 0,
       key: "noTranscript",
       label: "需转写"
     }
@@ -141,7 +133,7 @@ export function RecentLibrary({
         <div className="flex items-center gap-2">
           {totalItems > 0 ? (
             <IconActionButton
-              disabled={!canUseActions}
+              disabled={!canUseCollectionActions || isRefreshing}
               icon={Trash2}
               label="清空全部档案"
               tone="danger"
@@ -149,7 +141,7 @@ export function RecentLibrary({
             />
           ) : null}
           <IconActionButton
-            disabled={!canUseActions}
+            disabled={!canUseCollectionActions}
             icon={RefreshCw}
             isSpinning={isRefreshing}
             label="刷新最近档案"
@@ -170,7 +162,7 @@ export function RecentLibrary({
                     ? "bg-[var(--ink)] font-semibold text-[var(--paper-raised)] shadow-[2px_2px_0_0_var(--accent)]"
                     : "bg-[var(--paper-raised)] text-[var(--ink-soft)] hover:bg-[var(--accent-soft)]"
                 }`}
-                disabled={!canUseActions}
+                disabled={!canUseCollectionActions || isRefreshing}
                 key={filterOption.key}
                 type="button"
                 onClick={() => onChangeFilter(filterOption.key)}
@@ -238,7 +230,7 @@ export function RecentLibrary({
               const isCopied = copiedVideoId === item.video_id;
               const isLoadingItem = loadingVideoId === item.video_id;
               const isDeleting = deletingVideoId === item.video_id;
-              const isDisabled = !canUseActions;
+              const isDisabled = disabled || isClearing || isLoadingItem || isDeleting;
 
               return (
                 <div
@@ -287,14 +279,14 @@ export function RecentLibrary({
                   </span>
                   <div className="flex w-[84px] items-center justify-end gap-2 opacity-75 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                     <IconActionButton
-                      disabled={!canUseActions}
+                      disabled={disabled || isClearing || isDeleting}
                       icon={isCopied ? Check : Copy}
                       label={isCopied ? "源链接已复制" : "复制源链接"}
                       onClick={() => onCopySourceUrl(item)}
                     />
                     <IconActionButton
                       ariaLabel={`删除《${getLibraryDisplayTitle(item.title)}》`}
-                      disabled={!canUseActions || isDeleting}
+                      disabled={disabled || isClearing || isDeleting}
                       icon={isDeleting ? Loader2 : Trash2}
                       isSpinning={isDeleting}
                       label="删除档案"
@@ -314,7 +306,7 @@ export function RecentLibrary({
         <div className="mt-5 flex justify-center">
           <button
             className="ink-block inline-flex min-h-10 items-center gap-2 bg-[var(--paper-raised)] px-4 text-sm font-medium text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!canUseActions}
+            disabled={!canUseCollectionActions || isRefreshing}
             type="button"
             onClick={onLoadMore}
           >

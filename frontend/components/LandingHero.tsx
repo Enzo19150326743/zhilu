@@ -1,4 +1,4 @@
-import { ArrowUpRight, Link2, Loader2, Search } from "lucide-react";
+import { ArrowUpRight, FileText, Link2, Loader2, Search } from "lucide-react";
 import SplitText from "@/components/SplitText";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import type { DemoItem } from "@/lib/types";
@@ -13,12 +13,6 @@ interface LandingHeroProps {
   onChangeUrl: (value: string) => void;
   onLoadDemo: (demoId: string) => void;
 }
-
-const recommendationFallbacks: Record<string, string> = {
-  ai_talk_001: "/demo-covers/ai-talk.svg",
-  product_course_001: "/demo-covers/product-course.svg",
-  tech_podcast_001: "/demo-covers/tech-podcast.svg"
-};
 
 interface RecommendationDeckProps {
   items: DemoItem[];
@@ -42,30 +36,33 @@ function RecommendationDeck({
       <div className="shadow-hard-md divide-y-2 divide-[var(--line-ink)] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)]">
         {items.slice(0, 3).map((item) => {
           const isLoading = loadingItemId === item.demo_id;
-          const fallbackThumbnail =
-            recommendationFallbacks[item.demo_id] ?? "/demo-covers/ai-talk.svg";
           const thumbnailUrl = getDisplayThumbnailUrl(item.thumbnail);
 
           return (
             <button
               className="group grid min-h-[82px] w-full grid-cols-[78px_minmax(0,1fr)_24px] items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-55"
-              disabled={loadingItemId !== null}
+              disabled={isLoading}
               key={item.demo_id}
               type="button"
               onClick={() => onOpenItem(item.demo_id)}
             >
               <span className="aspect-video overflow-hidden border-2 border-[var(--line-ink)] bg-[var(--ink)]">
-                <img
-                  alt=""
-                  aria-hidden="true"
-                  className="h-full w-full object-cover"
-                  referrerPolicy="no-referrer"
-                  src={thumbnailUrl || fallbackThumbnail}
-                  onError={(event) => {
-                    event.currentTarget.onerror = null;
-                    event.currentTarget.src = fallbackThumbnail;
-                  }}
-                />
+                {thumbnailUrl ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                    src={thumbnailUrl}
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-[var(--paper-raised)]">
+                    <FileText aria-hidden="true" className="h-5 w-5" />
+                  </span>
+                )}
               </span>
               <span className="min-w-0">
                 <span className="font-editorial line-clamp-1 text-sm font-semibold leading-6 text-[var(--ink)] transition-colors group-hover:text-[var(--accent)]">
@@ -115,25 +112,26 @@ export function LandingHero({
                 text="看见的，"
                 className="mr-[0.16em]"
                 delay={45}
-                duration={0.82}
+                duration={1.10}
                 ease="power3.out"
                 splitType="words"
-                from={{ opacity: 0, y: 36 }}
+                from={{ opacity: 0, y: 48 }}
                 to={{ opacity: 1, y: 0 }}
                 rootMargin="0px"
+		startDelay={0.10}
                 textAlign="left"
               />
               <SplitText
                 tag="span"
                 text="听见的，"
                 delay={45}
-                duration={0.82}
+                duration={1.00}
                 ease="power3.out"
                 splitType="words"
-                from={{ opacity: 0, y: 36 }}
+                from={{ opacity: 0, y: 48 }}
                 to={{ opacity: 1, y: 0 }}
                 rootMargin="0px"
-                startDelay={0.16}
+                startDelay={0.32}
                 textAlign="left"
               />
             </span>
@@ -143,13 +141,13 @@ export function LandingHero({
                   tag="span"
                   text="都变成你的知识。"
                   delay={45}
-                  duration={0.82}
+                  duration={1.10}
                   ease="power3.out"
                   splitType="words"
-                  from={{ opacity: 0, y: 36 }}
+                  from={{ opacity: 0, y: 48 }}
                   to={{ opacity: 1, y: 0 }}
                   rootMargin="0px"
-                  startDelay={0.32}
+                  startDelay={0.56}
                   textAlign="left"
                 />
               </span>
@@ -189,7 +187,7 @@ export function LandingHero({
                 ) : (
                   <Search className="h-4 w-4" aria-hidden="true" />
                 )}
-                {isParsing ? "提取中" : "生成知识稿"}
+                {isParsing ? "提取中" : "提取内容"}
               </button>
             </div>
 
@@ -198,6 +196,7 @@ export function LandingHero({
                 {errorMessage}
               </div>
             ) : null}
+
           </div>
         </div>
 

@@ -14,9 +14,9 @@ from app.services.obsidian_export_service import build_obsidian_markdown
 
 
 class ObsidianExportServiceTests(unittest.TestCase):
-    def test_confirmed_quotes_and_ai_candidates_are_exported_separately(self) -> None:
+    def test_confirmed_quotes_exported_and_ai_candidates_excluded(self) -> None:
         """
-        用户确认摘录优先作为正式摘录，AI 候选必须单独标记为未确认。
+        只有用户确认的摘录进入文档，未确认的 AI 候选摘录一律不导出。
         """
         ai_candidate_text = "这是一条 AI 提取的摘录。"
         confirmed_text = "这是一条用户确认加入草稿的摘录。"
@@ -43,16 +43,15 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail)
 
-        self.assertIn("## 可靠原文摘录", markdown)
-        self.assertIn("> [!quote] 用户确认摘录", markdown)
+        self.assertIn("## 原文摘录", markdown)
+        self.assertIn("> [!quote] 原文金句", markdown)
         self.assertIn(confirmed_text, markdown)
-        self.assertIn("## AI 候选摘录（未确认）", markdown)
-        self.assertIn("> [!quote] AI 候选摘录", markdown)
-        self.assertIn(ai_candidate_text, markdown)
+        self.assertNotIn(ai_candidate_text, markdown)
+        self.assertNotIn("## AI 候选摘录", markdown)
 
-    def test_ai_candidates_never_look_like_confirmed_quotes(self) -> None:
+    def test_ai_candidates_are_excluded_without_confirmation(self) -> None:
         """
-        没有摘录草稿时，AI 候选仍可展示，但不能伪装成用户确认摘录。
+        没有确认任何摘录时，AI 候选不进入导出文档。
         """
         ai_candidate_text = "这是一条尚未确认的 AI 候选。"
         detail = _build_parse_response(
@@ -68,10 +67,88 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail)
 
-        self.assertIn("暂无用户确认摘录", markdown)
-        self.assertIn("## AI 候选摘录（未确认）", markdown)
-        self.assertIn(ai_candidate_text, markdown)
-        self.assertNotIn("> [!quote] 用户确认摘录\n> “这是一条尚未确认", markdown)
+        self.assertIn("暂无原文金句", markdown)
+        self.assertNotIn(ai_candidate_text, markdown)
+        self.assertNotIn("## AI 候选摘录", markdown)
+
+    def test_ai_quote_reason_split_into_lines_and_manual_has_no_reason(self) -> None:
+        """
+        AI 确认摘录的说明与应用场景分行输出；手动摘录不输出摘录说明。
+        """
+        detail = _build_parse_response(
+            summary_highlights=[],
+            note_draft=NoteDraft(
+                highlights=[
+                    SummaryHighlight(
+                        id="ai-1",
+                        text="AI 金句内容。",
+                        reason="这句话很重要 可用场景：写作引用",
+                        source="ai",
+                    ),
+                    SummaryHighlight(
+                        id="manual-1",
+                        text="手动摘录内容。",
+                        source="manual",
+                    ),
+                ]
+            ),
+        )
+
+        markdown = build_obsidian_markdown(detail)
+
+        self.assertIn("- 摘录说明：这句话很重要", markdown)
+        self.assertIn("- 应用场景：写作引用", markdown)
+        self.assertIn("> “手动摘录内容。”", markdown)
+        self.assertNotIn("用户手动加入摘录草稿", markdown)
+
+    def test_content_structure_flat_and_hidden_when_empty(self) -> None:
+        """
+        结构化分析的 ## 小节平级输出，不包裹“内容结构”标题；为空时不输出。
+        """
+        detail = _build_parse_response(
+            summary_highlights=[],
+            note_draft=None,
+        )
+
+        markdown = build_obsidian_markdown(detail)
+
+        self.assertNotIn("## 内容结构", markdown)
+        self.assertIn("## 结构化总结", markdown)
+
+        empty_detail = _build_parse_response(
+            summary_highlights=[],
+            note_draft=None,
+        )
+        empty_detail.summary.structured_analysis_markdown = ""
+        empty_markdown = build_obsidian_markdown(empty_detail)
+
+        self.assertNotIn("## 结构化总结", empty_markdown)
+
+    def test_platform_labels_and_duration_format_in_frontmatter(self) -> None:
+        """
+        YAML 平台输出中文；时长输出 hh:mm:ss，不足一小时输出 mm:ss。
+        """
+        for platform, expected_label in [
+            ("douyin", "抖音"),
+            ("xiaoyuzhou", "小宇宙"),
+            ("bilibili", "B 站"),
+            ("xiaohongshu", "小红书"),
+            ("unknown_platform", "unknown_platform"),
+        ]:
+            detail = _build_parse_response(
+                summary_highlights=[],
+                note_draft=None,
+                platform=platform,
+            )
+            markdown = build_obsidian_markdown(detail)
+            self.assertIn(f'平台: "{expected_label}"', markdown)
+
+        long_detail = _build_parse_response(
+            summary_highlights=[],
+            note_draft=None,
+            duration=3661,
+        )
+        self.assertIn('时长: "01:01:01"', build_obsidian_markdown(long_detail))
 
     def test_export_uses_universal_knowledge_draft_contract(self) -> None:
         """
@@ -90,7 +167,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
         self.assertIn("处理日期:", markdown)
         self.assertIn("内容关键词:", markdown)
         self.assertIn('  - "示例"', markdown)
-        self.assertIn("时长（秒）: 120", markdown)
+        self.assertIn('时长: "02:00"', markdown)
         self.assertNotIn("tags:", markdown)
         self.assertNotIn("用途:", markdown)
         self.assertNotIn("主题:", markdown)
@@ -111,9 +188,9 @@ class ObsidianExportServiceTests(unittest.TestCase):
         markdown = build_obsidian_markdown(detail, include_full_text=True)
 
         self.assertIn("## 一句话摘要", markdown)
-        self.assertIn("## 内容结构", markdown)
+        self.assertNotIn("## 内容结构", markdown)
         self.assertIn("## 核心观点", markdown)
-        self.assertIn("## 通用应用线索", markdown)
+        self.assertIn("## 可应用场景", markdown)
         self.assertIn("## 内容边界与待核实信息", markdown)
         self.assertIn("ASR 可能存在识别误差", markdown)
         self.assertNotIn("## 压缩时间轴", markdown)
@@ -125,16 +202,18 @@ class ObsidianExportServiceTests(unittest.TestCase):
 def _build_parse_response(
     summary_highlights: list[SummaryHighlight],
     note_draft: NoteDraft | None,
+    platform: str = "example",
+    duration: int = 120,
 ) -> ParseResponse:
     return ParseResponse(
         source_url="https://example.com/video",
         video=VideoInfo(
             video_id="video_001",
-            platform="example",
+            platform=platform,
             url="https://example.com/video",
             title="示例内容",
             author="示例作者",
-            duration=120,
+            duration=duration,
             thumbnail="",
             has_transcript=True,
             media_type="video",

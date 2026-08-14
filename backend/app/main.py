@@ -4,7 +4,7 @@ import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from dotenv import load_dotenv
@@ -29,7 +29,6 @@ from app.schemas import (
     CorrectionTermLibraryResponse,
     CorrectionTermMutationResponse,
     CorrectionTermRenameRequest,
-    DemoDetailResponse,
     DemoItem,
     DemoListResponse,
     DownloadRequest,
@@ -75,6 +74,7 @@ from app.services.correction_term_service import (
     rename_term,
 )
 from app.services.douyin_service import (
+    create_douyin_transcription_downloader,
     download_douyin_video,
     is_douyin_url,
 )
@@ -612,7 +612,7 @@ def get_demo_cover(demo_id: str) -> Response:
     return proxy_public_image(url=cover_url)
 
 
-@app.get("/api/demo/{demo_id}", response_model=DemoDetailResponse)
+@app.get("/api/demo/{demo_id}", response_model=ParseResponse)
 def get_demo_detail(demo_id: str) -> dict[str, Any]:
     """
     返回推荐内容的精简公开数据。
@@ -628,27 +628,28 @@ def get_demo_detail(demo_id: str) -> dict[str, Any]:
             },
         )
 
-    video = dict(demo["video"])
+    response = dict(demo)
+    video = dict(response["video"])
     video["thumbnail"] = f"/api/demo/{demo_id}/cover"
+    response["video"] = video
+    response["thumbnail"] = f"/api/demo/{demo_id}/cover"
 
-    return {
-        "success": True,
-        "video": video,
-        "formats": demo["formats"],
-        "transcript": demo["transcript"],
-        "summary": demo["summary"],
-        "mindmap_markdown": demo["mindmap_markdown"],
-    }
+    return response
 
 
 @app.get("/api/library/recent", response_model=LibraryListResponse)
 def list_recent_library(
     limit: int = Query(default=8, ge=1, le=50),
+    filter: Literal["all", "ready", "summarized", "noTranscript"] = Query(
+        default="all"
+    ),
 ) -> LibraryListResponse:
     """
     返回最近解析过的媒体记录。
     """
-    return LibraryListResponse(items=list_recent_library_items(limit=limit))
+    return LibraryListResponse(
+        items=list_recent_library_items(limit=limit, library_filter=filter)
+    )
 
 
 @app.get("/api/library/stats", response_model=LibraryStatsResponse)
@@ -988,6 +989,7 @@ def transcribe_video(
     """
     video_url = normalize_public_video_url(transcribe_request.url)
     transcribe_context = _get_transcribe_prompt_context(video_url)
+    is_douyin_source = is_douyin_url(video_url)
     transcribe_source_url, transcribe_http_headers = _resolve_transcription_source(
         video_url
     )
@@ -996,6 +998,9 @@ def transcribe_video(
         video_url=transcribe_source_url,
         video_id=transcribe_request.video_id,
         http_headers=transcribe_http_headers,
+        audio_downloader_factory=(
+            create_douyin_transcription_downloader if is_douyin_source else None
+        ),
         response_source_url=video_url,
         media_title=transcribe_context.get("title"),
         media_author=transcribe_context.get("author"),
@@ -1066,6 +1071,10 @@ def _resolve_transcription_source(
     if is_bilibili_url(source_url):
         bilibili_source = resolve_bilibili_transcription_source(source_url)
         return bilibili_source.audio_url, bilibili_source.http_headers
+
+    if is_douyin_url(source_url):
+        # 抖音媒体流必须在解析详情的匿名 Edge 上下文中获取，不能把短时直链交给 yt-dlp。
+        return source_url, None
 
     hostname = urlparse(source_url).hostname or ""
     if (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDemoLibrary } from "@/hooks/use-demo-library";
 import { useLibraryProcessingWorkflows } from "@/hooks/use-library-processing-workflows";
 import { useLibraryWorkspace } from "@/hooks/use-library-workspace";
 import { useSummaryWorkflow } from "@/hooks/use-summary-workflow";
@@ -8,8 +9,6 @@ import { useTranscribeWorkflow } from "@/hooks/use-transcribe-workflow";
 import { apiClient } from "@/lib/api";
 import { LIBRARY_PROCESSING_TIMEOUT_MS } from "@/lib/library-processing";
 import { getMediaType, getTextSourceType } from "@/lib/media";
-import { getDisplayThumbnailUrl } from "@/lib/media-image";
-import { mockDemoDetails, mockDemos } from "@/lib/mock-data";
 import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
 import {
   getSummaryMetaFromDetail,
@@ -19,7 +18,6 @@ import {
 import type {
   AppStatus,
   DemoDetail,
-  DemoItem,
   LibraryItem,
   NoteDraft,
   ParseTask,
@@ -30,31 +28,6 @@ import type {
 type TabKey = "summary" | "mindmap" | "qa" | "transcript";
 
 const RESTORED_WORKFLOW_POLL_INTERVAL_MS = 5000;
-const DEMO_COVER_PRELOAD_TIMEOUT_MS = 5000;
-
-function preloadDemoCover(thumbnail: string): Promise<void> {
-  return new Promise((resolve) => {
-    const image = new Image();
-    let hasSettled = false;
-    const settle = () => {
-      if (hasSettled) {
-        return;
-      }
-      hasSettled = true;
-      window.clearTimeout(timeoutId);
-      resolve();
-    };
-    const timeoutId = window.setTimeout(
-      settle,
-      DEMO_COVER_PRELOAD_TIMEOUT_MS
-    );
-
-    image.onload = settle;
-    image.onerror = settle;
-    image.src = getDisplayThumbnailUrl(thumbnail);
-  });
-}
-
 function hasPersistedSummary(detail: ParseResponse): boolean {
   return Boolean(
     detail.video.has_transcript &&
@@ -65,8 +38,7 @@ function hasPersistedSummary(detail: ParseResponse): boolean {
 }
 
 export function useWorkbenchController() {
-  const [demos, setDemos] = useState<DemoItem[]>([]);
-  const [areDemosReady, setAreDemosReady] = useState(false);
+  const { demos, isReady: areDemosReady } = useDemoLibrary();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const {
     beginProcessingWorkflow,
@@ -116,34 +88,6 @@ export function useWorkbenchController() {
   const inputUrlRef = useRef("");
   const isControllerMountedRef = useRef(true);
   const restoredRecoveryVideoIdsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    void (async () => {
-      let nextDemos = mockDemos;
-      try {
-        const response = await apiClient.getDemos();
-        nextDemos = response.demos;
-      } catch {
-        nextDemos = mockDemos;
-      }
-
-      await Promise.all(
-        nextDemos.slice(0, 3).map((demo) => preloadDemoCover(demo.thumbnail))
-      );
-      if (isCancelled) {
-        return;
-      }
-
-      setDemos(nextDemos);
-      setAreDemosReady(true);
-    })();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
 
   const activeDetail =
     detail && (status === "parsed" || status === "loading") ? detail : null;
@@ -446,14 +390,19 @@ export function useWorkbenchController() {
     try {
       const response = await apiClient.getDemoDetail(demoId);
       setDetail(response);
-    } catch {
-      setDetail(mockDemoDetails[demoId] ?? mockDemoDetails.ai_talk_001);
+    } catch (error) {
+      setStatus(detail ? "parsed" : "error");
+      setErrorMessage(
+        error instanceof Error ? error.message : "展示内容打开失败，请稍后重试。"
+      );
+      return;
     } finally {
-      setStatus("parsed");
-      setActiveTab("summary");
       setLoadingDemoId(null);
-      window.scrollTo({ behavior: "auto", left: 0, top: 0 });
     }
+
+    setStatus("parsed");
+    setActiveTab("summary");
+    window.scrollTo({ behavior: "auto", left: 0, top: 0 });
   };
 
   const handleGoHome = () => {

@@ -70,6 +70,7 @@ DEFAULT_SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS = 2
 TRANSCRIBE_AUDIO_TEMPLATE = "transcribe-audio.%(ext)s"
 TEMP_SUFFIXES = {".part", ".ytdl", ".tmp", ".temp"}
 AudioDownloader = Callable[[str], Path]
+AudioDownloaderFactory = Callable[[Path], AudioDownloader]
 AudioTranscriber = Callable[[Path], TranscriptPayload]
 
 
@@ -127,6 +128,7 @@ def transcribe_media_audio(
     video_id: str | None = None,
     http_headers: dict[str, str] | None = None,
     audio_downloader: AudioDownloader | None = None,
+    audio_downloader_factory: AudioDownloaderFactory | None = None,
     transcriber: AudioTranscriber | None = None,
     response_source_url: str | None = None,
     media_title: str | None = None,
@@ -160,7 +162,9 @@ def transcribe_media_audio(
     with tempfile.TemporaryDirectory(prefix="zhilu-asr-") as temporary_directory:
         temporary_path = Path(temporary_directory)
         active_downloader = audio_downloader or (
-            lambda url: _download_audio_for_transcription(
+            audio_downloader_factory(temporary_path)
+            if audio_downloader_factory is not None
+            else lambda url: _download_audio_for_transcription(
                 url,
                 temporary_path,
                 http_headers=http_headers,

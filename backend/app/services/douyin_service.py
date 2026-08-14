@@ -1,9 +1,13 @@
 import http.client
+import json
 import logging
 import os
 import re
+import shutil
 import ssl
+import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -28,7 +32,12 @@ DOUYIN_TIMEOUT_SECONDS = 15
 DOUYIN_MAX_REDIRECTS = 5
 DOUYIN_PAGE_MAX_BYTES = 8 * 1024 * 1024
 DOUYIN_DOWNLOAD_MAX_BYTES = 1024 * 1024 * 1024
+DOUYIN_BROWSER_TIMEOUT_SECONDS = 30
+DOUYIN_BROWSER_DOWNLOAD_TIMEOUT_SECONDS = 10 * 60
 DOWNLOAD_TEMP_SUFFIX = ".part"
+DOUYIN_BROWSER_SCRIPT = (
+    Path(__file__).resolve().parents[3] / "scripts" / "extract-douyin-media.mjs"
+)
 MOBILE_USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 "
@@ -96,7 +105,7 @@ def download_douyin_video(source_url: str) -> DownloadResponse:
     temporary_path = target_path.with_suffix(f"{target_path.suffix}{DOWNLOAD_TEMP_SUFFIX}")
 
     try:
-        DouyinPublicClient().download(media.video_url, temporary_path)
+        DouyinPublicClient().download_browser_media(source_url, temporary_path)
         temporary_path.replace(target_path)
     except OSError as error:
         logger.warning("douyin download failed: %s", error.__class__.__name__)
@@ -114,10 +123,52 @@ def download_douyin_video(source_url: str) -> DownloadResponse:
     )
 
 
+def create_douyin_transcription_downloader(
+    output_dir: Path,
+) -> Callable[[str], Path]:
+    """创建在 ASR 临时目录内保存抖音媒体文件的下载器。"""
+    target_path = output_dir / "douyin-transcribe.mp4"
+
+    def download(source_url: str) -> Path:
+        try:
+            DouyinPublicClient().download_browser_media(source_url, target_path)
+        except OSError as error:
+            logger.warning(
+                "douyin browser audio download failed: %s",
+                error.__class__.__name__,
+            )
+            raise _douyin_error(
+                "DOUYIN_AUDIO_DOWNLOAD_FAILED",
+                "音频下载失败：平台没有返回可用于转写的媒体流，请稍后重试或更换公开视频链接。",
+            ) from error
+        return target_path
+
+    return download
+
+
 def _extract_douyin_video(source_url: str) -> DouyinMediaInfo:
     client = DouyinPublicClient()
     try:
         resolved_url = client.resolve(source_url)
+        try:
+            browser_item = client.read_browser_item(resolved_url)
+        except OSError as error:
+            browser_item = None
+            logger.warning(
+                "douyin browser primary parser failed: %s",
+                error.__class__.__name__,
+            )
+
+        browser_video_id = _get_douyin_item_id(browser_item)
+        if browser_item is not None and browser_video_id is not None:
+            return _build_douyin_media_info(
+                browser_item,
+                video_id=browser_video_id,
+                source_url=source_url,
+                resolved_url=resolved_url,
+            )
+
+        # 仅兼容少数仍在静态页面中内嵌旧数据的历史链接；正常解析不依赖此分支。
         video_id = extract_video_id(resolved_url)
         page_url = _choose_page_url(resolved_url, video_id)
         page_text = client.read_text(page_url, mobile=True)
@@ -148,19 +199,12 @@ def _extract_douyin_video(source_url: str) -> DouyinMediaInfo:
                 "DOUYIN_PAGE_PARSE_FAILED",
                 "抖音页面解析失败，请稍后重试或换一个公开视频链接。",
             )
-
-        try:
-            return build_media_info(
-                item,
-                video_id=video_id,
-                source_url=source_url,
-                resolved_url=resolved_url,
-            )
-        except ValueError as error:
-            raise _douyin_error(
-                "DOUYIN_VIDEO_URL_NOT_FOUND",
-                "未找到抖音视频直链。",
-            ) from error
+        return _build_douyin_media_info(
+            item,
+            video_id=video_id,
+            source_url=source_url,
+            resolved_url=resolved_url,
+        )
     except HTTPException:
         raise
     except OSError as error:
@@ -245,6 +289,70 @@ class DouyinPublicClient:
 
         raise OSError("douyin file redirected too many times")
 
+    def read_browser_item(self, source_url: str) -> dict[str, object] | None:
+        """通过临时匿名浏览器读取抖音当前公开详情接口的响应。"""
+        node_executable = shutil.which("node") or shutil.which("node.exe")
+        if not node_executable:
+            raise OSError("node executable not found")
+        if not DOUYIN_BROWSER_SCRIPT.exists():
+            raise OSError("douyin browser helper not found")
+
+        try:
+            result = subprocess.run(
+                [node_executable, str(DOUYIN_BROWSER_SCRIPT), source_url],
+                capture_output=True,
+                check=False,
+                encoding="utf-8",
+                errors="replace",
+                timeout=DOUYIN_BROWSER_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise OSError("douyin browser fallback request failed") from error
+
+        if result.returncode != 0:
+            raise OSError("douyin browser fallback returned an error")
+        if len(result.stdout.encode("utf-8")) > DOUYIN_PAGE_MAX_BYTES:
+            raise OSError("douyin browser fallback payload is too large")
+
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise OSError("douyin browser fallback returned invalid JSON") from error
+
+        return payload if isinstance(payload, dict) else None
+
+    def download_browser_media(self, source_url: str, target_path: Path) -> None:
+        """在匿名 Edge 会话中取得媒体流，避免脱离页面上下文后被平台拒绝。"""
+        node_executable = shutil.which("node") or shutil.which("node.exe")
+        if not node_executable:
+            raise OSError("node executable not found")
+        if not DOUYIN_BROWSER_SCRIPT.exists():
+            raise OSError("douyin browser helper not found")
+
+        try:
+            result = subprocess.run(
+                [
+                    node_executable,
+                    str(DOUYIN_BROWSER_SCRIPT),
+                    "--download-media",
+                    str(target_path),
+                    source_url,
+                ],
+                capture_output=True,
+                check=False,
+                encoding="utf-8",
+                errors="replace",
+                timeout=DOUYIN_BROWSER_DOWNLOAD_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise OSError("douyin browser media request failed") from error
+
+        if result.returncode != 0 or not target_path.is_file():
+            raise OSError("douyin browser media request returned an error")
+        if target_path.stat().st_size > DOUYIN_DOWNLOAD_MAX_BYTES:
+            target_path.unlink(missing_ok=True)
+            raise OSError("douyin browser media file is too large")
+
     def _request(
         self,
         source_url: str,
@@ -278,6 +386,36 @@ def _choose_page_url(resolved_url: str, video_id: str | None) -> str:
     if video_id:
         return f"https://www.iesdouyin.com/share/video/{video_id}/"
     return resolved_url
+
+
+def _get_douyin_item_id(item: dict[str, object] | None) -> str | None:
+    if item is None:
+        return None
+
+    candidate = item.get("aweme_id") or item.get("awemeId") or item.get("id")
+    candidate_text = str(candidate or "")
+    return candidate_text if candidate_text.isdigit() else None
+
+
+def _build_douyin_media_info(
+    item: dict[str, object],
+    *,
+    video_id: str,
+    source_url: str,
+    resolved_url: str,
+) -> DouyinMediaInfo:
+    try:
+        return build_media_info(
+            item,
+            video_id=video_id,
+            source_url=source_url,
+            resolved_url=resolved_url,
+        )
+    except ValueError as error:
+        raise _douyin_error(
+            "DOUYIN_VIDEO_URL_NOT_FOUND",
+            "未找到抖音视频直链。",
+        ) from error
 
 
 def _validated_url(source_url: str):

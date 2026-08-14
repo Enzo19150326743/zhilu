@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from app.schemas import (
     LibraryItem,
@@ -26,6 +26,7 @@ DATABASE_PATH = Path(__file__).resolve().parents[2] / "data" / "local_library.sq
 DEFAULT_LIBRARY_LIMIT = 8
 MAX_LIBRARY_LIMIT = 50
 BILIBILI_BVID_PATTERN = re.compile(r"(BV[a-zA-Z0-9]+)")
+LibraryFilter = Literal["all", "ready", "summarized", "noTranscript"]
 
 
 def upsert_library_item(parse_response: ParseResponse) -> None:
@@ -117,6 +118,8 @@ def update_summary_for_source_url(
             if summarize_response.mindmap_meta
             else None
         )
+        # NOTE: 保留降级原因，便于事后排查偶发失败，不写入前端展示字段。
+        payload["summary_fallback_reason"] = summarize_response.fallback_reason
         summary_status = (
             "ai_generated" if summarize_response.is_ai_generated else "local_fallback"
         )
@@ -314,15 +317,51 @@ def _build_transcript_update_mindmap_placeholder(video: dict[str, Any]) -> str:
     )
 
 
-def list_recent_library_items(limit: int = DEFAULT_LIBRARY_LIMIT) -> list[LibraryItem]:
+def list_recent_library_items(
+    limit: int = DEFAULT_LIBRARY_LIMIT,
+    library_filter: LibraryFilter = "all",
+) -> list[LibraryItem]:
     """
     返回最近更新的本地解析记录。
     """
     normalized_limit = max(1, min(limit, MAX_LIBRARY_LIMIT))
+    filter_clauses = {
+        "all": "1 = 1",
+        "ready": """
+            has_transcript = 1
+            AND COALESCE(
+                CASE WHEN json_valid(payload_json)
+                    THEN json_extract(payload_json, '$.video.text_source_type')
+                END,
+                ''
+            ) != 'shownotes'
+            AND summary_status NOT IN ('ai_generated', 'local_fallback')
+        """,
+        "summarized": """
+            has_transcript = 1
+            AND COALESCE(
+                CASE WHEN json_valid(payload_json)
+                    THEN json_extract(payload_json, '$.video.text_source_type')
+                END,
+                ''
+            ) != 'shownotes'
+            AND summary_status IN ('ai_generated', 'local_fallback')
+        """,
+        "noTranscript": """
+            has_transcript = 0
+            OR COALESCE(
+                CASE WHEN json_valid(payload_json)
+                    THEN json_extract(payload_json, '$.video.text_source_type')
+                END,
+                ''
+            ) = 'shownotes'
+        """,
+    }
+    filter_clause = filter_clauses[library_filter]
     with _connect() as connection:
         _ensure_schema(connection)
         rows = connection.execute(
-            """
+            f"""
             SELECT video_id,
                    source_url,
                    title,
@@ -336,6 +375,7 @@ def list_recent_library_items(limit: int = DEFAULT_LIBRARY_LIMIT) -> list[Librar
                    payload_json,
                    updated_at
             FROM library_items
+            WHERE {filter_clause}
             ORDER BY updated_at DESC
             LIMIT ?
             """,
@@ -358,12 +398,36 @@ def get_library_stats() -> LibraryStatsResponse:
                        AS with_transcript_count,
                    SUM(CASE WHEN has_transcript = 0 THEN 1 ELSE 0 END)
                        AS no_transcript_count,
-                   SUM(CASE WHEN summary_status IN ('ai_generated', 'local_fallback')
+                   SUM(CASE WHEN has_transcript = 1
+                       AND COALESCE(
+                           CASE WHEN json_valid(payload_json)
+                               THEN json_extract(payload_json, '$.video.text_source_type')
+                           END,
+                           ''
+                       ) != 'shownotes'
+                       AND summary_status IN ('ai_generated', 'local_fallback')
                        THEN 1 ELSE 0 END) AS summarized_count,
                    SUM(CASE WHEN summary_status = 'ai_generated' THEN 1 ELSE 0 END)
                        AS ai_summary_count,
                    SUM(CASE WHEN summary_status = 'local_fallback' THEN 1 ELSE 0 END)
-                       AS fallback_summary_count
+                       AS fallback_summary_count,
+                   SUM(CASE WHEN has_transcript = 1
+                       AND COALESCE(
+                           CASE WHEN json_valid(payload_json)
+                               THEN json_extract(payload_json, '$.video.text_source_type')
+                           END,
+                           ''
+                       ) != 'shownotes'
+                       AND summary_status NOT IN ('ai_generated', 'local_fallback')
+                       THEN 1 ELSE 0 END) AS ready_count,
+                   SUM(CASE WHEN has_transcript = 0
+                       OR COALESCE(
+                           CASE WHEN json_valid(payload_json)
+                               THEN json_extract(payload_json, '$.video.text_source_type')
+                           END,
+                           ''
+                       ) = 'shownotes'
+                       THEN 1 ELSE 0 END) AS needs_transcript_count
             FROM library_items
             """
         ).fetchone()
@@ -375,6 +439,8 @@ def get_library_stats() -> LibraryStatsResponse:
         summarized_count=_row_int(row, "summarized_count"),
         ai_summary_count=_row_int(row, "ai_summary_count"),
         fallback_summary_count=_row_int(row, "fallback_summary_count"),
+        ready_count=_row_int(row, "ready_count"),
+        needs_transcript_count=_row_int(row, "needs_transcript_count"),
     )
 
 

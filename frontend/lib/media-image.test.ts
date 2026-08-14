@@ -4,8 +4,8 @@ import { getDisplayThumbnailUrl } from "./media-image";
 
 test("本地封面路径保持不变", () => {
   assert.equal(
-    getDisplayThumbnailUrl(" /demo-covers/fallback.svg ", "http://localhost:8000"),
-    "/demo-covers/fallback.svg"
+    getDisplayThumbnailUrl(" /images/fallback.svg ", "http://localhost:8000"),
+    "/images/fallback.svg"
   );
 });
 

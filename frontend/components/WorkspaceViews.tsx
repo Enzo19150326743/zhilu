@@ -36,11 +36,25 @@ export function WorkbenchWorkspace({
   detail,
   urlInputProps
 }: WorkbenchWorkspaceProps) {
+  const isTranscriptWorkspace = aiTabsProps.activeTab === "transcript";
+
   return (
     <>
       <UrlInput {...urlInputProps} />
-      <section className="mx-auto grid min-w-0 max-w-[90rem] grid-cols-[minmax(0,1fr)] gap-8 px-4 pb-14 pt-6 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:px-10">
-        <aside className="contents lg:sticky lg:top-[6.25rem] lg:block lg:self-start">
+      <section
+        className={`mx-auto grid min-w-0 max-w-[90rem] grid-cols-[minmax(0,1fr)] gap-8 px-4 pb-14 pt-6 sm:px-6 lg:px-10 ${
+          isTranscriptWorkspace
+            ? ""
+            : "lg:grid-cols-[300px_minmax(0,1fr)]"
+        }`}
+      >
+        <aside
+          className={
+            isTranscriptWorkspace
+              ? "hidden"
+              : "contents lg:sticky lg:top-[6.25rem] lg:block lg:self-start"
+          }
+        >
           <VideoPreviewCard video={detail.video} />
           {isParseResponse(detail) ? (
             <div className="order-3 lg:mt-5">

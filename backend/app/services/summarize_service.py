@@ -5,6 +5,8 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+import json_repair
+
 from app.schemas import (
     MindmapMeta,
     SummaryHighlight,
@@ -33,6 +35,26 @@ DEFAULT_DEEPSEEK_THINKING_TYPE = "disabled"
 DEFAULT_DEEPSEEK_TIMEOUT_SECONDS = 180
 UNIVERSAL_KNOWLEDGE_DRAFT_VERSION = "1.0"
 AiRequester = Callable[[SummarizeRequest], str]
+
+_DEEPSEEK_SYSTEM_PROMPT = (
+    "你是一个严谨的媒体内容分析助手，负责把单个媒体来源整理成通用知识草稿。"
+    "只根据用户提供的当前媒体元数据和内容文本总结，不要编造文本中没有的信息。"
+    "外部作者观点只能表述为当前内容的观点，不得推断任何用户的价值观、风格、目标或认同。"
+    "不得输出固定知识库页面、个人双链、个人选题或其他个人化判断。"
+    "不要输出时间轴、时间点、开始时间或结束时间；当前转写片段时间不够可靠。"
+    "必须返回合法 JSON，不要输出 JSON 之外的解释。"
+    "所有字符串内部换行必须写成 \\n，字段之间必须使用英文逗号分隔。"
+)
+
+
+class AiSummaryRepairNeededError(Exception):
+    """AI 输出内容无法解析为 JSON，需要携带错误上下文请求模型重新输出。"""
+
+    def __init__(self, *, content: str, detail: str) -> None:
+        super().__init__(detail)
+        self.content = content
+        self.detail = detail
+
 MEDIA_TYPE_LABELS = {
     "podcast": "播客单集",
     "video": "视频",
@@ -92,32 +114,92 @@ def summarize_transcript(
         return _simplify_summary_response(
             _build_ai_summary_response(normalized_request, content)
         )
+    except AiSummaryRepairNeededError as format_error:
+        # NOTE: 模型偶发输出非法 JSON 时先自愈重试一次，避免用户直接看到降级。
+        return _repair_malformed_ai_summary(
+            normalized_request,
+            original_content=format_error.content,
+            error_detail=format_error.detail,
+        )
     except DeepSeekOutputTruncatedError:
         # NOTE: 不完整的 AI 输出不能伪装成一次成功的本地摘要。
         raise
     except (DeepSeekClientError, TimeoutError, OSError, ValueError, KeyError) as error:
-        config = _get_deepseek_config_snapshot()
-        formatted_error = _format_deepseek_error(error)
-        logger.warning(
-            (
-                "AI summary fallback: error=%s detail=%s model=%s "
-                "base_url=%s max_tokens=%s thinking_type=%s"
-            ),
-            error.__class__.__name__,
-            formatted_error,
-            config["model"],
-            config["base_url"],
-            config["max_tokens"],
-            config["thinking_type"],
+        return _fallback_to_local_summary(normalized_request, error)
+
+
+def _repair_malformed_ai_summary(
+    summarize_request: SummarizeRequest,
+    *,
+    original_content: str,
+    error_detail: str,
+) -> SummarizeResponse:
+    """
+    携带损坏内容与解析错误重新请求模型输出完整 JSON，仍失败才降级基础摘要。
+
+    NOTE: 自愈请求单独计费一次；只有在模型输出格式损坏时才会发生，属罕见路径。
+    """
+    try:
+        repaired_content = _request_deepseek_summary_repair(
+            summarize_request,
+            original_content=original_content,
+            error_detail=error_detail,
         )
-        fallback_reason = f"{error.__class__.__name__}: {formatted_error}"
         return _simplify_summary_response(
-            _build_local_summary(
-                normalized_request,
-                model=ai_settings.model,
-                fallback_reason=fallback_reason,
-            )
+            _build_ai_summary_response(summarize_request, repaired_content)
         )
+    except AiSummaryRepairNeededError as repair_error:
+        logger.warning(
+            "AI summary self-repair failed: detail=%s model=%s",
+            repair_error.detail,
+            load_ai_settings().model,
+        )
+        return _fallback_to_local_summary(
+            summarize_request,
+            fallback_reason=f"JSONDecodeError (self-repair failed): {repair_error.detail}",
+        )
+    except DeepSeekOutputTruncatedError:
+        raise
+    except (DeepSeekClientError, TimeoutError, OSError, ValueError, KeyError) as error:
+        return _fallback_to_local_summary(
+            summarize_request,
+            fallback_reason=(
+                f"JSONDecodeError (self-repair request failed): "
+                f"{error.__class__.__name__}: {_format_deepseek_error(error)}"
+            ),
+        )
+
+
+def _fallback_to_local_summary(
+    summarize_request: SummarizeRequest,
+    error: Exception | None = None,
+    *,
+    fallback_reason: str | None = None,
+) -> SummarizeResponse:
+    config = _get_deepseek_config_snapshot()
+    if error is not None:
+        fallback_reason = (
+            f"{error.__class__.__name__}: {_format_deepseek_error(error)}"
+        )
+    resolved_reason = fallback_reason or "unknown error"
+    logger.warning(
+        (
+            "AI summary fallback: detail=%s model=%s "
+            "base_url=%s max_tokens=%s thinking_type=%s"
+        ),
+        resolved_reason,
+        config["model"],
+        config["base_url"],
+        config["max_tokens"],
+        config["thinking_type"],
+    )
+    return _simplify_summary_response(
+        _build_local_summary(
+            summarize_request,
+            model=load_ai_settings().model,
+            fallback_reason=resolved_reason,
+        )
+    )
 
 
 def _normalize_summarize_request(
@@ -159,15 +241,7 @@ def _request_deepseek_summary(summarize_request: SummarizeRequest) -> str:
         "messages": [
             {
                 "role": "system",
-                "content": (
-                    "你是一个严谨的媒体内容分析助手，负责把单个媒体来源整理成通用知识草稿。"
-                    "只根据用户提供的当前媒体元数据和内容文本总结，不要编造文本中没有的信息。"
-                    "外部作者观点只能表述为当前内容的观点，不得推断任何用户的价值观、风格、目标或认同。"
-                    "不得输出固定知识库页面、个人双链、个人选题或其他个人化判断。"
-                    "不要输出时间轴、时间点、开始时间或结束时间；当前转写片段时间不够可靠。"
-                    "必须返回合法 JSON，不要输出 JSON 之外的解释。"
-                    "所有字符串内部换行必须写成 \\n，字段之间必须使用英文逗号分隔。"
-                ),
+                "content": _DEEPSEEK_SYSTEM_PROMPT,
             },
             {
                 "role": "user",
@@ -188,6 +262,75 @@ def _request_deepseek_summary(summarize_request: SummarizeRequest) -> str:
     else:
         payload["temperature"] = 0.2
 
+    return _post_deepseek_payload(ai_settings, payload)
+
+
+def _request_deepseek_summary_repair(
+    summarize_request: SummarizeRequest,
+    *,
+    original_content: str,
+    error_detail: str,
+) -> str:
+    """
+    模型输出 JSON 损坏时，携带错误详情重新请求完整 JSON。
+
+    NOTE: 自愈请求的 max_tokens 至少取 8192，避免修复请求自身再次被截断。
+    """
+    ai_settings = load_ai_settings()
+    max_tokens = max(_get_deepseek_max_tokens(), 8192)
+    thinking_type = (
+        os.getenv("AI_THINKING_TYPE", "").strip()
+        or os.getenv("DEEPSEEK_THINKING_TYPE", "").strip()
+        or DEFAULT_DEEPSEEK_THINKING_TYPE
+    )
+    repair_instruction = (
+        "你上一次输出的 JSON 无法解析，解析错误如下：\n"
+        f"{error_detail}\n\n"
+        "你上一次输出的内容开头为（完整内容参见前一条消息）：\n"
+        f"{original_content[:1500]}\n\n"
+        "请严格按照最初要求的所有字段和类型，重新输出一份完整的合法 JSON。"
+        "不要输出 JSON 之外的任何文字。"
+        "所有字符串内部的换行必须写成 \\n，"
+        "字段之间必须使用英文逗号分隔，不能有尾随逗号。"
+    )
+    payload = {
+        "model": ai_settings.model,
+        "messages": [
+            {
+                "role": "system",
+                "content": _DEEPSEEK_SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": _build_deepseek_prompt(summarize_request),
+            },
+            {
+                "role": "user",
+                "content": repair_instruction,
+            },
+        ],
+        "max_tokens": max_tokens,
+        "response_format": {"type": "json_object"},
+        "stream": False,
+    }
+    if ai_settings.supports_deepseek_thinking:
+        payload["thinking"] = {"type": thinking_type}
+    if ai_settings.supports_deepseek_thinking and thinking_type == "enabled":
+        payload["reasoning_effort"] = (
+            os.getenv("AI_REASONING_EFFORT", "").strip()
+            or os.getenv("DEEPSEEK_REASONING_EFFORT", "high").strip()
+        )
+    else:
+        payload["temperature"] = 0.2
+
+    return _post_deepseek_payload(ai_settings, payload)
+
+
+def _post_deepseek_payload(
+    ai_settings: Any,
+    payload: dict[str, Any],
+) -> str:
+    """发送请求并提取模型输出文本；传输与截断错误与主请求路径一致。"""
     response_payload = post_deepseek_chat_completion(
         api_key=ai_settings.api_key,
         base_url=ai_settings.base_url,
@@ -469,7 +612,15 @@ def _extract_json_text(content: str) -> str:
 
 
 def _parse_summary_payload(content: str) -> dict[str, Any]:
-    json_text = _extract_json_text(content)
+    try:
+        json_text = _extract_json_text(content)
+    except ValueError as extract_error:
+        # NOTE: 输出连 JSON 对象结构都没有时同样交给自愈重试路径。
+        raise AiSummaryRepairNeededError(
+            content=content,
+            detail=str(extract_error),
+        ) from extract_error
+
     try:
         return json.loads(json_text)
     except json.JSONDecodeError as original_error:
@@ -482,7 +633,19 @@ def _parse_summary_payload(content: str) -> dict[str, Any]:
             except json.JSONDecodeError:
                 pass
 
-        raise original_error
+        try:
+            repaired_payload = json_repair.loads(json_text)
+        except Exception:
+            repaired_payload = None
+        if isinstance(repaired_payload, dict):
+            logger.info("repaired malformed summary JSON with json_repair")
+            return repaired_payload
+
+        # NOTE: 本地解析全部失败后，交给自愈重试路径，避免用户直接看到降级。
+        raise AiSummaryRepairNeededError(
+            content=content,
+            detail=f"{original_error.__class__.__name__}: {original_error}",
+        ) from original_error
 
 
 def _repair_common_json_text(json_text: str) -> str:

@@ -1,165 +1,732 @@
 {
   "demos": [
     {
-      "demo_id": "ai_talk_001",
-      "title": "从 LLM 到 Agent Skill：打通底层逻辑",
-      "description": "马克的技术工作坊 · B 站",
-      "thumbnail": "http://i0.hdslb.com/bfs/archive/fbafd1a0092b225c0b3adbbb28f931ea9eac5cf6.jpg",
+      "demo_id": "douyin_7672734312621444404",
+      "title": "孤独是人生的底色，相遇只是偶然的奖赏。 孤独是人生的底色，相遇只是偶然的奖赏。把视角反转：人生本就是一条黑带子，每一个白格子——父母相伴、朋友同行、爱人携手——都是对你的奖励，不是理所当然。\n很多人一辈子痛苦，是因为把所有人都当成自己故事的NPC：你明明可以帮我一把，为什么不帮？可那些东西从来就不属于你。得之我幸，失之我命。\n真正好的感情，不是让你离不开对方，而是让你在离开任何人以后，依然接得住自己。爱的最高境界不是依赖，是「我明明可以独自生活，却还是认真选择你」。\n#人生哲学  #情感  #缘分  #独立人格 #水球泡",
+      "description": "水球泡 · 抖音",
+      "thumbnail": "https://p26-sign.douyinpic.com/tos-cn-i-dy/8d60bcaa597e4d0eb2cf02574088820c~tplv-dy-resize-walign-adapt-aq:540:q75.webp?lk3s=138a59ce&x-expires=1787731200&x-signature=2LAQyOwhzRoCpHruGZq9t6b3YeM%3D&from=327834062&s=PackSourceEnum_DOUYIN_REFLOW&se=false&sc=cover&biz_tag=aweme_video&l=20260812161656C46F1AF3D83E46C01C75",
+      "success": true,
       "video": {
-        "video_id": "featured_BV1E7wtzaEdq",
-        "platform": "bilibili",
-        "url": "https://www.bilibili.com/video/BV1E7wtzaEdq",
-        "title": "从 LLM 到 Agent Skill，一期视频带你打通底层逻辑！",
+        "video_id": "douyin_7672734312621444404",
+        "platform": "douyin",
+        "url": "https://www.douyin.com/video/7672734312621444404?previous_page=app_code_link",
+        "title": "孤独是人生的底色，相遇只是偶然的奖赏。 孤独是人生的底色，相遇只是偶然的奖赏。把视角反转：人生本就是一条黑带子，每一个白格子——父母相伴、朋友同行、爱人携手——都是对你的奖励，不是理所当然。\n很多人一辈子痛苦，是因为把所有人都当成自己故事的NPC：你明明可以帮我一把，为什么不帮？可那些东西从来就不属于你。得之我幸，失之我命。\n真正好的感情，不是让你离不开对方，而是让你在离开任何人以后，依然接得住自己。爱的最高境界不是依赖，是「我明明可以独自生活，却还是认真选择你」。\n#人生哲学  #情感  #缘分  #独立人格 #水球泡",
+        "author": "水球泡",
+        "duration": 1794,
+        "thumbnail": "https://p26-sign.douyinpic.com/tos-cn-i-dy/8d60bcaa597e4d0eb2cf02574088820c~tplv-dy-resize-walign-adapt-aq:540:q75.webp?lk3s=138a59ce&x-expires=1787731200&x-signature=2LAQyOwhzRoCpHruGZq9t6b3YeM%3D&from=327834062&s=PackSourceEnum_DOUYIN_REFLOW&se=false&sc=cover&biz_tag=aweme_video&l=20260812161656C46F1AF3D83E46C01C75",
+        "has_transcript": true,
+        "media_type": "video",
+        "text_source_type": "curated_excerpt"
+      },
+      "formats": [
+        {
+          "format_id": "douyin_nowatermark",
+          "ext": "mp4",
+          "resolution": "1920p",
+          "vcodec": "unknown",
+          "acodec": "unknown",
+          "filesize": null,
+          "label": "1920p MP4 · 无水印直链"
+        }
+      ],
+      "format_diagnostics": null,
+      "transcript": {
+        "segments": [
+          {
+            "start": 0.03,
+            "end": 5.91,
+            "text": "来拍拍手说一下我们今天要聊的第一个我觉得比较重要的一个主题。那，你们可以把它理解为叫爱情观。",
+            "speaker": null
+          },
+          {
+            "start": 6.09,
+            "end": 10.17,
+            "text": "会很多频道里边同学在说在谈恋爱是吧？今天是恋爱主题还是什么？",
+            "speaker": null
+          },
+          {
+            "start": 10.17,
+            "end": 16.35,
+            "text": "不是的，这个其实在跟你们聊一个非常重要的这个主题叫做关系主题。",
+            "speaker": null
+          },
+          {
+            "start": 16.71,
+            "end": 26.25,
+            "text": "我们说的是人生中会有三大课题嘛，见天地，见众生，见自己，其中见众生和见自己，这两个部分其实都是跟关系相关。",
+            "speaker": null
+          },
+          {
+            "start": 26.79,
+            "end": 34.3,
+            "text": "众生呢就是众生和你的关系。这里边。你们比较常见的是来自于爱情的这个关系，因为它是一对一对应的。",
+            "speaker": null
+          },
+          {
+            "start": 34.54,
+            "end": 44.26,
+            "text": "当然有有些比较厉害同学可能一对多的对应在那替外话。缘分这个词中国人说了几千年，但绝大多数人不知道缘和份其实是两回事。",
+            "speaker": null
+          },
+          {
+            "start": 44.56,
+            "end": 49.84,
+            "text": "它是一个极其东方的概念。英语中的翻译多用fate destiny或者coincidence。",
+            "speaker": null
+          },
+          {
+            "start": 49.96,
+            "end": 59.98,
+            "text": "这类表达命运，宿命巧合的词来代替，但缘分的寓意深厚，巧合这个词太轻，宿命这个词又太重，无法完整承载我们对缘分的定义。",
+            "speaker": null
+          },
+          {
+            "start": 60.41,
+            "end": 65.75,
+            "text": "缘是两个人相遇的条件，时间、地点、场合全部对上，这叫有缘。",
+            "speaker": null
+          },
+          {
+            "start": 66.05,
+            "end": 70.97,
+            "text": "而份是这段关系持续多久，只有走下去，走到底才叫有份。",
+            "speaker": null
+          },
+          {
+            "start": 71.27,
+            "end": 79.43,
+            "text": "其实份的意思，我们天天都在用本分是你该做的那一份，福分是你命里有的那一份，缘分是你和这个人被分到的那一份连接。",
+            "speaker": null
+          },
+          {
+            "start": 79.85,
+            "end": 89.69,
+            "text": "有缘无份是精确的形容。指的是一段关系被分到了一份相遇，但没有被分到走下去的份额，不是不够好，不是不努力，是缘的额度只有这么多。",
+            "speaker": null
+          },
+          {
+            "start": 90.05,
+            "end": 94.07,
+            "text": "很多我们耳熟能详的故事里都展示了古人对缘分的理解。",
+            "speaker": null
+          },
+          {
+            "start": 94.31,
+            "end": 106.25,
+            "text": "白素贞修炼1700年观音菩萨说，只是你尘缘未了，又如何能白日飞升，弟子此心一定重念阶级，任何尘缘。",
+            "speaker": null
+          },
+          {
+            "start": 937.74,
+            "end": 945.76,
+            "text": "从此成了你心的软肋。 真正的依赖，不是我没有你就活不了，而是我本来什么都能扛，却愿意把一句，我需要你说给你听。",
+            "speaker": null
+          },
+          {
+            "start": 945.82,
+            "end": 952.96,
+            "text": "争到最后才发现独立和依赖从来不是感情里的两个极端，真正需要警惕的，是把依赖变成衣服，把独立活成梳理。",
+            "speaker": null
+          },
+          {
+            "start": 953.08,
+            "end": 958.3,
+            "text": "接这个视频来说，也是刚才我们就是感情也好，就是我们说这个独立人格也好。",
+            "speaker": null
+          },
+          {
+            "start": 958.3,
+            "end": 964.0,
+            "text": "我现在教你们的方法呢，其实并不一定是。 你们两个人都能相处的比较好的方法。",
+            "speaker": null
+          },
+          {
+            "start": 964.12,
+            "end": 968.92,
+            "text": "换句话说呢，如果你是男孩，你听到这个方法是让你如何不让女孩伤害你。",
+            "speaker": null
+          },
+          {
+            "start": 968.98,
+            "end": 973.72,
+            "text": "如果你是女孩，也是如何不让男孩去去操纵你，都是这样的。",
+            "speaker": null
+          },
+          {
+            "start": 973.85,
+            "end": 980.03,
+            "text": "那他并不一定会让你们两个人，比如两个一对男女朋友都听我这视频，那估计废了。",
+            "speaker": null
+          },
+          {
+            "start": 980.15,
+            "end": 988.49,
+            "text": "但是有一方面来听，我是教你如何保护自己。 就是把自己的思想讲成讲成独立，还是那句话得知我幸，失之我命。",
+            "speaker": null
+          },
+          {
+            "start": 988.79,
+            "end": 993.77,
+            "text": "如果我真的这么爱他了，他还不爱我，这个其实无所谓的，真的是这样，就是。",
+            "speaker": null
+          },
+          {
+            "start": 993.83,
+            "end": 1007.81,
+            "text": "你的付出是来自于你的主体，你能你能赚到，你能得到他的回馈，那是因为也没有什么因为，是因为你够好，或者说有这个有那是他的选择，他不选择你，那就不选择了，但你一定不能丧失自己的主体权。",
+            "speaker": null
+          },
+          {
+            "start": 1007.97,
+            "end": 1012.77,
+            "text": "就你自己是可以活下去的，你自己可以作为自己的独立人格，你是能面对这个世界的。",
+            "speaker": null
+          },
+          {
+            "start": 1012.83,
+            "end": 1018.29,
+            "text": "因为孤独是这个世界的底色，你永远要去练习一种跟自己独处的方式。",
+            "speaker": null
+          },
+          {
+            "start": 1018.47,
+            "end": 1027.47,
+            "text": "这个世界父母。 朋友这个二子女都不可能永远佩待你，只有你自己和你自己相处，这是你必须需要练就的基本能力。",
+            "speaker": null
+          },
+          {
+            "start": 1027.53,
+            "end": 1035.15,
+            "text": "而这个世界在不断的进化，各种工具啊，各种文化啊，各种思想啊，都在帮你去处理这件事情，以前可能很难。",
+            "speaker": null
+          },
+          {
+            "start": 1783.84,
+            "end": 1793.56,
+            "text": "或者说所有的喜怒哀乐，所有的相遇，以及分别超越了我的本体感受而构成了真实的我。",
+            "speaker": null
+          }
+        ],
+        "plain_text": "来拍拍手说一下我们今天要聊的第一个我觉得比较重要的一个主题。那，你们可以把它理解为叫爱情观。会很多频道里边同学在说在谈恋爱是吧？今天是恋爱主题还是什么？不是的，这个其实在跟你们聊一个非常重要的这个主题叫做关系主题。我们说的是人生中会有三大课题嘛，见天地，见众生，见自己，其中见众生和见自己，这两个部分其实都是跟关系相关。众生呢就是众生和你的关系。这里边。你们比较常见的是来自于爱情的这个关系，因为它是一对一对应的。当然有有些比较厉害同学可能一对多的对应在那替外话。缘分这个词中国人说了几千年，但绝大多数人不知道缘和份其实是两回事。它是一个极其东方的概念。英语中的翻译多用fate destiny或者coincidence。这类表达命运，宿命巧合的词来代替，但缘分的寓意深厚，巧合这个词太轻，宿命这个词又太重，无法完整承载我们对缘分的定义。缘是两个人相遇的条件，时间、地点、场合全部对上，这叫有缘。而份是这段关系持续多久，只有走下去，走到底才叫有份。其实份的意思，我们天天都在用本分是你该做的那一份，福分是你命里有的那一份，缘分是你和这个人被分到的那一份连接。有缘无份是精确的形容。指的是一段关系被分到了一份相遇，但没有被分到走下去的份额，不是不够好，不是不努力，是缘的额度只有这么多。很多我们耳熟能详的故事里都展示了古人对缘分的理解。白素贞修炼1700年观音菩萨说，只是你尘缘未了，又如何能白日飞升，弟子此心一定重念阶级，任何尘缘。\n\n……（中间内容已省略）……\n\n从此成了你心的软肋。 真正的依赖，不是我没有你就活不了，而是我本来什么都能扛，却愿意把一句，我需要你说给你听。争到最后才发现独立和依赖从来不是感情里的两个极端，真正需要警惕的，是把依赖变成衣服，把独立活成梳理。接这个视频来说，也是刚才我们就是感情也好，就是我们说这个独立人格也好。我现在教你们的方法呢，其实并不一定是。 你们两个人都能相处的比较好的方法。换句话说呢，如果你是男孩，你听到这个方法是让你如何不让女孩伤害你。如果你是女孩，也是如何不让男孩去去操纵你，都是这样的。那他并不一定会让你们两个人，比如两个一对男女朋友都听我这视频，那估计废了。但是有一方面来听，我是教你如何保护自己。 就是把自己的思想讲成讲成独立，还是那句话得知我幸，失之我命。如果我真的这么爱他了，他还不爱我，这个其实无所谓的，真的是这样，就是。你的付出是来自于你的主体，你能你能赚到，你能得到他的回馈，那是因为也没有什么因为，是因为你够好，或者说有这个有那是他的选择，他不选择你，那就不选择了，但你一定不能丧失自己的主体权。就你自己是可以活下去的，你自己可以作为自己的独立人格，你是能面对这个世界的。因为孤独是这个世界的底色，你永远要去练习一种跟自己独处的方式。这个世界父母。 朋友这个二子女都不可能永远佩待你，只有你自己和你自己相处，这是你必须需要练就的基本能力。而这个世界在不断的进化，各种工具啊，各种文化啊，各种思想啊，都在帮你去处理这件事情，以前可能很难。\n\n……（中间内容已省略）……\n\n或者说所有的喜怒哀乐，所有的相遇，以及分别超越了我的本体感受而构成了真实的我。"
+      },
+      "transcript_variants": {},
+      "active_transcript_variant": null,
+      "summary": {
+        "draft_version": "1.0",
+        "content_type": "视频",
+        "topics": [
+          "人生哲学",
+          "情感关系",
+          "缘分",
+          "独立人格",
+          "孤独与相遇"
+        ],
+        "tldr": "人生底色是孤独，相遇只是偶然的奖赏；应转换视角，将关系视为奖励而非理所当然，培养独立人格，接受别离常态，从而获得内心平和。",
+        "key_points": [
+          "缘分是东方概念，缘是相遇条件，份是相处时间，有缘无份指只有相遇份额而无持续份额。",
+          "人生底色是孤独，相遇是白色格子般的奖赏，而非黑色格子般的惩罚，视角转换能减少痛苦。",
+          "许多人将他人视为自己故事的NPC，认为他人理应帮助自己，这种思维导致持续痛苦。",
+          "真正好的感情是彼此独立，离开对方后仍能接住自己，爱的最高境界是“我明明可以独自生活，却还是认真选择你”。",
+          "依赖与独立并非对立，好的感情中双方既能独立又能相互依赖，警惕把依赖变成依附，把独立活成梳理。",
+          "所有关系都有生命周期，无常是规律，抗拒变化才是痛苦根源，应坦然接受相遇与别离。",
+          "心外无物，内心稳定是根本，通过练习与自己独处，把亲密关系视为奖励，才能活得绚烂。",
+          "特修斯之船思想实验说明，构成自我的不是实体，而是经历和旅程，所有相遇和分别塑造了真实自我。"
+        ],
+        "timeline": [],
+        "structured_analysis_markdown": "## 核心问题\n如何理解人生中的孤独与相遇？如何建立健康的关系观，减少痛苦，获得内心平和？\n\n## 论证与方法\n1. **缘分解析**：缘是相遇条件，份是相处时间，有缘无份是常态，如白素贞故事所示，缘分额度有限，超额支出导致痛苦。\n2. **视角转换**：将人生视为黑色带子（孤独底色），白色格子（相遇）是奖励，而非相反。这种转换能让人自洽，减少爱别离之苦。\n3. **主体性批判**：许多人把他人当作自己故事的NPC，认为他人理应帮助自己，这种思维导致怨恨和痛苦。应认识到他人给予是奖励，不给是常态。\n4. **独立与依赖的辩证**：好的感情让人彼此独立，离开后仍能接住自己；同时，健康依赖是愿意分享脆弱，但警惕依附和控制。\n5. **无常与接纳**：关系有生命周期，无常是规律，抗拒变化消耗自己。应如庄子所言“相濡以沫，不如相忘于江湖”，坦然接受阶段性同行。\n6. **内心修炼**：心外无物，守住内心稳定，不因外界变化而动摇。通过练习独处，把关系视为奖励，活出绚烂人生。\n\n## 案例与依据\n- 白素贞故事：报恩超额支出缘分，导致水漫金山，说明缘分额度有限。\n- 两个女孩要求免费上课：将他人帮助视为理所当然，未满足便歇斯底里，体现主体性错位。\n- 中外合办大学学生恨父母：认为父母应支持昂贵学费，未得到便怨恨，反映“他人应为我付出”的思维。\n- 辩论赛观点：好的感情更让人彼此独立，爱是自由意志的苏醒，而非沉沦。\n- 特修斯之船：自我由经历和旅程构成，而非实体，所有相遇分别塑造真实自我。\n\n## 适用条件\n- 适用于感到关系痛苦、害怕失去、依赖他人认可的人群。\n- 适用于希望建立独立人格、减少情绪波动的人。\n- 视角转换需要长期练习，非一蹴而就。\n\n## 反例或争议\n- 过度强调独立可能导致疏离，需平衡依赖与独立。\n- 视角转换可能被误解为冷漠或消极，实际是积极接纳。\n- 文中案例可能极端，日常关系更复杂，需灵活应用。\n\n## 结论与行动线索\n- 接受孤独底色，把相遇当奖励，减少期待痛苦。\n- 培养独立能力，不依附他人，同时允许健康依赖。\n- 练习内心稳定，坦然面对关系变化。\n- 反思自己是否将他人工具化，调整主体性认知。",
+        "takeaways": [
+          "可用于自我反思，检查是否将他人帮助视为理所当然，调整期待。",
+          "在情感关系中，练习独立与依赖的平衡，避免依附或疏离。",
+          "面对离别时，用“奖励”视角缓解痛苦，接受关系阶段性。",
+          "作为哲学思考素材，探讨自我构成与关系本质。",
+          "用于心理调适，减少因他人行为产生的怨恨和无力感。"
+        ],
+        "highlights": [
+          {
+            "id": "ai-001",
+            "text": "缘是两个人相遇的条件，时间、地点、场合全部对上，这叫有缘。而份是这段关系持续多久，只有走下去，走到底才叫有份。",
+            "start": null,
+            "end": null,
+            "reason": "清晰定义了缘分的东方概念，区分缘与份，有助于理解关系本质。 可用场景：可用于解释关系中的相遇与持续，帮助人们接受有缘无份的常态。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-002",
+            "text": "人生本就是孤独的，人本来就是孤独的。我一直就是自己一个人只不过在每一个阶段，在我小时候有父母相伴，在我初中的时候，高中的时候有学有同学和老师相伴，在我岁数大了以后，有爱人相伴，在我老的时候可能有子女相伴。每一个相伴的白色的块是对你的奖励。",
+            "start": null,
+            "end": null,
+            "reason": "生动比喻人生底色与相遇的关系，提供视角转换的具体方法。 可用场景：可用于自我安慰或辅导他人，将孤独视为常态，相遇视为惊喜。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-004",
+            "text": "爱一个人的最高境界，不是让他越来越离不开你，是你给了他独自站立的能力，他却依然愿意走向你。",
+            "start": null,
+            "end": null,
+            "reason": "点明爱的最高境界是成全独立，而非制造依赖。 可用场景：可用于反思亲密关系中的控制欲，倡导相互成就。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-005",
+            "text": "人生本就是一场不断相遇，不断告别的过程。遇见时认真相处，离开时坦然接受，不强留，不攀附，不预设结果，也不逃避变化。",
+            "start": null,
+            "end": null,
+            "reason": "总结关系无常的应对态度，提供行动指南。 可用场景：可用于面对离别时的自我疏导，培养坦然心态。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-006",
+            "text": "心外无物。真正的意思，不是世界不存在，而是一个人最大的战场，永远都在自己的内心。",
+            "start": null,
+            "end": null,
+            "reason": "引用王阳明心学，强调内心稳定的重要性。 可用场景：可用于哲学讨论或心理建设，提醒向内求索。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          }
+        ],
+        "content_keywords": [
+          "孤独",
+          "相遇",
+          "缘分",
+          "独立人格",
+          "关系观",
+          "视角转换",
+          "无常",
+          "心外无物"
+        ],
+        "application_clues": [
+          "可用于自我反思，检查是否将他人帮助视为理所当然，调整期待。",
+          "在情感关系中，练习独立与依赖的平衡，避免依附或疏离。",
+          "面对离别时，用“奖励”视角缓解痛苦，接受关系阶段性。",
+          "作为哲学思考素材，探讨自我构成与关系本质。",
+          "用于心理调适，减少因他人行为产生的怨恨和无力感。"
+        ],
+        "content_boundaries": [
+          "文本为AI转写稿，可能存在识别误差，专有名词或表述需谨慎引用。",
+          "案例细节（如两个女孩事件）可能因转写不完整，具体情境需结合原视频核实。",
+          "辩论赛内容为引用，非作者原创观点，但作为论证依据。",
+          "特修斯之船解读为作者个人感悟，非标准哲学结论。",
+          "当前内容基于 AI 转写稿，可能存在识别、专有名词或断句误差。",
+          "重要原文摘录和事实信息需要结合原媒体复核。"
+        ],
+        "reason_for_saving": null,
+        "personal_relevance": [],
+        "transformation_ideas": [],
+        "search_keywords": [
+          "孤独",
+          "相遇",
+          "缘分",
+          "独立人格",
+          "关系观",
+          "视角转换",
+          "无常",
+          "心外无物"
+        ],
+        "related_wikilinks": [],
+        "to_confirm": []
+      },
+      "mindmap_markdown": "# 孤独底色与相遇奖赏\n## 缘分本质\n### 缘是相遇条件\n### 份是相处时间\n### 有缘无份是常态\n#### 白素贞故事：额度超支\n## 视角转换\n### 人生是黑色带子\n### 白色格子是奖励\n### 别离是回归常态\n#### 减少痛苦，自洽生活\n## 主体性批判\n### 他人非NPC\n### 给予是奖励，不给非惩罚\n#### 案例：女孩要求免费课\n#### 案例：学生恨父母不付学费\n### 避免歇斯底里，保持优雅\n## 健康感情观\n### 独立与依赖辩证\n#### 独立：离开后接住自己\n#### 依赖：愿意分享脆弱\n### 爱的最高境界：选择而非依附\n#### 辩论：好的感情让人独立\n## 无常与接纳\n### 关系有生命周期\n### 抗拒变化消耗自己\n#### 庄子：相忘于江湖\n### 来时认真，走时坦然\n## 内心修炼\n### 心外无物，守住内心\n### 练习独处能力\n### 关系视为奖励，活得绚烂\n## 自我构成\n### 特修斯之船：旅程即自我\n### 经历塑造真实自我\n### 相遇分别皆有意义",
+      "mindmap_meta": {
+        "layout": "tree",
+        "content_category": "self_growth",
+        "template_id": "self_growth_tree",
+        "media_type": "video",
+        "text_source_type": "asr_transcript"
+      },
+      "note_draft": {
+        "highlights": [],
+        "updated_at": "2026-08-14T09:37:53+00:00"
+      },
+      "transcription_source_url": "https://aweme.snssdk.com/aweme/v1/play/?video_id=v0d00fg10000d9tgb5vog65pmgk1okcg&ratio=720p&line=0",
+      "source_url": "https://v.douyin.com/ZIXBL8FMtcs/",
+      "is_placeholder": false,
+      "is_from_cache": false,
+      "library_summary_status": "ai_generated",
+      "library_summary_model": "deepseek-v4-pro"
+    },
+    {
+      "demo_id": "douyin_7617124416941608230",
+      "title": "一期视频带你打通 AI 底层逻辑！",
+      "description": "马克的技术工作坊 · 抖音",
+      "thumbnail": "https://p3-pc-sign.douyinpic.com/image-cut-tos-priv/c30e07be24058bb583e8134b0bda38c6~tplv-dy-resize-origshort-autoq-75:330.jpeg?lk3s=138a59ce&x-expires=2102058000&x-signature=%2F6rPyhS5zLPDi8wZW%2B8W6Yjopro%3D&from=327834062&s=PackSourceEnum_AWEME_DETAIL&se=false&sc=cover&biz_tag=pcweb_cover&l=20260814170624B17C60494CF17BFE4AF6",
+      "success": true,
+      "video": {
+        "video_id": "douyin_7617124416941608230",
+        "platform": "douyin",
+        "url": "https://www.douyin.com/video/7617124416941608230?previous_page=web_code_link",
+        "title": "一期视频带你打通 AI 底层逻辑！",
         "author": "马克的技术工作坊",
         "duration": 1951,
-        "thumbnail": "http://i0.hdslb.com/bfs/archive/fbafd1a0092b225c0b3adbbb28f931ea9eac5cf6.jpg",
+        "thumbnail": "https://p3-pc-sign.douyinpic.com/image-cut-tos-priv/c30e07be24058bb583e8134b0bda38c6~tplv-dy-resize-origshort-autoq-75:330.jpeg?lk3s=138a59ce&x-expires=2102058000&x-signature=%2F6rPyhS5zLPDi8wZW%2B8W6Yjopro%3D&from=327834062&s=PackSourceEnum_AWEME_DETAIL&se=false&sc=cover&biz_tag=pcweb_cover&l=20260814170624B17C60494CF17BFE4AF6",
         "has_transcript": true,
         "media_type": "video",
         "text_source_type": "curated_excerpt"
       },
-      "formats": [],
+      "formats": [
+        {
+          "format_id": "douyin_nowatermark",
+          "ext": "mp4",
+          "resolution": "2160p",
+          "vcodec": "unknown",
+          "acodec": "unknown",
+          "filesize": null,
+          "label": "2160p MP4 · 无水印直链"
+        }
+      ],
+      "format_diagnostics": null,
       "transcript": {
         "segments": [
           {
-            "start": 1147,
-            "end": 1164,
-            "text": "Tool 的本质，是给大模型提供一套可以调用的外部能力，让它能够感知和影响外部环境。"
+            "start": 0.03,
+            "end": 8.13,
+            "text": "AI圈子里每天都在冒新名词，LM、token、context、prompt、RAG、skill，这些词你可能都听说过。",
+            "speaker": null
           },
           {
-            "start": 1740,
-            "end": 1763,
-            "text": "Agent Skill 本质上是一份给 Agent 看的说明文档，用来规定做事的步骤和规则。"
+            "start": 8.13,
+            "end": 12.75,
+            "text": "但是我问大家，你真的能准确地说出其中每一个概念的确切含义吗？",
+            "speaker": null
+          },
+          {
+            "start": 13.29,
+            "end": 21.63,
+            "text": "这期视频我们不整那些虚头巴脑的商业概念，我们就从最底层的工程视角出发，一个一个地把这些概念拆开、揉碎，讲清楚。",
+            "speaker": null
+          },
+          {
+            "start": 21.87,
+            "end": 29.43,
+            "text": "看完这期视频，相信你对AI的理解绝对会上升一个台阶。我们先从最底层的东西开始，一层一层地往上搭。",
+            "speaker": null
+          },
+          {
+            "start": 29.61,
+            "end": 34.42,
+            "text": "最底层的就是LM。",
+            "speaker": null
+          },
+          {
+            "start": 34.69,
+            "end": 40.87,
+            "text": "LLM全称是Large Language Model，翻译成中文就是大语言模型，简称大模型。",
+            "speaker": null
+          },
+          {
+            "start": 41.29,
+            "end": 45.55,
+            "text": "基本上现在所有的大模型都是基于Transformer这套架构训练出来的。",
+            "speaker": null
+          },
+          {
+            "start": 45.85,
+            "end": 50.83,
+            "text": "这个架构看起来很复杂，不过不用担心，这张图你现在看不懂是完全正常的。",
+            "speaker": null
+          },
+          {
+            "start": 51.13,
+            "end": 60.97,
+            "text": "我们今天呢也不打算研究它，你只需要知道大模型的底层引擎就是它。Transformer架构最早其实是由Google团队在2017年的时候提出来的。",
+            "speaker": null
+          },
+          {
+            "start": 61.03,
+            "end": 71.17,
+            "text": "对应的论文名字叫做Attention Is All You Need。很有戏剧性的是，虽然Google发明了火种，但真正把它点燃，并且引爆全世界的却是OpenAI。",
+            "speaker": null
+          },
+          {
+            "start": 71.53,
+            "end": 83.25,
+            "text": "大家应该都记得，2022年底GPT-3.5横空出世。它应该算是第一个真正达到可用级别的大模型了，相信当时用过的人都能感受到它的强大，但这还没完。",
+            "speaker": null
+          },
+          {
+            "start": 83.55,
+            "end": 87.93,
+            "text": "仅仅几个月之后，在2023年的3月份，GPT-4发布。",
+            "speaker": null
+          },
+          {
+            "start": 88.13,
+            "end": 96.59,
+            "text": "它呢是直接把AI的能力天花板拉到了一个新的高度。可以说GPT系列就是我们今天AI浪潮的绝对鼻祖了。",
+            "speaker": null
+          },
+          {
+            "start": 934.01,
+            "end": 943.79,
+            "text": "因为大模型只是个文字接龙游戏，它的能力是根据训练数据来预测下一个词，但他真的没有办法去查天气预报网站，拿到实时的天气数据。",
+            "speaker": null
+          },
+          {
+            "start": 943.94,
+            "end": 952.94,
+            "text": "这该怎么办呢？这就需要tool了。tool翻译成中文就是工具，工具这个词不太好理解，我们再换一个词函数。",
+            "speaker": null
+          },
+          {
+            "start": 953.18,
+            "end": 958.76,
+            "text": "对，没错，tool本质上呢就是一个函数，你给它输入，它就给你输出。",
+            "speaker": null
+          },
+          {
+            "start": 958.97,
+            "end": 965.03,
+            "text": "比如一个天气查询工具，它的输入呢可能会包含两个参数，分别是城市和日期。",
+            "speaker": null
+          },
+          {
+            "start": 965.45,
+            "end": 972.95,
+            "text": "传入后，它内部一通操作。比如说它可能会去调用气象局的接口，但不管怎么样，最后它都会给你一个输出。",
+            "speaker": null
+          },
+          {
+            "start": 972.98,
+            "end": 977.6,
+            "text": "告诉你对应的天气信息，有了它大模型就可以回答天气相关的问题了。",
+            "speaker": null
+          },
+          {
+            "start": 977.9,
+            "end": 987.32,
+            "text": "让我们来看一下从用户提问到大模型回答的完整流程。整个流程所涉及到的角色呢是包括用户、大模型、天气查询工具。",
+            "speaker": null
+          },
+          {
+            "start": 987.36,
+            "end": 992.64,
+            "text": "还有平台，你可能会问平台是什么？你可以把平台理解为一个传话筒。",
+            "speaker": null
+          },
+          {
+            "start": 993.06,
+            "end": 1002.0,
+            "text": "因为用户、大模型、天气查询工具这三个角色没有办法直接对话，所以呢我们就需要平台这个角色来做传递信息的工作。",
+            "speaker": null
+          },
+          {
+            "start": 1002.19,
+            "end": 1006.81,
+            "text": "它本质上呢就是一段代码用来负责上传下达。你可能还有点懵。",
+            "speaker": null
+          },
+          {
+            "start": 1006.93,
+            "end": 1015.09,
+            "text": "没事，现在不明白也没有关系，你看完流程就懂了。在流程一开始的时候，用户的问题会首先发给平台。",
+            "speaker": null
+          },
+          {
+            "start": 1015.28,
+            "end": 1025.96,
+            "text": "平台会把用户的问题转发给大模型，不过发给大模型的可不只有用户问题，还有目前可用的工具列表，比如说是天气查询工具、计算器工具等等。",
+            "speaker": null
+          },
+          {
+            "start": 1026.32,
+            "end": 1036.11,
+            "text": "大模型收到这个问题之后，他会自己分析。用户想知道天气，而我没有实时的天气数据，但是这里面有一个天气查询工具可以用。",
+            "speaker": null
+          },
+          {
+            "start": 1036.41,
+            "end": 1043.91,
+            "text": "好，那我就调用这个工具，注意大模型无法自己调用工具，它唯一的能力就是输出文本。",
+            "speaker": null
+          },
+          {
+            "start": 1942.15,
+            "end": 1950.67,
+            "text": "如果对你有帮助，别忘了点赞关注。我是马克，用最通俗的语言讲最硬核的技术，我们下期再见，拜拜。",
+            "speaker": null
           }
         ],
-        "plain_text": "Tool 的本质，是给大模型提供一套可以调用的外部能力，让它能够感知和影响外部环境。\nAgent Skill 本质上是一份给 Agent 看的说明文档，用来规定做事的步骤和规则。"
+        "plain_text": "AI圈子里每天都在冒新名词，LM、token、context、prompt、RAG、skill，这些词你可能都听说过。但是我问大家，你真的能准确地说出其中每一个概念的确切含义吗？这期视频我们不整那些虚头巴脑的商业概念，我们就从最底层的工程视角出发，一个一个地把这些概念拆开、揉碎，讲清楚。看完这期视频，相信你对AI的理解绝对会上升一个台阶。我们先从最底层的东西开始，一层一层地往上搭。最底层的就是LM。LLM全称是Large Language Model，翻译成中文就是大语言模型，简称大模型。基本上现在所有的大模型都是基于Transformer这套架构训练出来的。这个架构看起来很复杂，不过不用担心，这张图你现在看不懂是完全正常的。我们今天呢也不打算研究它，你只需要知道大模型的底层引擎就是它。Transformer架构最早其实是由Google团队在2017年的时候提出来的。对应的论文名字叫做Attention Is All You Need。很有戏剧性的是，虽然Google发明了火种，但真正把它点燃，并且引爆全世界的却是OpenAI。大家应该都记得，2022年底GPT-3.5横空出世。它应该算是第一个真正达到可用级别的大模型了，相信当时用过的人都能感受到它的强大，但这还没完。仅仅几个月之后，在2023年的3月份，GPT-4发布。它呢是直接把AI的能力天花板拉到了一个新的高度。可以说GPT系列就是我们今天AI浪潮的绝对鼻祖了。\n\n……（中间内容已省略）……\n\n因为大模型只是个文字接龙游戏，它的能力是根据训练数据来预测下一个词，但他真的没有办法去查天气预报网站，拿到实时的天气数据。这该怎么办呢？这就需要tool了。tool翻译成中文就是工具，工具这个词不太好理解，我们再换一个词函数。对，没错，tool本质上呢就是一个函数，你给它输入，它就给你输出。比如一个天气查询工具，它的输入呢可能会包含两个参数，分别是城市和日期。传入后，它内部一通操作。比如说它可能会去调用气象局的接口，但不管怎么样，最后它都会给你一个输出。告诉你对应的天气信息，有了它大模型就可以回答天气相关的问题了。让我们来看一下从用户提问到大模型回答的完整流程。整个流程所涉及到的角色呢是包括用户、大模型、天气查询工具。还有平台，你可能会问平台是什么？你可以把平台理解为一个传话筒。因为用户、大模型、天气查询工具这三个角色没有办法直接对话，所以呢我们就需要平台这个角色来做传递信息的工作。它本质上呢就是一段代码用来负责上传下达。你可能还有点懵。没事，现在不明白也没有关系，你看完流程就懂了。在流程一开始的时候，用户的问题会首先发给平台。平台会把用户的问题转发给大模型，不过发给大模型的可不只有用户问题，还有目前可用的工具列表，比如说是天气查询工具、计算器工具等等。大模型收到这个问题之后，他会自己分析。用户想知道天气，而我没有实时的天气数据，但是这里面有一个天气查询工具可以用。好，那我就调用这个工具，注意大模型无法自己调用工具，它唯一的能力就是输出文本。\n\n……（中间内容已省略）……\n\n如果对你有帮助，别忘了点赞关注。我是马克，用最通俗的语言讲最硬核的技术，我们下期再见，拜拜。"
       },
+      "transcript_variants": {},
+      "active_transcript_variant": null,
       "summary": {
+        "draft_version": "1.0",
         "content_type": "视频",
-        "topics": ["大语言模型", "Agent", "工具协议"],
-        "tldr": "从底层工程视角拆解 LLM、Token、Context、Prompt、Tool、MCP、Agent 和 Agent Skill，建立理解 AI 技术栈的完整框架。",
+        "topics": [
+          "大语言模型基础概念",
+          "Transformer架构",
+          "Token与Tokenizer",
+          "上下文与上下文窗口",
+          "提示词工程"
+        ],
+        "tldr": "从工程视角系统拆解AI底层核心概念，包括LLM、Token、Context、Prompt、Tool、MCP、Agent和Agent Skill，帮助建立完整认知框架。",
         "key_points": [
-          "LLM 通过逐个预测下一个 Token 生成回答，Token 是模型处理文本的基本单元。",
-          "Context 决定模型每次处理任务时能看到的信息，Prompt 则定义任务和行为规则。",
-          "Tool 扩展模型影响外部环境的能力，MCP 为不同工具提供统一接入协议。",
-          "Agent 能持续规划和调用工具，Agent Skill 则用文档约束其步骤与规则。"
+          "LLM基于Transformer架构，由Google在2017年提出，OpenAI通过GPT系列将其推向实用，GPT-3.5和GPT-4是里程碑。",
+          "大模型本质是文字接龙游戏，逐Token预测下一个词，直到输出结束标识符。",
+          "Tokenizer负责文字与数字的转换，Token是模型处理文本的最小单位，与词并非一一对应，平均1 Token约等于1.5-2个汉字。",
+          "Context是模型每次处理任务时接收到的信息总和，包括对话历史、当前输入、工具列表等，Context Window限制了其最大Token容量。",
+          "Prompt分为User Prompt和System Prompt，前者是用户输入的具体任务，后者是开发者设置的人设和规则，清晰具体的Prompt能提升输出质量。",
+          "Tool本质是函数，让大模型通过平台调用外部能力，解决无法感知实时信息的问题；MCP统一了工具接入标准，避免重复开发。",
+          "Agent能自主规划、调用工具、持续工作直至完成任务，常见构建模式有ReAct、Plan-and-Execute等。",
+          "Agent Skill是给Agent看的说明文档，包含元数据层和指令层，用于规定做事步骤、规则和输出格式，通过渐进式披露节省Token。"
         ],
         "timeline": [],
-        "structured_analysis_markdown": "## 核心概念\n### LLM、Token 与 Context\n模型在上下文窗口内，根据 Token 序列持续预测输出。\n### Prompt 与 Tool\nPrompt 规定任务，Tool 让模型能够调用外部能力。\n### MCP、Agent 与 Agent Skill\nMCP 统一工具接入，Agent 负责规划执行，Skill 负责沉淀可复用的工作规则。",
+        "structured_analysis_markdown": "## 核心问题\n如何从工程视角理解AI领域的底层概念，建立从LLM到Agent Skill的完整认知框架？\n\n### 论证、案例、条件与结论\n- **LLM基础**：所有大模型基于Transformer架构，由Google在2017年提出，OpenAI通过GPT-3.5和GPT-4引爆应用，当前GPT-5.4、Claude、Gemini等竞争激烈。\n- **工作原理**：大模型本质是文字接龙，逐Token预测下一个词，直到输出结束标识符；Tokenizer负责文字与数字的编码解码，Token是基本处理单元，与词并非一一对应。\n- **上下文机制**：Context是模型每次处理任务时接收到的信息总和，包括对话历史、当前输入、工具列表等；Context Window限制其最大Token容量，主流模型可达100万Token以上。\n- **提示词工程**：Prompt是给大模型的具体指令，分为User Prompt和System Prompt；清晰具体的Prompt能提升输出质量，但Prompt Engineering因门槛低和模型能力增强而热度下降。\n- **工具与协议**：Tool本质是函数，让大模型通过平台调用外部能力；MCP统一工具接入标准，避免为不同平台重复开发。\n- **Agent与Skill**：Agent能自主规划、调用工具、持续工作直至完成任务；Agent Skill是给Agent看的说明文档，规定步骤、规则和输出格式，通过渐进式披露节省Token。\n- **适用条件**：理解这些概念有助于看懂AI新产品和新技术，如CloudCode、Codex等，它们均在此框架下运作。\n- **反例与争议**：Token与词并非一一对应，如“工作坊”被拆为两个Token；Prompt Engineering热度下降，因模型能力增强可弥补模糊提示。\n- **结论与行动线索**：掌握LLM、Token、Context、Prompt、Tool、MCP、Agent、Agent Skill的递进关系，可建立AI技术认知体系，为进一步学习或应用提供基础。",
         "takeaways": [
-          "用一条概念链理解 AI 技术栈各层之间的关系。",
-          "设计 Agent 前，先区分模型、工具、协议和行为规则。",
-          "把稳定工作方法写成 Agent 可读取的说明文档。"
+          "可用于复习AI基础概念，建立从模型到应用的系统认知。",
+          "帮助理解AI产品（如CloudCode、Codex）的技术架构和运作逻辑。",
+          "为学习提示词工程、工具调用或Agent开发提供概念基础。",
+          "可结合原视频进一步核查Token切分、MCP协议等细节。"
         ],
         "highlights": [
           {
-            "id": "featured-ai-skill-quote-1",
-            "text": "Tool 的本质，是给大模型提供一套可以调用的外部能力，让它能够感知和影响外部环境。",
-            "start": 1147,
-            "end": 1164,
-            "reason": "概括 Tool 在 AI 系统中的核心作用。",
-            "tags": ["Tool"],
+            "id": "ai-001",
+            "text": "大模型本质上是一个庞大的数学函数，里面跑的全是矩阵运算，它接收的呢是数字，输出的也是数字，压根儿就不认识人类写的文字。",
+            "start": null,
+            "end": null,
+            "reason": "准确概括了大模型的数学本质，是理解Tokenizer作用的关键。 可用场景：用于解释为什么需要Tokenizer进行文字与数字的转换。",
+            "tags": [],
             "source": "ai",
-            "source_type": "curated_excerpt"
+            "source_type": null,
+            "created_at": null
           },
           {
-            "id": "featured-ai-skill-quote-2",
-            "text": "Agent Skill 本质上是一份给 Agent 看的说明文档，用来规定做事的步骤和规则。",
-            "start": 1740,
-            "end": 1763,
-            "reason": "直接说明 Agent Skill 的定位。",
-            "tags": ["Agent Skill"],
+            "id": "ai-002",
+            "text": "Token才是大模型处理文本的最基本单元。大模型一个Token一个Token地接收输入，然后再一个Token一个Token地输出结果。",
+            "start": null,
+            "end": null,
+            "reason": "明确了Token在大模型处理流程中的核心地位。 可用场景：用于说明Token的定义及其在模型输入输出中的作用。",
+            "tags": [],
             "source": "ai",
-            "source_type": "curated_excerpt"
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-003",
+            "text": "context呢就是大模型每次处理任务时所接收到的信息总和。从某种程度上我们也可以把它看成是大模型的一个临时记忆体。",
+            "start": null,
+            "end": null,
+            "reason": "简洁定义了Context，并比喻为临时记忆体，易于理解。 可用场景：用于解释大模型如何“记住”对话历史。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-004",
+            "text": "一个好的prompt应该是清晰的、具体的、明确的。",
+            "start": null,
+            "end": null,
+            "reason": "直接给出高质量Prompt的标准，具有实践指导意义。 可用场景：用于指导用户编写更有效的提示词。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-005",
+            "text": "tool本质上呢就是一个函数，你给它输入，它就给你输出。",
+            "start": null,
+            "end": null,
+            "reason": "用函数类比工具，简化了Tool的概念。 可用场景：用于解释Tool的基本原理。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-006",
+            "text": "agentskill本质上就是你提前写好塞给agent的一份说明文档。",
+            "start": null,
+            "end": null,
+            "reason": "一句话点明Agent Skill的本质，便于快速理解。 可用场景：用于介绍Agent Skill的定义和用途。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
           }
-        ]
+        ],
+        "content_keywords": [
+          "LLM",
+          "Token",
+          "Context",
+          "Prompt",
+          "Tool",
+          "MCP",
+          "Agent",
+          "Agent Skill"
+        ],
+        "application_clues": [
+          "可用于复习AI基础概念，建立从模型到应用的系统认知。",
+          "帮助理解AI产品（如CloudCode、Codex）的技术架构和运作逻辑。",
+          "为学习提示词工程、工具调用或Agent开发提供概念基础。",
+          "可结合原视频进一步核查Token切分、MCP协议等细节。"
+        ],
+        "content_boundaries": [
+          "文本为AI转写稿，可能存在专有名词识别误差，如“GPT-5.4”“Claude Opus 4.6”等需结合原视频核实。",
+          "部分概念（如BPE算法、MCP协议细节）仅提及，未深入展开，需参考作者其他视频。",
+          "演示中的工具返回结果为作者虚构，仅用于流程演示，不代表真实数据。",
+          "未提供具体时间点，无法验证内容时效性。",
+          "当前内容基于 AI 转写稿，可能存在识别、专有名词或断句误差。",
+          "重要原文摘录和事实信息需要结合原媒体复核。"
+        ],
+        "reason_for_saving": null,
+        "personal_relevance": [],
+        "transformation_ideas": [],
+        "search_keywords": [
+          "LLM",
+          "Token",
+          "Context",
+          "Prompt",
+          "Tool",
+          "MCP",
+          "Agent",
+          "Agent Skill"
+        ],
+        "related_wikilinks": [],
+        "to_confirm": []
       },
-      "mindmap_markdown": "# 从 LLM 到 Agent Skill\n## LLM\n### Token 预测\n### Transformer\n## Context\n### 上下文窗口\n### 对话历史\n## Prompt\n### 任务指令\n### 行为规则\n## Tool 与 MCP\n### 外部能力\n### 统一协议\n## Agent\n### 自主规划\n### 工具调用\n## Agent Skill\n### 说明文档\n### 可复用规则"
-    },
-    {
-      "demo_id": "product_course_001",
-      "title": "Agent 的下一步：从个人助手走向组织能力",
-      "description": "晓辉博士 · 抖音",
-      "thumbnail": "",
-      "video": {
-        "video_id": "featured_douyin_7663153637631210149",
-        "platform": "douyin",
-        "url": "https://www.douyin.com/video/7663153637631210149",
-        "title": "Agent 的下一步：从个人助手走向组织能力",
-        "author": "晓辉博士",
-        "duration": 375,
-        "thumbnail": "",
-        "has_transcript": true,
+      "mindmap_markdown": "# AI底层逻辑\n## LLM\n### Transformer架构\n### GPT系列发展\n## Token与Tokenizer\n### Token定义\n### 编码解码过程\n### Token与词的关系\n## Context与Context Window\n### Context组成\n### Context Window容量\n## Prompt\n### User Prompt\n### System Prompt\n### Prompt Engineering\n## Tool与MCP\n### Tool本质\n### 工具调用流程\n### MCP统一标准\n## Agent与Agent Skill\n### Agent自主规划\n### Agent Skill结构\n### 渐进式披露",
+      "mindmap_meta": {
+        "layout": "tree",
+        "content_category": "business_tech",
+        "template_id": "business_tech_tree",
         "media_type": "video",
-        "text_source_type": "curated_excerpt"
+        "text_source_type": "asr_transcript"
       },
-      "formats": [],
-      "transcript": {
-        "segments": [
-          {
-            "start": 184,
-            "end": 207,
-            "text": "角色、目标、规则、资源、关系和状态，有了这六个要素之后，才能基于情境判断下一步做什么。"
-          },
-          {
-            "start": 331,
-            "end": 339,
-            "text": "这套体系不光对 AI 有用，对我们每个人重新审视自己的工作也是有用的。"
-          }
-        ],
-        "plain_text": "角色、目标、规则、资源、关系和状态，有了这六个要素之后，才能基于情境判断下一步做什么。\n这套体系不光对 AI 有用，对我们每个人重新审视自己的工作也是有用的。"
-      },
-      "summary": {
-        "content_type": "视频",
-        "topics": ["Agent", "组织能力", "情境感知"],
-        "tldr": "讨论 AI Agent 不通过人直接进入组织时所需的情境感知能力，并用新员工入职类比出六项必要上下文。",
-        "key_points": [
-          "Agent 从个人助手走向组织成员，需要理解所在环境，而不只是接受人的单次指令。",
-          "情境感知由角色、目标、规则、资源、关系和状态六项上下文构成。",
-          "组织需要判断向 Agent 开放哪些上下文、权限和协作关系。",
-          "这套框架也能帮助个人重新审视自己的工作结构。"
-        ],
-        "timeline": [],
-        "structured_analysis_markdown": "## 核心问题\nAI Agent 如果不通过人作为媒介，如何直接进入组织并做出判断？\n## 情境感知六要素\n### 角色与目标\n明确职能定位和组织预期。\n### 规则与资源\n了解制度边界和可用支持。\n### 关系与状态\n识别协作网络和当前进展。\n## 组织启示\nAgent 的价值取决于组织能否提供必要且受控的上下文。",
-        "takeaways": [
-          "用六要素检查 Agent 是否真正理解组织情境。",
-          "在开放上下文前，同时设计权限和信息边界。",
-          "用同一框架复盘个人的工作环境。"
-        ],
-        "highlights": [
-          {
-            "id": "featured-context-quote-1",
-            "text": "角色、目标、规则、资源、关系和状态，有了这六个要素之后，才能基于情境判断下一步做什么。",
-            "start": 184,
-            "end": 207,
-            "reason": "给出情境感知能力的核心检查清单。",
-            "tags": ["Context Awareness"],
-            "source": "ai",
-            "source_type": "curated_excerpt"
-          },
-          {
-            "id": "featured-context-quote-2",
-            "text": "这套体系不光对 AI 有用，对我们每个人重新审视自己的工作也是有用的。",
-            "start": 331,
-            "end": 339,
-            "reason": "将组织 Agent 框架延伸到个人工作反思。",
-            "tags": ["工作反思"],
-            "source": "ai",
-            "source_type": "curated_excerpt"
-          }
-        ]
-      },
-      "mindmap_markdown": "# Agent 的组织情境感知\n## 角色\n### 职能定位\n## 目标\n### 组织预期\n## 规则\n### 制度边界\n## 资源\n### 预算与专家\n## 关系\n### 汇报与协作\n## 状态\n### 当前进展\n## 组织行动\n### 开放必要上下文\n### 管理权限边界"
+      "note_draft": null,
+      "transcription_source_url": "https://v11-weba.douyinvod.com/50798e03988b7de6d03146b2477200de/6a7f0c5f/video/tos/cn/tos-cn-ve-15/oooCY6JefHmTLBAAQnqS7cBGAIzBE1qeP9aDIa/?a=6383&ch=26&cr=3&dr=0&lr=all&cd=0%7C0%7C0%7C3&cv=1&br=1394&bt=1394&cs=0&ds=4&ft=AJkeU_TLRR0s~hC32D12Nc.xBiGNbLpwIGRU_4pMRLJJNv7TGW&mime_type=video_mp4&qs=0&rc=ODVoZjM2PGk8PDo6NDc2ZUBpajN1eWo5cnNuOTMzNGkzM0AuNmNfYTMxXzUxLmFfNGE1YSNobm8uMmQ0Nm5hLS1kLS9zcw%3D%3D&btag=c0000e00038000&cquery=100o_100w_100B_100H_100K&dy_q=1786698385&feature_id=59cb2766d89ae6284516c6a254e9fb61&l=20260814170624B17C60494CF17BFE4AF6",
+      "source_url": "https://v.douyin.com/-S6-GfaQHdw/",
+      "is_placeholder": false,
+      "is_from_cache": false,
+      "library_summary_status": "ai_generated",
+      "library_summary_model": "deepseek-v4-pro"
     },
     {
-      "demo_id": "tech_podcast_001",
-      "title": "我祝福你永远自由地航行",
-      "description": "付宇_KlTr · 小宇宙播客",
+      "demo_id": "xiaoyuzhou_69e7875e1d989496e72d7216",
+      "title": "1# 我不想祝福你安稳度过人生的「奥德赛时期」，我祝福你永远自由地航行",
+      "description": "付宇_KlTr · 小宇宙",
       "thumbnail": "https://image.xyzcdn.net/Frx6NEfvLmaCyJ0kNu3_8S36mtUl.png",
+      "success": true,
       "video": {
-        "video_id": "featured_xiaoyuzhou_69e7875e1d989496e72d7216",
+        "video_id": "xiaoyuzhou_69e7875e1d989496e72d7216",
         "platform": "xiaoyuzhou",
         "url": "https://www.xiaoyuzhoufm.com/episode/69e7875e1d989496e72d7216",
-        "title": "我不想祝福你安稳度过人生的「奥德赛时期」，我祝福你永远自由地航行",
+        "title": "1# 我不想祝福你安稳度过人生的「奥德赛时期」，我祝福你永远自由地航行",
         "author": "付宇_KlTr",
         "duration": 3957,
         "thumbnail": "https://image.xyzcdn.net/Frx6NEfvLmaCyJ0kNu3_8S36mtUl.png",
@@ -168,62 +735,359 @@
         "text_source_type": "curated_excerpt"
       },
       "formats": [],
+      "format_diagnostics": null,
       "transcript": {
         "segments": [
           {
-            "start": 987,
-            "end": 1018,
-            "text": "并不是因为你还没长大，而是因为时代变了。我们脚底下踩着的土地不再是水泥地，而变成了摇晃的甲板。"
+            "start": 0.45,
+            "end": 12.86,
+            "text": "啊，各位好，欢迎大家收听新一期的青刀快马。",
+            "speaker": null
           },
           {
-            "start": 3457,
-            "end": 3494,
-            "text": "真正值得怀疑的，是所谓主流、所谓正轨的存在。也许更重要的是重新发明一套关于理想生活的叙事。"
+            "start": 13.58,
+            "end": 25.64,
+            "text": "你现在听到的这一期节目是青刀快马与小宇宙创作者学院联合出品共同策划的独家内容专题，给年轻人的社会学第一课系列。",
+            "speaker": null
+          },
+          {
+            "start": 26.54,
+            "end": 39.38,
+            "text": "这个系列将在小宇宙平台独家发布。我们的每一期节目都会从时下热门的社会现象入手，从社会学的视角出发，尝试发现那些超越。",
+            "speaker": null
+          },
+          {
+            "start": 39.45,
+            "end": 46.53,
+            "text": "对现象层次的结构性的解释，理解我们今天的时代精神以及每个人的命运。",
+            "speaker": null
+          },
+          {
+            "start": 47.19,
+            "end": 58.05,
+            "text": "如果你喜欢这个系列，喜欢这一期节目，欢迎在评论区留言分享，也欢迎你将这一期节目转发给你的朋友，转发给更多像你一样的年轻人。",
+            "speaker": null
+          },
+          {
+            "start": 58.59,
+            "end": 63.09,
+            "text": "今天第一期节目啊，我们来聊一聊奥德赛时期。",
+            "speaker": null
+          },
+          {
+            "start": 63.78,
+            "end": 78.0,
+            "text": "奥德赛时期最近这个概念非常火啊，你会看到很多呃在小红书上面也好，在B站上面也好，有很多的博主啊都在讨论这个概念，有很多的博主用奥德赛时期来概括自己当下的这种。",
+            "speaker": null
+          },
+          {
+            "start": 78.21,
+            "end": 83.73,
+            "text": "迷茫这种自我探索，不断的在找方向，不断的在变换方向的这个状态。",
+            "speaker": null
+          },
+          {
+            "start": 84.27,
+            "end": 88.53,
+            "text": "当然也有更多的博主去批判这个概念说你们不要都去讲。",
+            "speaker": null
+          },
+          {
+            "start": 88.62,
+            "end": 94.32,
+            "text": "啊，奥德赛时期如何如何，你们误用了这个概念，你们挪用了这个概念等等等等。",
+            "speaker": null
+          },
+          {
+            "start": 95.1,
+            "end": 99.36,
+            "text": "我觉得关于奥德赛时期的讨论是一个非常有意思的案例啊。",
+            "speaker": null
+          },
+          {
+            "start": 99.42,
+            "end": 105.49,
+            "text": "所以我们今天就从这个开始聊起。首先。我们说说看什么是奥德赛时期。",
+            "speaker": null
+          },
+          {
+            "start": 106.39,
+            "end": 110.95,
+            "text": "奥德赛时期，这个听起来就是一个不明觉厉的词儿，对吧？",
+            "speaker": null
+          },
+          {
+            "start": 111.069,
+            "end": 117.61,
+            "text": "你可能并没有那么清楚这个词儿它到底意思是什么，但是你仍然会觉得这个词听起来很厉害。",
+            "speaker": null
+          },
+          {
+            "start": 117.72,
+            "end": 125.4,
+            "text": "呃，那实际上这个词最早出现在2007年啊，07年的时候，在美国有一个专栏作家叫大卫布鲁克斯。",
+            "speaker": null
+          },
+          {
+            "start": 125.76,
+            "end": 129.9,
+            "text": "然后他在纽约时报上面写了一篇文章，就第一次提出了。",
+            "speaker": null
+          },
+          {
+            "start": 1954.75,
+            "end": 1962.67,
+            "text": "我们能够自由地选择工作，自由地选择爱一个什么样的人，自由地选择自己的生活方式，选择自己居住在哪里。",
+            "speaker": null
+          },
+          {
+            "start": 1962.89,
+            "end": 1970.51,
+            "text": "当个体从过去那些坚固的制度，从那些坚固的结构当中脱离出来。",
+            "speaker": null
+          },
+          {
+            "start": 1970.93,
+            "end": 1977.17,
+            "text": "当你从家庭、宗族、单位、社区所有这些结构当中脱离出来之后，是的。",
+            "speaker": null
+          },
+          {
+            "start": 1977.26,
+            "end": 1981.76,
+            "text": "你不得不自己去面对所有的这些风险，去面对理论上无限的可能性。",
+            "speaker": null
+          },
+          {
+            "start": 1981.76,
+            "end": 1991.84,
+            "text": "但反过来，这就是自由。所有这些让人眼花缭乱、让人头晕目眩的东西，它就叫做自由。",
+            "speaker": null
+          },
+          {
+            "start": 1992.03,
+            "end": 1999.17,
+            "text": "所以这就是我们聊到的第二个问题啊，奥德赛时期的出现跟风靡，这到底是一种偶然还是一种必然呢？",
+            "speaker": null
+          },
+          {
+            "start": 1999.38,
+            "end": 2011.2,
+            "text": "从社会学的角度来看，呃，我们大概率会告诉你说，这可能并不是因为今天年轻的一代人，95后、00后、05后没有赶上时代红利，没有赶上所谓经济上星期的美，所以才这样子。",
+            "speaker": null
+          },
+          {
+            "start": 2011.44,
+            "end": 2023.27,
+            "text": "不是的。我们可能会告诉你说，这种迷茫和焦虑恰恰就是自由的另一面，恰恰就是现代社会发展到晚期阶段之后的必然。",
+            "speaker": null
+          },
+          {
+            "start": 2023.57,
+            "end": 2032.27,
+            "text": "好了，接下来我们就可以聊一聊下一个问题了。很多人呢对奥德赛时期这个概念啊批评得很厉害，说这个概念没有回应真正的问题。",
+            "speaker": null
+          },
+          {
+            "start": 2032.63,
+            "end": 2036.89,
+            "text": "这概念有很多浪漫化的想象，你只是发明一个新的概念。",
+            "speaker": null
+          },
+          {
+            "start": 2037.05,
+            "end": 2041.07,
+            "text": "你解决任何问题了吗？呃，你有让年轻人生活得更好一点吗？",
+            "speaker": null
+          },
+          {
+            "start": 2041.07,
+            "end": 2046.29,
+            "text": "除了自我安慰还有什么意义呢？好了，我可以说得直白一点，把我的观点亮出来。",
+            "speaker": null
+          },
+          {
+            "start": 2046.59,
+            "end": 2052.33,
+            "text": "我觉得这种命名，这种叙事。很重要，而且很有意义。",
+            "speaker": null
+          },
+          {
+            "start": 2052.39,
+            "end": 2059.11,
+            "text": "特别是在今天，那我为什么会这么说呢？这个跟社会学的理论之间有一些什么样的关系呢？",
+            "speaker": null
+          },
+          {
+            "start": 2059.17,
+            "end": 2069.98,
+            "text": "这个就是我们接下来。啊，我想聊一聊的第三个问题啊，对于年轻人来讲，当他们发明了类似奥德赛时期，或者是重新发明了这样的概念之后，到底意味着什么呢？",
+            "speaker": null
+          },
+          {
+            "start": 3932.11,
+            "end": 3936.74,
+            "text": "好了，这期节目就是这样，再次感谢大家的收听。我们下期节目再见。",
+            "speaker": null
           }
         ],
-        "plain_text": "并不是因为你还没长大，而是因为时代变了。我们脚底下踩着的土地不再是水泥地，而变成了摇晃的甲板。\n真正值得怀疑的，是所谓主流、所谓正轨的存在。也许更重要的是重新发明一套关于理想生活的叙事。"
+        "plain_text": "啊，各位好，欢迎大家收听新一期的青刀快马。你现在听到的这一期节目是青刀快马与小宇宙创作者学院联合出品共同策划的独家内容专题，给年轻人的社会学第一课系列。这个系列将在小宇宙平台独家发布。我们的每一期节目都会从时下热门的社会现象入手，从社会学的视角出发，尝试发现那些超越。对现象层次的结构性的解释，理解我们今天的时代精神以及每个人的命运。如果你喜欢这个系列，喜欢这一期节目，欢迎在评论区留言分享，也欢迎你将这一期节目转发给你的朋友，转发给更多像你一样的年轻人。今天第一期节目啊，我们来聊一聊奥德赛时期。奥德赛时期最近这个概念非常火啊，你会看到很多呃在小红书上面也好，在B站上面也好，有很多的博主啊都在讨论这个概念，有很多的博主用奥德赛时期来概括自己当下的这种。迷茫这种自我探索，不断的在找方向，不断的在变换方向的这个状态。当然也有更多的博主去批判这个概念说你们不要都去讲。啊，奥德赛时期如何如何，你们误用了这个概念，你们挪用了这个概念等等等等。我觉得关于奥德赛时期的讨论是一个非常有意思的案例啊。所以我们今天就从这个开始聊起。首先。我们说说看什么是奥德赛时期。奥德赛时期，这个听起来就是一个不明觉厉的词儿，对吧？你可能并没有那么清楚这个词儿它到底意思是什么，但是你仍然会觉得这个词听起来很厉害。呃，那实际上这个词最早出现在2007年啊，07年的时候，在美国有一个专栏作家叫大卫布鲁克斯。然后他在纽约时报上面写了一篇文章，就第一次提出了。\n\n……（中间内容已省略）……\n\n我们能够自由地选择工作，自由地选择爱一个什么样的人，自由地选择自己的生活方式，选择自己居住在哪里。当个体从过去那些坚固的制度，从那些坚固的结构当中脱离出来。当你从家庭、宗族、单位、社区所有这些结构当中脱离出来之后，是的。你不得不自己去面对所有的这些风险，去面对理论上无限的可能性。但反过来，这就是自由。所有这些让人眼花缭乱、让人头晕目眩的东西，它就叫做自由。所以这就是我们聊到的第二个问题啊，奥德赛时期的出现跟风靡，这到底是一种偶然还是一种必然呢？从社会学的角度来看，呃，我们大概率会告诉你说，这可能并不是因为今天年轻的一代人，95后、00后、05后没有赶上时代红利，没有赶上所谓经济上星期的美，所以才这样子。不是的。我们可能会告诉你说，这种迷茫和焦虑恰恰就是自由的另一面，恰恰就是现代社会发展到晚期阶段之后的必然。好了，接下来我们就可以聊一聊下一个问题了。很多人呢对奥德赛时期这个概念啊批评得很厉害，说这个概念没有回应真正的问题。这概念有很多浪漫化的想象，你只是发明一个新的概念。你解决任何问题了吗？呃，你有让年轻人生活得更好一点吗？除了自我安慰还有什么意义呢？好了，我可以说得直白一点，把我的观点亮出来。我觉得这种命名，这种叙事。很重要，而且很有意义。特别是在今天，那我为什么会这么说呢？这个跟社会学的理论之间有一些什么样的关系呢？这个就是我们接下来。啊，我想聊一聊的第三个问题啊，对于年轻人来讲，当他们发明了类似奥德赛时期，或者是重新发明了这样的概念之后，到底意味着什么呢？\n\n……（中间内容已省略）……\n\n好了，这期节目就是这样，再次感谢大家的收听。我们下期节目再见。"
       },
+      "transcript_variants": {},
+      "active_transcript_variant": null,
       "summary": {
+        "draft_version": "1.0",
         "content_type": "播客",
-        "topics": ["奥德赛时期", "个体化", "人生叙事"],
-        "tldr": "把“奥德赛时期”放回社会学和历史语境：年轻人的漂泊不只是成年延迟，而是旧人生脚本失效后，对新生活叙事的持续探索。",
+        "topics": [
+          "奥德赛时期",
+          "个体化理论",
+          "叙事社会学",
+          "液态现代性",
+          "风险个体化"
+        ],
+        "tldr": "本期播客从社会学视角解析“奥德赛时期”概念的起源、演变与当代意义，指出其反映的个体化社会必然性，并批判其隐含的目的论，最终提出以“锚点”替代“上岸”作为应对不确定性的实践策略。",
         "key_points": [
-          "2007 年语境中的奥德赛时期偏向主动推迟成年，而今天更多伴随结构性不稳定。",
-          "现代社会把职业、关系和风险不断下沉到个人，使结构性问题常被解释成个人能力问题。",
-          "命名漂泊阶段能提供共享叙事，让处于过渡状态的人获得理解和表达。",
-          "真正需要质疑的不是何时回归正轨，而是是否存在唯一的主流人生脚本。"
+          "奥德赛时期概念由美国专栏作家大卫·布鲁克斯于2007年提出，指20至35岁年轻人从校园到社会成年的过渡期，特征包括身份探索、职业变动、亲密关系试错和城市流动。",
+          "该概念源自荷马史诗《奥德赛》，奥德修斯漂泊十年终回故乡伊萨卡，隐喻经历试炼后找到归宿；学术上对应“成年初显期”和“四分之一人生危机”。",
+          "2007年美国经济上行期，奥德赛时期体现为年轻人主动推迟成年、追求自我探索的浪漫主义；而当下Z世代则因结构性压力（如助学贷款、房价、就业难）被迫滞留，从主动漂泊变为被动悬浮。",
+          "从社会学个体化理论看，吉登斯的自反现代性、鲍曼的液态现代性和贝克的风险个体化共同表明：传统人生脚本失效、稳定结构消解、社会风险下沉至个人，因此当代年轻人的迷茫与焦虑是现代社会发展的必然，而非单纯经济波动的结果。",
+          "奥德赛时期作为一种叙事建构具有重要意义：它通过命名过渡状态，将零散的生活经验整合为连贯的成长轨迹，类似赫拉利所述“讲故事”的能力，帮助年轻人获得身份认同和集体共鸣。",
+          "对奥德赛时期的批判包括：它可能掩盖阶级不平等（探索自我是中产特权）、将结构性问题个人化，以及隐含目的论——假设存在一个必须抵达的“伊萨卡”（稳定归宿），但该归宿在现代液态社会中可能并不存在。",
+          "韩炳哲对主体性的词源学分析揭示，主体（subject）本身包含从属意味，无限选择反而导致“自由的眩晕”；因此，应对不确定性的关键不是追求上岸，而是找到自己的“锚点”，如喜欢的城市、稳定的关系或收入来源，从而在航行中获得自由。"
         ],
         "timeline": [],
-        "structured_analysis_markdown": "## 概念来源\n“奥德赛时期”最初描述年轻人主动推迟传统成年节点。\n## 时代变化\n今天的漂泊同时受到行业、城市、关系和制度风险的影响。\n## 社会学解释\n个体化让人拥有更多选择，也让结构性风险更多由个人承担。\n## 叙事价值\n新的命名让过渡状态被看见，但不应只是把回归传统正轨的期限向后推迟。\n## 最终追问\n与其等待抵达唯一终点，不如重新定义值得叙述和实践的生活。",
+        "structured_analysis_markdown": "## 核心问题\n本期播客探讨“奥德赛时期”这一流行概念的社会学内涵：它为何在当下中国年轻人中爆火？其背后反映了怎样的时代精神转变？以及年轻人应如何应对这种充满不确定性的过渡状态？\n\n### 概念溯源与演变\n- 奥德赛时期由大卫·布鲁克斯于2007年提出，指20-35岁年轻人从校园到社会成年的过渡期，特征包括身份探索、职业变动、亲密关系试错和城市流动。\n- 该概念源自荷马史诗《奥德赛》，奥德修斯漂泊十年终回故乡伊萨卡，隐喻经历试炼后找到归宿；学术上对应“成年初显期”和“四分之一人生危机”。\n- 2007年美国经济上行期，奥德赛时期体现为年轻人主动推迟成年、追求自我探索的浪漫主义（如何伟、伊丽莎白·吉尔伯特案例）；而当下Z世代则因结构性压力（如助学贷款、房价、就业难）被迫滞留，从主动漂泊变为被动悬浮。\n\n### 社会学理论解释\n- 个体化理论：吉登斯的自反现代性（人生脚本失效，个体不断自我反思）、鲍曼的液态现代性（一切坚固的东西烟消云散，稳定成为奢侈）、贝克的风险个体化（社会风险下沉至个人，被叙述为个人能力结果）。\n- 这些理论表明，当代年轻人的迷茫与焦虑是现代社会发展的必然，而非单纯经济波动的结果；个体化既是风险也是自由。\n\n### 叙事建构的意义\n- 奥德赛时期作为一种叙事，通过命名过渡状态，将零散的生活经验整合为连贯的成长轨迹，类似赫拉利所述“讲故事”的能力，帮助年轻人获得身份认同和集体共鸣。\n- 类比童年、青春期等概念，它们也是文化建构的产物，并非生物必然；因此命名新阶段具有正当性。\n\n### 批判与反思\n- 对奥德赛时期的批判包括：它可能掩盖阶级不平等（探索自我是中产特权）、将结构性问题个人化，以及隐含目的论——假设存在一个必须抵达的“伊萨卡”（稳定归宿），但该归宿在现代液态社会中可能并不存在。\n- 韩炳哲对主体性的词源学分析揭示，主体（subject）本身包含从属意味，无限选择反而导致“自由的眩晕”；因此，应对不确定性的关键不是追求上岸，而是找到自己的“锚点”，如喜欢的城市、稳定的关系或收入来源，从而在航行中获得自由。\n\n### 结论与行动线索\n- 承认悬浮感是真实的，是时代常态而非个人失败。\n- 抛弃“30岁必须上岸”等线性时间观，将目标从“找到伊萨卡”转变为“学会航行”。\n- 寻找并坚守个人锚点，在不确定中建立主体性，实现自由。",
         "takeaways": [
-          "区分个人选择与结构性环境，减少对迷茫的单一道德判断。",
-          "把人生阶段的命名当作理解工具，而不是新的标准答案。",
-          "持续探索能成立的生活叙事，而不是只等待回到所谓正轨。"
+          "可用于理解当代年轻人迷茫现象的社会学背景，辅助撰写相关评论或分析。",
+          "可借鉴个体化理论框架，分析其他社会现象中的个人与结构关系。",
+          "可参考叙事建构的视角，思考命名和话语对群体认同的作用。",
+          "可运用“锚点”概念进行自我反思或设计个人发展策略。",
+          "可进一步核查布鲁克斯原文、吉登斯、鲍曼、贝克及韩炳哲的相关著作，深化理论理解。"
         ],
         "highlights": [
           {
-            "id": "featured-odyssey-quote-1",
-            "text": "并不是因为你还没长大，而是因为时代变了。我们脚底下踩着的土地不再是水泥地，而变成了摇晃的甲板。",
-            "start": 987,
-            "end": 1018,
-            "reason": "把个人迷茫放回时代结构中理解。",
-            "tags": ["时代变化"],
+            "id": "ai-001",
+            "text": "当上一代人在谈论稳定的时候说的是什么？他们说的是单位分房。他们说的是工龄熬资历，结婚啊，一辈子看到头。但是到了今天的年轻人，这里我们讲的所有的这些东西其实都变成了一些选择题。",
+            "start": null,
+            "end": null,
+            "reason": "对比了代际间对“稳定”的不同理解，突出当代年轻人面临的不确定性。 可用场景：可用于讨论代际差异或社会变迁对个人生活脚本的影响。",
+            "tags": [],
             "source": "ai",
-            "source_type": "curated_excerpt"
+            "source_type": null,
+            "created_at": null
           },
           {
-            "id": "featured-odyssey-quote-2",
-            "text": "真正值得怀疑的，是所谓主流、所谓正轨的存在。也许更重要的是重新发明一套关于理想生活的叙事。",
-            "start": 3457,
-            "end": 3494,
-            "reason": "指出节目对线性人生脚本的核心反思。",
-            "tags": ["人生叙事"],
+            "id": "ai-002",
+            "text": "我们脚底下踩着的这片土地已经不是水泥地了，它变成了一个摇晃的甲板。",
+            "start": null,
+            "end": null,
+            "reason": "生动比喻当代社会的不稳定性，强化悬浮感的意象。 可用场景：可用于描述现代生活的不确定状态，或作为演讲、写作的引喻。",
+            "tags": [],
             "source": "ai",
-            "source_type": "curated_excerpt"
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-003",
+            "text": "如果没有个体化，也就没有那些我们今天把它命名为自由的东西。",
+            "start": null,
+            "end": null,
+            "reason": "点明个体化的双重性：风险与自由并存，是理解现代性矛盾的关键句。 可用场景：可用于探讨自由与风险的辩证关系，或作为社会学讨论的切入点。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-004",
+            "text": "你要做的不是去催人们伐木啊，砍树，也不是忙着分配工作，更不是站在高处发号施令。你要做的是激发人们对于浩瀚无垠的大海的向往。",
+            "start": null,
+            "end": null,
+            "reason": "引用赫拉利观点，强调叙事和愿景在集体行动中的核心作用。 可用场景：可用于领导力、组织行为或社会动员相关话题的论述。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-005",
+            "text": "伊萨卡可能是不存在的，伊萨卡大概率是不存在的。",
+            "start": null,
+            "end": null,
+            "reason": "直接质疑奥德赛时期隐含的目的论，提出对“上岸”叙事的根本反思。 可用场景：可用于批判线性成功观或讨论后现代生活意义。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
+          },
+          {
+            "id": "ai-006",
+            "text": "人生需要锚点。锚点让你自由。",
+            "start": null,
+            "end": null,
+            "reason": "总结全篇的实践建议，简洁有力，具有行动指导意义。 可用场景：可作为个人成长或心理咨询中的启发式语句。",
+            "tags": [],
+            "source": "ai",
+            "source_type": null,
+            "created_at": null
           }
-        ]
+        ],
+        "content_keywords": [
+          "奥德赛时期",
+          "个体化",
+          "液态现代性",
+          "风险个体化",
+          "叙事建构",
+          "人生锚点",
+          "悬浮感",
+          "时代精神"
+        ],
+        "application_clues": [
+          "可用于理解当代年轻人迷茫现象的社会学背景，辅助撰写相关评论或分析。",
+          "可借鉴个体化理论框架，分析其他社会现象中的个人与结构关系。",
+          "可参考叙事建构的视角，思考命名和话语对群体认同的作用。",
+          "可运用“锚点”概念进行自我反思或设计个人发展策略。",
+          "可进一步核查布鲁克斯原文、吉登斯、鲍曼、贝克及韩炳哲的相关著作，深化理论理解。"
+        ],
+        "content_boundaries": [
+          "文本为AI转写稿，可能存在专有名词识别误差，如人名、书名等需结合原音频核实。",
+          "播客中提及的统计数据（如助学贷款、房价等）未提供具体来源，引用时需进一步查证。",
+          "对吉登斯、鲍曼、贝克、韩炳哲等理论的转述为播客作者的理解，可能与原著有出入，建议阅读原著确认。",
+          "播客内容为个人观点分享，不代表学术共识，引用时需注意语境。",
+          "当前内容基于 AI 转写稿，可能存在识别、专有名词或断句误差。",
+          "重要原文摘录和事实信息需要结合原媒体复核。"
+        ],
+        "reason_for_saving": null,
+        "personal_relevance": [],
+        "transformation_ideas": [],
+        "search_keywords": [
+          "奥德赛时期",
+          "个体化",
+          "液态现代性",
+          "风险个体化",
+          "叙事建构",
+          "人生锚点",
+          "悬浮感",
+          "时代精神"
+        ],
+        "related_wikilinks": [],
+        "to_confirm": []
       },
-      "mindmap_markdown": "# 奥德赛时期与人生叙事\n## 概念来源\n### 主动推迟成年\n### 探索不同道路\n## 当代变化\n### 结构性不稳定\n### 旧脚本失效\n## 个体化\n### 选择增加\n### 风险下沉\n## 叙事的作用\n### 命名过渡状态\n### 获得共享理解\n## 核心反思\n### 质疑唯一正轨\n### 重新定义理想生活\n### 保持自由航行"
+      "mindmap_markdown": "# 奥德赛时期的社会学解读\n## 概念起源与演变\n### 布鲁克斯2007年提出\n#### 20-35岁过渡期\n#### 特征：探索、变动、试错\n### 荷马史诗隐喻\n#### 奥德修斯漂泊与回归\n### 学术对应概念\n#### 成年初显期\n#### 四分之一人生危机\n## 时代精神转变\n### 2007年美国：主动推迟成年\n#### 经济上行期浪漫主义\n#### 案例：何伟、伊丽莎白·吉尔伯特\n### 当下Z世代：被动滞留\n#### 结构性压力：贷款、房价、就业\n#### 从主动漂泊到被动悬浮\n## 社会学理论解释\n### 个体化理论\n#### 吉登斯：自反现代性\n#### 鲍曼：液态现代性\n#### 贝克：风险个体化\n### 必然性与自由\n#### 迷茫是现代社会必然\n#### 个体化带来自由与风险\n## 叙事建构的意义\n### 命名过渡状态\n#### 整合零散经验\n#### 赫拉利：讲故事的力量\n### 类比童年与青春期\n#### 文化建构而非生物必然\n## 批判与反思\n### 掩盖阶级不平等\n### 将结构问题个人化\n### 隐含目的论\n#### 伊萨卡可能不存在\n## 实践策略：锚点\n### 抛弃上岸幻想\n### 学会航行\n### 寻找个人锚点\n#### 城市、关系、收入\n#### 锚点带来自由",
+      "mindmap_meta": {
+        "layout": "tree",
+        "content_category": "self_growth",
+        "template_id": "self_growth_tree",
+        "media_type": "podcast",
+        "text_source_type": "asr_transcript"
+      },
+      "note_draft": null,
+      "transcription_source_url": "https://media.xyzcdn.net/640482a886730b8173861298/lt88j-Hdfhtf-vZyhIMzqaADRL9D.m4a",
+      "source_url": "https://www.xiaoyuzhoufm.com/episode/69e7875e1d989496e72d7216",
+      "is_placeholder": false,
+      "is_from_cache": false,
+      "library_summary_status": "ai_generated",
+      "library_summary_model": "deepseek-v4-pro"
     }
   ]
 }

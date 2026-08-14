@@ -555,6 +555,8 @@ class LibraryStatsResponse(BaseModel):
     summarized_count: int
     ai_summary_count: int
     fallback_summary_count: int
+    ready_count: int
+    needs_transcript_count: int
 
 
 class LibraryDeleteResponse(BaseModel):

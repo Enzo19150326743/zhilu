@@ -163,7 +163,7 @@ export function getTextSourceHint(
     return "当前文本来自平台公开字幕，通常比音频转写更接近原始字幕。";
   }
   if (textSourceType === "curated_excerpt") {
-    return "推荐内容仅包含少量公开摘录，不包含完整逐字稿。";
+    return "公开展示仅包含精选片段，不包含完整逐字稿。";
   }
 
   return null;
@@ -340,12 +340,11 @@ export function extractSelectedExcerpt(
     return null;
   }
 
-  const rootRect = root.getBoundingClientRect();
   const left = Math.min(
     Math.max(visibleRect.left + visibleRect.width / 2, 150),
     window.innerWidth - 150
   );
-  const top = Math.max(visibleRect.top - 46, rootRect.top + 8, 12);
+  const top = Math.max(visibleRect.top - 56, 12);
 
   return {
     charCount: text.length,

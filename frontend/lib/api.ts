@@ -3,11 +3,11 @@ import type {
   AsrStatusResponse,
   BrowserDownloadResponse,
   CorrectionTermLibraryResponse,
-  DemoDetail,
   DemoListResponse,
   HealthResponse,
   LibraryClearResponse,
   LibraryDeleteResponse,
+  LibraryFilter,
   LibraryListResponse,
   LibraryStatsResponse,
   NoteDraftUpdateRequest,
@@ -283,11 +283,15 @@ export const apiClient = {
   getDemos(): Promise<DemoListResponse> {
     return requestJson<DemoListResponse>("/api/demo", { timeoutMs: 3000 });
   },
-  getDemoDetail(demoId: string): Promise<DemoDetail> {
-    return requestJson<DemoDetail>(`/api/demo/${demoId}`, { timeoutMs: 3000 });
+  getDemoDetail(demoId: string): Promise<ParseResponse> {
+    return requestJson<ParseResponse>(`/api/demo/${demoId}`, { timeoutMs: 5000 });
   },
-  getRecentLibraryItems(limit = 8): Promise<LibraryListResponse> {
-    return requestJson<LibraryListResponse>(`/api/library/recent?limit=${limit}`, {
+  getRecentLibraryItems(
+    limit = 8,
+    filter: LibraryFilter = "all"
+  ): Promise<LibraryListResponse> {
+    const query = new URLSearchParams({ filter, limit: String(limit) });
+    return requestJson<LibraryListResponse>(`/api/library/recent?${query}`, {
       timeoutMs: 3000
     });
   },

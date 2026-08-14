@@ -27,12 +27,10 @@ import {
   formatTimestamp,
   getTextSourceHint,
   getTextSourceSlug,
-  getTranscriptForViewMode,
   getTranscriptSourceLabel,
   getTranscriptVariantLabel,
   inferTranscriptVariantKey,
-  sanitizeFilename,
-  type TranscriptViewMode
+  sanitizeFilename
 } from "@/lib/transcript-workbench";
 
 interface TranscriptTabProps {
@@ -71,8 +69,6 @@ export function TranscriptTab({
 }: TranscriptTabProps) {
   const [hasCopied, setHasCopied] = useState(false);
   const [hasExported, setHasExported] = useState(false);
-  const [transcriptViewMode, setTranscriptViewMode] =
-    useState<TranscriptViewMode>("final");
   const [selectedTranscriptVariant, setSelectedTranscriptVariant] =
     useState<string>(activeTranscriptVariant ?? "");
   const [isComparingTranscripts, setIsComparingTranscripts] = useState(false);
@@ -88,10 +84,13 @@ export function TranscriptTab({
     handleAddSelectedExcerpt,
     handleDraftTextBlur,
     handleDraftTextChange,
+    handleExcerptPointerDown,
+    handleExcerptPointerUp,
     handleExportObsidianNote,
     handleRemoveHighlight,
     isExportingNote,
     isSavingDraft,
+    recentlyAddedHighlightId,
     savedHighlightIdentities,
     selectedExcerpt,
     transcriptTextRootRef
@@ -120,24 +119,8 @@ export function TranscriptTab({
     normalizedTranscriptVariants[selectedTranscriptVariant] ?? transcript;
   const sourceLabel = getTranscriptSourceLabel(textSourceType, selectedTranscript);
   const sourceHint = getTextSourceHint(textSourceType, selectedTranscript);
-  const rawSegments = selectedTranscript?.raw_segments ?? [];
-  const rawPlainText = selectedTranscript?.raw_plain_text?.trim() ?? "";
-  const canShowRawTranscript = Boolean(
-    textSourceType === "asr_transcript" &&
-      selectedTranscript &&
-      (rawSegments.length > 0 || rawPlainText)
-  );
-  const visibleTranscript = useMemo<TranscriptPayload | null>(() => {
-    if (!selectedTranscript) {
-      return null;
-    }
-    return getTranscriptForViewMode(selectedTranscript, transcriptViewMode);
-  }, [
-    selectedTranscript,
-    transcriptViewMode
-  ]);
+  const activeTranscript = selectedTranscript ?? transcript;
   useEffect(() => {
-    setTranscriptViewMode("final");
     setTranscriptQuery("");
   }, [sourceUrl, transcript]);
 
@@ -157,18 +140,18 @@ export function TranscriptTab({
   ]);
 
   const handleCopy = async () => {
-    if (!visibleTranscript) {
+    if (!activeTranscript) {
       return;
     }
 
     // NOTE: 复制纯文本能让用户直接带走内容文本，不依赖后续下载功能。
-    await navigator.clipboard.writeText(visibleTranscript.plain_text);
+    await navigator.clipboard.writeText(activeTranscript.plain_text);
     setHasCopied(true);
     window.setTimeout(() => setHasCopied(false), 1600);
   };
 
   const handleExport = () => {
-    if (!visibleTranscript) {
+    if (!activeTranscript) {
       return;
     }
 
@@ -176,7 +159,7 @@ export function TranscriptTab({
     const sourceSlug = getTextSourceSlug(textSourceType);
     downloadTextFile(
       `${filenameBase}-${sourceSlug}.txt`,
-      visibleTranscript.plain_text,
+      activeTranscript.plain_text,
       "text/plain;charset=utf-8"
     );
     setHasExported(true);
@@ -246,6 +229,7 @@ export function TranscriptTab({
       draftMessage={draftMessage}
       isExportingNote={isExportingNote}
       isSavingDraft={isSavingDraft}
+      recentlyAddedHighlightId={recentlyAddedHighlightId}
       savedHighlightIdentities={savedHighlightIdentities}
       sourceUrl={sourceUrl}
       textSourceType={textSourceType}
@@ -257,7 +241,7 @@ export function TranscriptTab({
     />
   );
 
-  if (!transcript || !hasTranscript) {
+  if (!activeTranscript || !hasTranscript) {
     return (
       <div className="space-y-4">
         <TranscribeRequiredState
@@ -276,7 +260,6 @@ export function TranscriptTab({
     );
   }
 
-  const activeTranscript = visibleTranscript ?? selectedTranscript ?? transcript;
   const preferredComparisonKeys = ["local_whisper", "sensevoice_small"].filter(
     (variantKey) => Boolean(normalizedTranscriptVariants[variantKey])
   );
@@ -341,9 +324,11 @@ export function TranscriptTab({
           </div>
         </section>
 
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.48fr)] lg:items-start">
           <article
-            className="max-h-[650px] min-w-0 overflow-auto rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-5 py-5"
+            className="min-w-0 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-5 py-5"
+            onPointerDown={handleExcerptPointerDown}
+            onPointerUp={handleExcerptPointerUp}
             ref={(element) => {
               transcriptTextRootRef.current = element;
             }}
@@ -363,9 +348,7 @@ export function TranscriptTab({
               ))}
             </div>
           </article>
-          <aside className="max-h-[650px] min-w-0 overflow-y-auto pr-1 xl:sticky xl:top-[9rem]">
-            {renderNoteWorkflow()}
-          </aside>
+          {renderNoteWorkflow()}
         </div>
 
         {transcribeErrorMessage ? (
@@ -380,77 +363,7 @@ export function TranscriptTab({
   return (
     <div className="space-y-4">
       {renderSelectionToolbar()}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--ink)]">
-            {sourceLabel}
-          </h3>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            共 {activeTranscript.segments.length} 个片段
-          </p>
-          {sourceHint ? (
-            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-              {sourceHint}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {transcriptVariantKeys.length > 1 && !isComparingTranscripts ? (
-            <select
-              aria-label="选择转写稿版本"
-              className="h-10 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-3 text-sm font-medium text-[var(--ink-soft)] outline-none transition focus:border-[var(--accent)]"
-              value={selectedTranscriptVariant}
-              onChange={(event) => {
-                setSelectedTranscriptVariant(event.target.value);
-                setTranscriptViewMode("final");
-              }}
-            >
-              {transcriptVariantKeys.map((variantKey) => (
-                <option key={variantKey} value={variantKey}>
-                  {getTranscriptVariantLabel(variantKey)}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {canCompareTranscripts ? (
-            <IconActionButton
-              icon={GitCompareArrows}
-              label={isComparingTranscripts ? "退出并排对比" : "并排对比转写稿"}
-              pressed={isComparingTranscripts}
-              onClick={() => setIsComparingTranscripts((current) => !current)}
-            />
-          ) : null}
-          {canShowRawTranscript ? (
-            <div className="inline-flex h-10 overflow-hidden rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper)] p-1">
-              <button
-                className={`rounded-[2px] px-2.5 text-sm font-medium transition-colors ${
-                  transcriptViewMode === "final"
-                    ? "bg-[var(--paper-raised)] text-[var(--ink)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--ink-soft)]"
-                }`}
-                type="button"
-                onClick={() => setTranscriptViewMode("final")}
-              >
-                校对稿
-              </button>
-              <button
-                className={`rounded-[2px] px-2.5 text-sm font-medium transition-colors ${
-                  transcriptViewMode === "raw"
-                    ? "bg-[var(--paper-raised)] text-[var(--ink)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--ink-soft)]"
-                }`}
-                type="button"
-                onClick={() => setTranscriptViewMode("raw")}
-              >
-                原始稿
-              </button>
-            </div>
-          ) : null}
-          {renderTopActions("transcript")}
-        </div>
-      </div>
-
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.48fr)] lg:items-start">
         <div className="min-w-0">
           {isComparingTranscripts && canCompareTranscripts ? (
             <div className="grid gap-4 2xl:grid-cols-2">
@@ -459,13 +372,55 @@ export function TranscriptTab({
                   key={variantKey}
                   transcript={normalizedTranscriptVariants[variantKey]}
                   variantKey={variantKey}
-                  viewMode={transcriptViewMode}
+                  viewMode="final"
                 />
               ))}
             </div>
           ) : (
             <>
-              <label className="relative mb-3 block">
+              <div className="mb-3 flex items-end justify-between gap-4 select-none">
+                <div>
+                  <h3 className="font-editorial text-xl font-bold leading-7 text-[var(--ink)]">
+                    原文
+                  </h3>
+                  <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                    选中文本，加入摘录。
+                  </p>
+                  {sourceHint ? (
+                    <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                      {sourceHint}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {transcriptVariantKeys.length > 1 && !isComparingTranscripts ? (
+                    <select
+                      aria-label="选择转写稿版本"
+                      className="h-10 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-3 text-sm font-medium text-[var(--ink-soft)] outline-none transition focus:border-[var(--accent)]"
+                      value={selectedTranscriptVariant}
+                      onChange={(event) => {
+                        setSelectedTranscriptVariant(event.target.value);
+                      }}
+                    >
+                      {transcriptVariantKeys.map((variantKey) => (
+                        <option key={variantKey} value={variantKey}>
+                          {getTranscriptVariantLabel(variantKey)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  {canCompareTranscripts ? (
+                    <IconActionButton
+                      icon={GitCompareArrows}
+                      label={isComparingTranscripts ? "退出并排对比" : "并排对比转写稿"}
+                      pressed={isComparingTranscripts}
+                      onClick={() => setIsComparingTranscripts((current) => !current)}
+                    />
+                  ) : null}
+                  {renderTopActions("transcript")}
+                </div>
+              </div>
+              <label className="relative mb-3 block select-none">
                 <span className="sr-only">搜索并定位原文</span>
                 <Search
                   aria-hidden="true"
@@ -480,7 +435,9 @@ export function TranscriptTab({
                 />
               </label>
               <div
-                className="max-h-[650px] overflow-auto rounded-[2px] border border-[var(--line-strong)]"
+                className="rounded-[2px] border border-[var(--line-strong)]"
+                onPointerDown={handleExcerptPointerDown}
+                onPointerUp={handleExcerptPointerUp}
                 ref={(element) => {
                   transcriptTextRootRef.current = element;
                 }}
@@ -520,9 +477,7 @@ export function TranscriptTab({
             </>
           )}
         </div>
-        <aside className="max-h-[700px] min-w-0 overflow-y-auto pr-1 xl:sticky xl:top-[9rem]">
-          {renderNoteWorkflow()}
-        </aside>
+        {renderNoteWorkflow()}
       </div>
     </div>
   );

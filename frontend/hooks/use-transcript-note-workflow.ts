@@ -48,7 +48,11 @@ export function useTranscriptNoteWorkflow({
   const [selectedExcerpt, setSelectedExcerpt] = useState<SelectedExcerpt | null>(
     null
   );
+  const [recentlyAddedHighlightId, setRecentlyAddedHighlightId] = useState<
+    string | null
+  >(null);
   const transcriptTextRootRef = useRef<HTMLElement | null>(null);
+  const isSelectingExcerptRef = useRef(false);
   const draftHighlightsRef = useRef<SummaryHighlight[]>(draftHighlights);
   const editSaveTimeoutsRef = useRef<Record<string, number>>({});
   const editStatusTimeoutsRef = useRef<Record<string, number>>({});
@@ -70,6 +74,16 @@ export function useTranscriptNoteWorkflow({
     []
   );
 
+  const handleExcerptPointerDown = () => {
+    isSelectingExcerptRef.current = true;
+    setSelectedExcerpt(null);
+  };
+
+  const handleExcerptPointerUp = () => {
+    isSelectingExcerptRef.current = false;
+    setSelectedExcerpt(readSelectedExcerpt());
+  };
+
   useEffect(() => {
     setDraftHighlights(noteDraft?.highlights ?? []);
     const nextEditValues = buildDraftTextMap(noteDraft?.highlights ?? []);
@@ -78,6 +92,7 @@ export function useTranscriptNoteWorkflow({
     lastSavedTextRef.current = nextEditValues;
     setDraftMessage(null);
     setDraftErrorMessage(null);
+    setRecentlyAddedHighlightId(null);
   }, [noteDraft, sourceUrl]);
 
   useEffect(() => {
@@ -90,6 +105,9 @@ export function useTranscriptNoteWorkflow({
 
   useEffect(() => {
     const handleSelectionChange = () => {
+      if (isSelectingExcerptRef.current) {
+        return;
+      }
       setSelectedExcerpt(readSelectedExcerpt());
     };
 
@@ -112,7 +130,8 @@ export function useTranscriptNoteWorkflow({
 
   const persistDraft = async (
     nextHighlights: SummaryHighlight[],
-    successMessage: string
+    successMessage: string,
+    addedHighlightId?: string
   ) => {
     if (!sourceUrl) {
       setDraftErrorMessage("当前内容没有可保存的源链接。");
@@ -137,6 +156,10 @@ export function useTranscriptNoteWorkflow({
       lastSavedTextRef.current = savedEditValues;
       setDraftMessage(successMessage);
       window.setTimeout(() => setDraftMessage(null), 1800);
+      if (addedHighlightId) {
+        setRecentlyAddedHighlightId(addedHighlightId);
+        window.setTimeout(() => setRecentlyAddedHighlightId(null), 2200);
+      }
     } catch (error) {
       setDraftHighlights(previousHighlights);
       setDraftEditValues(previousEditValues);
@@ -274,7 +297,11 @@ export function useTranscriptNoteWorkflow({
       return;
     }
 
-    await persistDraft([nextHighlight, ...draftHighlights], "已加入摘录草稿。");
+    await persistDraft(
+      [...draftHighlights, nextHighlight],
+      "已加入摘录草稿。",
+      nextHighlight.id
+    );
   };
 
   const handleAddSelectedExcerpt = async () => {
@@ -285,7 +312,11 @@ export function useTranscriptNoteWorkflow({
     }
 
     const nextHighlight = buildManualHighlightFromExcerpt(excerpt, textSourceType);
-    await persistDraft([nextHighlight, ...draftHighlights], "手动摘录已保存。");
+    await persistDraft(
+      [...draftHighlights, nextHighlight],
+      "手动摘录已保存。",
+      nextHighlight.id
+    );
     window.getSelection()?.removeAllRanges();
     setSelectedExcerpt(null);
   };
@@ -336,10 +367,13 @@ export function useTranscriptNoteWorkflow({
     handleAddSelectedExcerpt,
     handleDraftTextBlur,
     handleDraftTextChange,
+    handleExcerptPointerDown,
+    handleExcerptPointerUp,
     handleExportObsidianNote,
     handleRemoveHighlight,
     isExportingNote,
     isSavingDraft,
+    recentlyAddedHighlightId,
     savedHighlightIdentities,
     selectedExcerpt,
     transcriptTextRootRef
