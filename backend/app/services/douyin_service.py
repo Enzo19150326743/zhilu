@@ -34,6 +34,8 @@ DOUYIN_PAGE_MAX_BYTES = 8 * 1024 * 1024
 DOUYIN_DOWNLOAD_MAX_BYTES = 1024 * 1024 * 1024
 DOUYIN_BROWSER_TIMEOUT_SECONDS = 30
 DOUYIN_BROWSER_DOWNLOAD_TIMEOUT_SECONDS = 10 * 60
+DOUYIN_BROWSER_MAX_ATTEMPTS = 3
+DOUYIN_BROWSER_RETRY_DELAYS_SECONDS = (2, 5)
 DOWNLOAD_TEMP_SUFFIX = ".part"
 DOUYIN_BROWSER_SCRIPT = (
     Path(__file__).resolve().parents[3] / "scripts" / "extract-douyin-media.mjs"
@@ -137,9 +139,14 @@ def create_douyin_transcription_downloader(
                 "douyin browser audio download failed: %s",
                 error.__class__.__name__,
             )
+            message = (
+                "音频下载失败：抖音暂时没有返回播放详情，已自动重试，请稍后再试。"
+                if "request failed after retries" in str(error)
+                else "音频下载失败：平台没有返回可用于转写的媒体流，请稍后重试或更换公开视频链接。"
+            )
             raise _douyin_error(
                 "DOUYIN_AUDIO_DOWNLOAD_FAILED",
-                "音频下载失败：平台没有返回可用于转写的媒体流，请稍后重试或更换公开视频链接。",
+                message,
             ) from error
         return target_path
 
@@ -291,26 +298,10 @@ class DouyinPublicClient:
 
     def read_browser_item(self, source_url: str) -> dict[str, object] | None:
         """通过临时匿名浏览器读取抖音当前公开详情接口的响应。"""
-        node_executable = shutil.which("node") or shutil.which("node.exe")
-        if not node_executable:
-            raise OSError("node executable not found")
-        if not DOUYIN_BROWSER_SCRIPT.exists():
-            raise OSError("douyin browser helper not found")
-
-        try:
-            result = subprocess.run(
-                [node_executable, str(DOUYIN_BROWSER_SCRIPT), source_url],
-                capture_output=True,
-                check=False,
-                encoding="utf-8",
-                errors="replace",
-                timeout=DOUYIN_BROWSER_TIMEOUT_SECONDS,
-            )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            raise OSError("douyin browser fallback request failed") from error
-
-        if result.returncode != 0:
-            raise OSError("douyin browser fallback returned an error")
+        result = self._run_browser_helper(
+            [source_url],
+            timeout_seconds=DOUYIN_BROWSER_TIMEOUT_SECONDS,
+        )
         if len(result.stdout.encode("utf-8")) > DOUYIN_PAGE_MAX_BYTES:
             raise OSError("douyin browser fallback payload is too large")
 
@@ -323,35 +314,65 @@ class DouyinPublicClient:
 
     def download_browser_media(self, source_url: str, target_path: Path) -> None:
         """在匿名 Edge 会话中取得媒体流，避免脱离页面上下文后被平台拒绝。"""
+        self._run_browser_helper(
+            ["--download-media", str(target_path), source_url],
+            timeout_seconds=DOUYIN_BROWSER_DOWNLOAD_TIMEOUT_SECONDS,
+            failed_target_path=target_path,
+        )
+        if not target_path.is_file():
+            raise OSError("douyin browser media request returned no file")
+        if target_path.stat().st_size > DOUYIN_DOWNLOAD_MAX_BYTES:
+            target_path.unlink(missing_ok=True)
+            raise OSError("douyin browser media file is too large")
+
+    def _run_browser_helper(
+        self,
+        arguments: list[str],
+        *,
+        timeout_seconds: int,
+        failed_target_path: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """在独立匿名 Edge 会话中重试短暂缺失的抖音详情请求。"""
         node_executable = shutil.which("node") or shutil.which("node.exe")
         if not node_executable:
             raise OSError("node executable not found")
         if not DOUYIN_BROWSER_SCRIPT.exists():
             raise OSError("douyin browser helper not found")
 
-        try:
-            result = subprocess.run(
-                [
-                    node_executable,
-                    str(DOUYIN_BROWSER_SCRIPT),
-                    "--download-media",
-                    str(target_path),
-                    source_url,
-                ],
-                capture_output=True,
-                check=False,
-                encoding="utf-8",
-                errors="replace",
-                timeout=DOUYIN_BROWSER_DOWNLOAD_TIMEOUT_SECONDS,
-            )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            raise OSError("douyin browser media request failed") from error
+        for attempt in range(DOUYIN_BROWSER_MAX_ATTEMPTS):
+            try:
+                result = subprocess.run(
+                    [node_executable, str(DOUYIN_BROWSER_SCRIPT), *arguments],
+                    capture_output=True,
+                    check=False,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout_seconds,
+                )
+            except (OSError, subprocess.TimeoutExpired) as error:
+                result = None
+                failure_reason = error.__class__.__name__
+            else:
+                if result.returncode == 0:
+                    return result
+                failure_reason = _read_browser_failure_reason(result.stderr)
 
-        if result.returncode != 0 or not target_path.is_file():
-            raise OSError("douyin browser media request returned an error")
-        if target_path.stat().st_size > DOUYIN_DOWNLOAD_MAX_BYTES:
-            target_path.unlink(missing_ok=True)
-            raise OSError("douyin browser media file is too large")
+            if failed_target_path is not None:
+                failed_target_path.unlink(missing_ok=True)
+            if attempt == DOUYIN_BROWSER_MAX_ATTEMPTS - 1:
+                raise OSError(
+                    "douyin browser request failed after retries: "
+                    f"{failure_reason}"
+                )
+
+            delay_seconds = DOUYIN_BROWSER_RETRY_DELAYS_SECONDS[attempt]
+            logger.warning(
+                "douyin browser request failed; retry=%s/%s reason=%s",
+                attempt + 1,
+                DOUYIN_BROWSER_MAX_ATTEMPTS,
+                failure_reason,
+            )
+            time.sleep(delay_seconds)
 
     def _request(
         self,
@@ -377,6 +398,12 @@ class DouyinPublicClient:
             return response.status, headers, body
         finally:
             connection.close()
+
+
+def _read_browser_failure_reason(stderr: str) -> str:
+    """压缩浏览器脚本错误，供服务端日志区分超时与媒体流拒绝。"""
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    return lines[-1] if lines else "unknown"
 
 
 def _choose_page_url(resolved_url: str, video_id: str | None) -> str:

@@ -1,7 +1,10 @@
 import tempfile
 import unittest
 from pathlib import Path
+from subprocess import CompletedProcess
 from unittest.mock import patch
+
+from fastapi import HTTPException
 
 from app.services.douyin_service import (
     DouyinPublicClient,
@@ -11,6 +14,40 @@ from app.services.douyin_service import (
 
 
 class DouyinServiceTestCase(unittest.TestCase):
+    def test_browser_detail_request_retries_after_temporary_failure(self) -> None:
+        browser_item = {
+            "aweme_id": "445566",
+            "video": {"play_addr": {"url_list": ["https://media.example/video.mp4"]}},
+        }
+        failed_result = CompletedProcess(
+            args=[],
+            returncode=1,
+            stdout="",
+            stderr="page.waitForResponse: Timeout 15000ms exceeded",
+        )
+        successful_result = CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout='{"aweme_id": "445566", "video": {"play_addr": {"url_list": ["https://media.example/video.mp4"]}}}',
+            stderr="",
+        )
+
+        with (
+            patch("app.services.douyin_service.shutil.which", return_value="node"),
+            patch(
+                "app.services.douyin_service.subprocess.run",
+                side_effect=[failed_result, successful_result],
+            ) as run_browser,
+            patch("app.services.douyin_service.time.sleep") as sleep,
+        ):
+            result = DouyinPublicClient().read_browser_item(
+                "https://v.douyin.com/example/"
+            )
+
+        self.assertEqual(result, browser_item)
+        self.assertEqual(run_browser.call_count, 2)
+        sleep.assert_called_once_with(2)
+
     def test_transcription_downloader_uses_browser_media_request(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_dir = Path(temporary_directory)
@@ -23,6 +60,24 @@ class DouyinServiceTestCase(unittest.TestCase):
         download.assert_called_once_with(
             "https://v.douyin.com/example/",
             result,
+        )
+
+    def test_transcription_downloader_reports_retried_detail_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            downloader = create_douyin_transcription_downloader(
+                Path(temporary_directory)
+            )
+            with patch.object(
+                DouyinPublicClient,
+                "download_browser_media",
+                side_effect=OSError("douyin browser request failed after retries"),
+            ):
+                with self.assertRaises(HTTPException) as captured:
+                    downloader("https://v.douyin.com/example/")
+
+        self.assertEqual(
+            captured.exception.detail["message"],
+            "音频下载失败：抖音暂时没有返回播放详情，已自动重试，请稍后再试。",
         )
 
     def test_uses_browser_as_primary_parser_without_requesting_static_page(self) -> None:
