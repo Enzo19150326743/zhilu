@@ -83,28 +83,32 @@ def build_obsidian_markdown(
         detail.note_draft.highlights if detail.note_draft else []
     )
     frontmatter = _build_frontmatter(detail)
-    # NOTE: 结构化分析本身由 ## 一级小节组成（核心问题、论证、案例等），
-    # 直接平级输出，不再包裹“内容结构”标题；为空时不输出任何内容。
+    # NOTE: 深入区块由 AI 按文本证据决定，导出时直接保留其具体标题，
+    # 不再包裹一个没有信息量的固定“结构化分析”标题。
     content_structure = _format_content_structure(detail)
     sections = [
         frontmatter,
         f"# {video.title}",
         "## 一句话摘要",
         summary.tldr,
+        f"## {summary.key_points_title or '内容要点'}",
+        _format_markdown_list(summary.key_points),
     ]
+    content_outline = _format_content_outline(detail)
+    if content_outline:
+        sections.extend(["## 内容脉络", content_outline])
+    methods = _format_methods(detail)
+    if methods:
+        sections.extend([f"## {summary.method_title or '可借鉴的方法'}", methods])
     if content_structure:
         sections.append(content_structure)
     sections.extend([
-        "## 核心观点",
-        _format_markdown_list(summary.key_points),
         "## 原文摘录",
         _format_highlights(
             confirmed_highlights,
             callout_title="原文金句",
             empty_text="- 暂无原文金句。",
         ),
-        "## 可应用场景",
-        _format_application_clues(detail),
         "## 内容边界与待核实信息",
         _format_content_boundaries(detail, include_full_text),
     ])
@@ -158,13 +162,16 @@ def _format_markdown_list(items: list[str]) -> str:
 
 
 def _format_content_structure(detail: ParseResponse) -> str:
-    """返回结构化分析 markdown（核心问题、论证、案例、反例等）；为空时返回空串。"""
+    """返回动态深入区块 markdown；为空时不写入导出。"""
     return (detail.summary.structured_analysis_markdown or "").strip()
 
 
-def _format_application_clues(detail: ParseResponse) -> str:
-    items = detail.summary.application_clues or detail.summary.takeaways
-    return _format_markdown_list(items)
+def _format_content_outline(detail: ParseResponse) -> str:
+    return _format_markdown_list(detail.summary.content_outline) if detail.summary.content_outline else ""
+
+
+def _format_methods(detail: ParseResponse) -> str:
+    return _format_markdown_list(detail.summary.methods) if detail.summary.methods else ""
 
 
 def _format_content_boundaries(

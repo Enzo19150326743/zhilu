@@ -200,17 +200,27 @@ export function SummaryTab({
   }
 
   const topicTags = getTopicTags(summary);
-  const applicationClues =
-    summary.application_clues?.length
-      ? summary.application_clues
-      : summary.takeaways;
+  const keyPointsTitle = summary.key_points_title?.trim() || "内容要点";
+  const contentOutline = summary.content_outline ?? [];
+  const methods = summary.methods ?? [];
+  const deepDiveSections =
+    summary.deep_dive_sections?.length
+      ? summary.deep_dive_sections
+      : summary.structured_analysis_markdown.trim()
+        ? [
+            {
+              title: "结构化分析",
+              markdown: summary.structured_analysis_markdown
+            }
+          ]
+        : [];
 
   return (
     <div className="space-y-5">
       <section className="border-b-2 border-[var(--line-ink)] pb-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
-            <h3 className="font-editorial text-lg font-semibold text-[var(--ink)]">结构化总结</h3>
+            <h3 className="font-editorial text-lg font-semibold text-[var(--ink)]">内容总结</h3>
             <span
               className={`mono inline-flex items-center rounded-[2px] border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] ${
                 summaryGenerationMeta
@@ -291,7 +301,7 @@ export function SummaryTab({
         </div>
       ) : null}
 
-      <section aria-label="一句话总结" className="space-y-4 px-1 py-2">
+      <section aria-label="一句话概览" className="space-y-4 px-1 py-2">
         <span
           aria-hidden="true"
           className="block h-1 w-7 bg-[var(--accent)]"
@@ -316,7 +326,7 @@ export function SummaryTab({
       ) : null}
 
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
-        <SummarySectionHeading title="核心观点" />
+        <SummarySectionHeading title={keyPointsTitle} />
         <ol className="border-t border-[var(--line-strong)]">
           {summary.key_points.map((point, index) => (
             <li
@@ -334,29 +344,20 @@ export function SummaryTab({
         </ol>
       </section>
 
-      {summary.structured_analysis_markdown.trim() ? (
-        <section className="grid gap-5 border-y border-[var(--line-strong)] py-6 lg:grid-cols-[140px_1fr] lg:gap-8">
-          <SummarySectionHeading title="结构化分析" />
-          <SafeMarkdown markdown={summary.structured_analysis_markdown} />
-        </section>
-      ) : null}
-
-      {summary.timeline.length > 0 ? (
+      {contentOutline.length > 0 ? (
         <section>
-          <h3 className="text-sm font-semibold text-[var(--ink)]">
-            {isShownotes ? "笔记线索" : "结构线索"}
-          </h3>
+          <h3 className="text-sm font-semibold text-[var(--ink)]">内容脉络</h3>
           <div className="mt-3 border-y border-[var(--line-strong)]">
-            {summary.timeline.map((item, index) => (
+            {contentOutline.map((item, index) => (
               <div
                 className="grid grid-cols-[76px_1fr] border-b border-[var(--line)] last:border-b-0 even:bg-[var(--paper-deep)]/35"
-                key={`${item.time}-${item.content}`}
+                key={item}
               >
                 <div className="mono px-3 py-3 text-xs text-[var(--muted)]">
-                  {isShownotes ? `笔记 ${index + 1}` : item.time}
+                  {String(index + 1).padStart(2, "0")}
                 </div>
                 <div className="border-l border-[var(--line)] px-3 py-3 text-sm leading-6 text-[var(--ink-soft)]">
-                  {item.content}
+                  {item}
                 </div>
               </div>
             ))}
@@ -364,10 +365,11 @@ export function SummaryTab({
         </section>
       ) : null}
 
+      {methods.length > 0 ? (
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
-        <SummarySectionHeading title="可行动建议" />
+        <SummarySectionHeading title={summary.method_title || "可借鉴的方法"} />
         <ol className="grid border-t border-[var(--line-strong)] sm:grid-cols-2">
-          {applicationClues.map((item, index) => (
+          {methods.map((item, index) => (
             <li
               className="grid min-h-24 grid-cols-[34px_1fr] gap-3 border-b border-[var(--line)] py-4 sm:odd:pr-5 sm:even:border-l sm:even:pl-5"
               key={item}
@@ -382,6 +384,17 @@ export function SummaryTab({
           ))}
         </ol>
       </section>
+      ) : null}
+
+      {deepDiveSections.map((section) => (
+        <section
+          className="grid gap-5 border-y border-[var(--line-strong)] py-6 lg:grid-cols-[140px_1fr] lg:gap-8"
+          key={`${section.title}-${section.markdown}`}
+        >
+          <SummarySectionHeading title={section.title} />
+          <SafeMarkdown markdown={section.markdown} />
+        </section>
+      ))}
 
       {summary.content_boundaries?.length ? (
         <section className="rounded-[2px] border-2 border-[var(--line-ink)] bg-[#f7ead9] px-4 py-4">

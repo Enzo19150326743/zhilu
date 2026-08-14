@@ -7,7 +7,7 @@
 
 - 功能目标：把单个媒体来源转换为不依赖特定用户背景的通用知识草稿。
 - 核心入口：`POST /api/summarize` 生成结构化总结，`POST /api/exports/obsidian-note` 生成通用 Markdown。
-- 当前草稿版本：`1.0`。
+- 当前草稿版本：`1.1`。
 
 第一阶段只负责提取来源中的事实、观点、结构、可靠摘录、通用应用线索和证据边界。个人价值观、创作风格、长期目标、选题判断和固定 Obsidian 页面由后续个人数字分身阶段处理。
 
@@ -24,9 +24,12 @@
 
 ### 3.1 通用总结合同
 
-- `draft_version`：新结果固定为 `1.0`；旧记录缺失时解析为 `legacy`。
+- `draft_version`：新结果固定为 `1.1`；旧记录缺失时解析为 `legacy`。
+- `summary_profile`：仅用于判断摘要的主表达形态，取值为 information、viewpoint、method、narrative 或 generic；无法可靠判断时回落为 generic。
+- `key_points_title`、`content_outline`：让“关键信息 / 核心观点 / 关键方法”等标题和内容脉络随文本变化，而不是固定套用“核心观点”。
+- `methods`、`deep_dive_sections`：只有文本中存在明确可复用做法或足够深入依据时才出现；不再生成面向用户的固定行动建议。
 - `content_keywords`：只描述当前内容本身。
-- `application_clues`：面向任意用户的复习、创作、决策、实践或核查线索。
+- `application_clues`、`takeaways`：仅保留为旧 JSON 兼容字段；新结果由 `methods` 表达有文本依据的可借鉴做法。
 - `content_boundaries`：文本来源、证据范围、ASR 误差和待核实信息。
 - `topics`、`takeaways`、`search_keywords` 继续保留，分别与通用主题、应用线索和关键词保持兼容。
 - 旧个人化字段保留默认值以读取历史 JSON，但新提示词与新 Markdown 不消费它们。
@@ -35,7 +38,7 @@
 
 ```text
 媒体元数据 + 当前内容文本
-→ summarize_service 生成 draft_version=1.0 的通用 JSON
+→ summarize_service 生成 draft_version=1.1 的通用 JSON
 → VideoSummary 校验并写回原有 payload_json.summary
 → 现有前端继续展示 summary / highlights / mindmap
 → obsidian_export_service 读取通用字段和摘录草稿
@@ -48,7 +51,7 @@ SQLite 表结构、原始字幕、Whisper 原始稿、校对稿、QA、导图和
 
 YAML 必备字段：草稿版本、标题、内容类型、平台、原始作者、源链接、处理日期、内容关键词。已有可靠时长时补充时长；没有稳定发布日期时不编造。
 
-正文固定为：一句话摘要、内容结构、核心观点、可靠原文摘录、通用应用线索、内容边界与待核实信息。存在 AI 摘录候选时，额外输出“AI 候选摘录（未确认）”。默认不附完整逐字稿。
+正文由内容动态决定：一句话摘要、关键信息 / 核心观点 / 关键方法、内容脉络、可借鉴的方法、深入解读、可靠原文摘录、内容边界与待核实信息。没有文本依据的模块不输出；默认不附完整逐字稿。
 
 ### 3.4 摘录边界
 

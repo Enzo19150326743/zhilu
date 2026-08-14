@@ -683,7 +683,7 @@ test("资料库危险操作使用站内确认并可取消", async ({ page }) => 
   expect(browserErrors).toEqual([]);
 });
 
-test("一句话总结使用顶部横向强调线", async ({ page }) => {
+test("一句话概览使用顶部横向强调线", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await installApiMocks(page);
   await page.goto("/");
@@ -691,7 +691,7 @@ test("一句话总结使用顶部横向强调线", async ({ page }) => {
   await page.getByRole("button", { name: "已总结 1" }).click();
   await page.getByRole("button", { name: "已总结演示", exact: true }).click();
 
-  const tldrRegion = page.getByRole("region", { name: "一句话总结" });
+  const tldrRegion = page.getByRole("region", { name: "一句话概览" });
   const accent = tldrRegion.locator('[data-summary-accent="true"]');
   const accentBox = await accent.boundingBox();
   expect(accentBox).not.toBeNull();

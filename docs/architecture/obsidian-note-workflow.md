@@ -33,8 +33,8 @@ frontend/
 
 - `SummaryHighlight`：摘录结构，包含 `id`、`text`、`start`、`end`、`reason`、`tags`、`source`、`source_type`、`created_at`。
 - `VideoSummary.highlights`：AI 总结结果里的候选摘录；旧记录缺失该字段时默认为空数组。
-- `VideoSummary.draft_version`：新通用草稿固定为 `1.0`；旧记录缺失时解析为 `legacy`。
-- `VideoSummary.content_keywords`、`application_clues`、`content_boundaries`：通用关键词、应用线索和来源 / 证据边界。
+- `VideoSummary.draft_version`：新通用草稿固定为 `1.1`；旧记录缺失时解析为 `legacy`。
+- `VideoSummary.content_keywords`、`methods`、`content_boundaries`：通用关键词、原内容中有依据的可借鉴方法、来源 / 证据边界。
 - `NoteDraft`：当前媒体摘录草稿，包含 `highlights` 和 `updated_at`。
 - `ParseResponse.note_draft`：本地历史详情返回时携带摘录草稿。
 - SQLite 仍只使用 `library_items.payload_json` 保存完整工作台数据；摘录草稿存放在 `payload_json.note_draft`，不新增独立表。

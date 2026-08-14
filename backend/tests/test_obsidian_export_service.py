@@ -158,7 +158,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail)
 
-        self.assertIn('草稿版本: "1.0"', markdown)
+        self.assertIn('草稿版本: "1.1"', markdown)
         self.assertIn('标题: "示例内容"', markdown)
         self.assertIn('内容类型: "视频"', markdown)
         self.assertIn('平台: "example"', markdown)
@@ -181,7 +181,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
     def test_markdown_contains_generic_sections_and_no_full_text_or_timeline(self) -> None:
         """
-        通用正文保留结构、应用线索和边界，但不附完整逐字稿或不可靠时间点。
+        通用正文按内容保留动态区块和边界，但不附完整逐字稿或不可靠时间点。
         """
         detail = _build_parse_response(summary_highlights=[], note_draft=None)
 
@@ -189,8 +189,8 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         self.assertIn("## 一句话摘要", markdown)
         self.assertNotIn("## 内容结构", markdown)
-        self.assertIn("## 核心观点", markdown)
-        self.assertIn("## 可应用场景", markdown)
+        self.assertIn("## 内容要点", markdown)
+        self.assertNotIn("## 可应用场景", markdown)
         self.assertIn("## 内容边界与待核实信息", markdown)
         self.assertIn("ASR 可能存在识别误差", markdown)
         self.assertNotIn("## 压缩时间轴", markdown)

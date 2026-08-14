@@ -13,6 +13,10 @@ const MEDIA_MAX_BYTES = 1024 * 1024 * 1024;
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const frontendRequire = createRequire(join(scriptDirectory, "../frontend/package.json"));
 const { chromium } = frontendRequire("playwright");
+// 使用独立于用户日常浏览器资料的 Edge profile。抖音会给新会话分配状态，
+// 每次都从 Playwright 临时 profile 启动会显著增加详情接口偶发缺失的概率。
+const browserProfileDirectory = process.env.DOUYIN_BROWSER_PROFILE_DIR?.trim()
+  || join(scriptDirectory, "../../private/douyin-edge-profile");
 
 function resolveBrowserExecutable() {
   const configuredPath = process.env.DOUYIN_BROWSER_EXECUTABLE?.trim();
@@ -116,15 +120,15 @@ async function main() {
     throw new Error("未找到本机 Edge 或 Chrome。可通过 DOUYIN_BROWSER_EXECUTABLE 配置浏览器路径。");
   }
 
-  const browser = await chromium.launch({
+  await fs.mkdir(browserProfileDirectory, { recursive: true });
+  const context = await chromium.launchPersistentContext(browserProfileDirectory, {
     executablePath,
     headless: true
   });
 
   try {
-    const page = await browser.newPage({
-      viewport: { width: 1280, height: 720 }
-    });
+    const page = context.pages()[0] ?? await context.newPage();
+    await page.setViewportSize({ width: 1280, height: 720 });
     const detailResponsePromise = page.waitForResponse(
       (response) =>
         response.request().method() === "GET" &&
@@ -154,7 +158,7 @@ async function main() {
 
     process.stdout.write(JSON.stringify(payload.aweme_detail));
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 

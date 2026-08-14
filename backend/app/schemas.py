@@ -409,6 +409,13 @@ class QaRequest(BaseModel):
     timeline: list[TimelineItem] = Field(default_factory=list)
 
 
+class SummaryDetailSection(BaseModel):
+    """按内容证据动态出现的深入解读区块。"""
+
+    title: str = Field(min_length=1, max_length=80)
+    markdown: str = Field(min_length=1, max_length=12000)
+
+
 class VideoSummary(BaseModel):
     """AI 结构化总结。"""
 
@@ -424,6 +431,13 @@ class VideoSummary(BaseModel):
     content_keywords: list[str] = Field(default_factory=list)
     application_clues: list[str] = Field(default_factory=list)
     content_boundaries: list[str] = Field(default_factory=list)
+    # NOTE: 1.1 起由内容文本决定展示结构；旧字段继续保留，保证历史档案可读取。
+    summary_profile: str = Field(default="generic", max_length=40)
+    key_points_title: str = Field(default="内容要点", max_length=80)
+    content_outline: list[str] = Field(default_factory=list)
+    method_title: str | None = Field(default=None, max_length=80)
+    methods: list[str] = Field(default_factory=list)
+    deep_dive_sections: list[SummaryDetailSection] = Field(default_factory=list)
     # NOTE: 以下字段只用于兼容旧数字分身草稿记录，新版通用总结不再生成或消费。
     reason_for_saving: str | None = Field(default=None, max_length=1200)
     personal_relevance: list[str] = Field(default_factory=list)

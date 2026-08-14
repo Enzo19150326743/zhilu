@@ -9,6 +9,7 @@ import json_repair
 
 from app.schemas import (
     MindmapMeta,
+    SummaryDetailSection,
     SummaryHighlight,
     SummarizeRequest,
     SummarizeResponse,
@@ -33,7 +34,7 @@ DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
 DEFAULT_DEEPSEEK_MAX_TOKENS = 8192
 DEFAULT_DEEPSEEK_THINKING_TYPE = "disabled"
 DEFAULT_DEEPSEEK_TIMEOUT_SECONDS = 180
-UNIVERSAL_KNOWLEDGE_DRAFT_VERSION = "1.0"
+UNIVERSAL_KNOWLEDGE_DRAFT_VERSION = "1.1"
 AiRequester = Callable[[SummarizeRequest], str]
 
 _DEEPSEEK_SYSTEM_PROMPT = (
@@ -85,6 +86,13 @@ MINDMAP_CATEGORY_LABELS = {
     "business_tech": "商业科技 / 干货",
     "interview_podcast": "访谈播客",
     "tutorial_howto": "教程方法",
+}
+SUMMARY_PROFILE_TITLES = {
+    "information": "关键信息",
+    "viewpoint": "核心观点",
+    "method": "关键方法",
+    "narrative": "重要经历与启发",
+    "generic": "内容要点",
 }
 
 
@@ -432,12 +440,15 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 通用总结规则：
 - 只根据当前媒体元数据和内容文本总结，不引用或推断任何用户的个人背景。
 - 必须完整覆盖内容文本的开头、中段和结尾，不能只抓开头，也不要为了简短遗漏后半段的重要转折或结论。
-- key_points 返回 5 到 8 条，概括核心观点、依据、案例和观点之间的关系；不把外部作者观点等同于任何用户的观点。
-- structured_analysis_markdown 必须根据当前内容类型动态组织，优先写清核心问题、论证或方法、案例与依据、适用条件、反例或争议、结论与行动线索。
+- 先判断 summary_profile：information（时讯、事实、变化）、viewpoint（观点、访谈、商业观察）、method（教程、方法论）、narrative（故事、经历）或 generic（无法可靠判断）。
+- key_points 返回 3 到 6 条，必须和 summary_profile 对应：信息类提炼事实、变化和影响；观点类提炼判断、理由和分歧；方法类提炼目标、步骤和条件；叙事类提炼关键经历、转折和启发。不要把外部作者观点等同于任何用户的观点。
+- key_points_title 必须使用对应标题：information 为“关键信息”、viewpoint 为“核心观点”、method 为“关键方法”、narrative 为“重要经历与启发”、generic 为“内容要点”。
+- content_outline 只在文本存在清晰的阶段、论证或叙事推进时返回 3 到 6 条；否则返回空数组。每一条都必须是一句可独立阅读的完整脉络：写明“这一段谈什么 + 得出什么判断/发生什么变化 + 为什么或凭什么”。不要只返回“提出问题”“分析三大支柱”这类目录标题。原文足够时，每条控制在约 35 到 90 个汉字，保留关键对象、因果关系和数据/案例线索。
+- methods 只提取文本中明确出现、可复用的做法，并写清适用条件或限制；没有足够依据时必须返回空数组。不得把常识性劝告、泛泛复习建议或模型自行推导的行动建议写入 methods。
+- deep_dive_sections 只返回有文本依据的深入模块，可使用“论证与依据”“案例与背景”“争议与限制”等具体标题；没有足够信息时返回空数组。不得生成名为“结构化分析”的空泛固定栏目。对于超过 2,000 字、且存在明确观点推进、数据、案例或因果论证的文本，必须返回 2 到 3 个模块；每个模块至少写 2 段或 3 条要点，说明“主张是什么、文本给出的依据是什么、两者如何相连”，并点出具体数据、人物、案例或限制（仅限原文确实出现者）。不要用一句“作者通过历史数据支撑观点”代替证据说明。
 - 不要强行凑齐原文没有的栏目；证据不足或无法确定的内容写入 content_boundaries，不要编造补全。
 - 内容类型当前只允许“视频”和“播客”；不要输出“文章”，除非后续明确上线文章解析功能。
 - topics 和 content_keywords 只描述当前内容本身，不包含“视频”“播客”这类媒介形态。
-- application_clues 面向所有用户，说明内容可用于复习、创作、决策、实践或继续核查的通用线索。
 - content_boundaries 记录证据不足、文本来源限制、ASR 误差或需要结合原媒体核实的内容。
 - 不输出个人价值判断、个人表达风格、个人目标、个人选题、固定知识库页面或双链。
 - 不生成时间轴、时间点、开始时间或结束时间；当前转写片段时间不够可靠。
@@ -468,11 +479,17 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
   "draft_version": "{UNIVERSAL_KNOWLEDGE_DRAFT_VERSION}",
   "content_type": "视频或播客",
   "topics": ["当前内容的通用主题，不包含视频或播客"],
+  "summary_profile": "information、viewpoint、method、narrative 或 generic",
   "tldr": "一句话总结",
-  "key_points": ["覆盖开头、中段和结尾的核心要点，共 5 到 8 条"],
-  "structured_analysis_markdown": "## 核心问题\\n### 论证、案例、条件与结论",
+  "key_points_title": "关键信息、核心观点、关键方法、重要经历与启发或内容要点",
+  "key_points": ["覆盖开头、中段和结尾的 3 到 6 条重点内容"],
+  "content_outline": ["一条包含主题、判断和因果/证据线索的完整内容脉络；没有清晰推进时为空数组"],
+  "method_title": "存在 methods 时固定为可借鉴的方法，否则为 null",
+  "methods": ["文本中明确出现的方法、适用条件和限制；没有则为空数组"],
+  "deep_dive_sections": [
+    {{"title": "论证与依据", "markdown": "用 2 段或 3 条要点展开主张、原文依据及其关系；没有足够信息则整个数组为空"}}
+  ],
   "content_keywords": ["只描述当前内容的关键词，不超过 8 个"],
-  "application_clues": ["面向任意用户的通用使用线索"],
   "quotes": [
     {{
       "text": "来自内容文本的原文摘录",
@@ -546,10 +563,30 @@ def _build_ai_summary_response(
         payload.get("topics"),
         summarize_request,
     )
-    application_clues = _safe_text_list(
-        payload.get("application_clues", payload.get("takeaways")),
-        ["建议结合当前内容文本复核关键结论。"],
-    )[:6]
+    summary_profile = _safe_summary_profile(payload.get("summary_profile"))
+    key_points_title = _safe_key_points_title(
+        payload.get("key_points_title"),
+        summary_profile,
+    )
+    content_outline = _safe_text_list(payload.get("content_outline"), [])[:6]
+    methods = _safe_text_list(payload.get("methods"), [])[:5]
+    deep_dive_sections = _safe_deep_dive_sections(
+        payload.get("deep_dive_sections")
+    )
+    # NOTE: 已保存的 1.0 结果只有一段结构化 Markdown；解析时包装成动态区块，
+    # 让前端和导出可以用同一套新结构读取历史数据。
+    if not deep_dive_sections:
+        legacy_analysis = _safe_text(
+            payload.get("structured_analysis_markdown"),
+            "",
+        )
+        if legacy_analysis:
+            deep_dive_sections = [
+                SummaryDetailSection(
+                    title="结构化分析",
+                    markdown=legacy_analysis,
+                )
+            ]
     content_boundaries = _safe_content_boundaries(
         payload.get("content_boundaries"),
         summarize_request,
@@ -564,18 +601,21 @@ def _build_ai_summary_response(
         tldr=_safe_text(payload.get("tldr"), "AI 已生成总结。"),
         key_points=_safe_text_list(payload.get("key_points"), ["内容文本已完成结构化整理。"]),
         timeline=[],
-        structured_analysis_markdown=_safe_text(
-            payload.get("structured_analysis_markdown"),
-            "## 结构化分析\n### 当前媒体内容\nAI 已基于内容文本生成结构化摘要。",
-        ),
-        takeaways=application_clues,
+        structured_analysis_markdown=_build_deep_dive_markdown(deep_dive_sections),
+        takeaways=methods,
         highlights=_safe_highlights(
             payload.get("quotes", payload.get("highlights")),
             summarize_request,
         ),
         content_keywords=content_keywords,
-        application_clues=application_clues,
+        application_clues=methods,
         content_boundaries=content_boundaries,
+        summary_profile=summary_profile,
+        key_points_title=key_points_title,
+        content_outline=content_outline,
+        method_title=("可借鉴的方法" if methods else None),
+        methods=methods,
+        deep_dive_sections=deep_dive_sections,
         search_keywords=content_keywords,
     )
     mindmap_markdown = _safe_text(
@@ -658,8 +698,15 @@ def _repair_common_json_text(json_text: str) -> str:
         "draft_version",
         "tldr",
         "content_type",
+        "summary_profile",
         "topics",
         "key_points",
+        "key_points_title",
+        "content_outline",
+        "method_title",
+        "methods",
+        "deep_dive_sections",
+        "markdown",
         "reason_for_saving",
         "personal_relevance",
         "transformation_ideas",
@@ -813,10 +860,6 @@ def _build_local_summary(
     snippets = _extract_snippets(transcript)
     text_label = _get_text_source_label(summarize_request)
     content_keywords = _infer_local_content_keywords(summarize_request)
-    application_clues = [
-        "可先用基础摘要快速判断当前内容是否值得继续阅读或收听。",
-        "建议在获得 AI 结构化总结后，再结合原文复核关键结论。",
-    ]
     summary = VideoSummary(
         draft_version=UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
         content_type=_get_obsidian_content_type_label(summarize_request),
@@ -828,18 +871,18 @@ def _build_local_summary(
             snippets[0] if snippets else "建议优先确认该媒体内容存在可用文本。",
         ],
         timeline=[],
-        structured_analysis_markdown=(
-            f"## {title}\n"
-            "### 当前状态\n"
-            f"已获得{text_label}，当前生成基础摘要。\n"
-            "### 内容线索\n"
-            f"{_format_markdown_list(snippets)}"
-        ),
-        takeaways=application_clues,
+        structured_analysis_markdown="",
+        takeaways=[],
         highlights=_build_local_highlights(summarize_request),
         content_keywords=content_keywords,
-        application_clues=application_clues,
+        application_clues=[],
         content_boundaries=_build_default_content_boundaries(summarize_request),
+        summary_profile="generic",
+        key_points_title=SUMMARY_PROFILE_TITLES["generic"],
+        content_outline=snippets,
+        method_title=None,
+        methods=[],
+        deep_dive_sections=[],
         search_keywords=content_keywords,
     )
     mindmap_meta = _build_local_mindmap_meta(summarize_request)
@@ -1021,6 +1064,54 @@ def _safe_text_list(value: Any, fallback: list[str]) -> list[str]:
 
     result = [item.strip() for item in value if isinstance(item, str) and item.strip()]
     return result or fallback
+
+
+def _safe_summary_profile(value: Any) -> str:
+    if isinstance(value, str):
+        normalized_value = value.strip().lower()
+        if normalized_value in SUMMARY_PROFILE_TITLES:
+            return normalized_value
+
+    return "generic"
+
+
+def _safe_key_points_title(value: Any, summary_profile: str) -> str:
+    fallback = SUMMARY_PROFILE_TITLES.get(
+        summary_profile,
+        SUMMARY_PROFILE_TITLES["generic"],
+    )
+    if isinstance(value, str) and value.strip() == fallback:
+        return fallback
+
+    return fallback
+
+
+def _safe_deep_dive_sections(value: Any) -> list[SummaryDetailSection]:
+    if not isinstance(value, list):
+        return []
+
+    sections: list[SummaryDetailSection] = []
+    seen_titles: set[str] = set()
+    for item in value[:3]:
+        if not isinstance(item, dict):
+            continue
+        title = _safe_text(item.get("title"), "")[:80]
+        markdown = _safe_text(item.get("markdown"), "")[:12000]
+        normalized_title = re.sub(r"\s+", "", title)
+        if not title or not markdown or normalized_title in seen_titles:
+            continue
+        seen_titles.add(normalized_title)
+        sections.append(SummaryDetailSection(title=title, markdown=markdown))
+
+    return sections
+
+
+def _build_deep_dive_markdown(sections: list[SummaryDetailSection]) -> str:
+    return "\n\n".join(
+        f"## {section.title}\n{section.markdown.strip()}"
+        for section in sections
+        if section.title.strip() and section.markdown.strip()
+    )
 
 
 def _normalize_content_type(

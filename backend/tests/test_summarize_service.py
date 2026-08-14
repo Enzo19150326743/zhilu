@@ -42,7 +42,9 @@ class SummarizeServiceTests(unittest.TestCase):
             UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
         )
         self.assertTrue(response.summary.content_keywords)
-        self.assertTrue(response.summary.application_clues)
+        self.assertEqual(response.summary.methods, [])
+        self.assertEqual(response.summary.key_points_title, "内容要点")
+        self.assertTrue(response.summary.content_outline)
         self.assertTrue(response.summary.content_boundaries)
         self.assertEqual(response.summary.personal_relevance, [])
         self.assertEqual(response.summary.related_wikilinks, [])
@@ -58,13 +60,19 @@ class SummarizeServiceTests(unittest.TestCase):
             video_title="AI 访谈",
         )
         payload = {
-            "draft_version": "1.0",
+            "draft_version": "1.1",
             "content_type": "播客",
             "topics": ["AI 产品", "工作流"],
+            "summary_profile": "viewpoint",
             "tldr": "一句话总结",
+            "key_points_title": "核心观点",
             "key_points": ["观点一", "观点二"],
-            "structured_analysis_markdown": "## 分析\n### 观点",
-            "application_clues": ["可用于复习 AI 产品工作流的关键步骤"],
+            "content_outline": ["先讨论 AI 产品定位", "再分析工作流"],
+            "method_title": "可借鉴的方法",
+            "methods": ["先验证用户需求，再确定产品定位。"],
+            "deep_dive_sections": [
+                {"title": "论证与依据", "markdown": "### 观点\n通过案例说明产品定位。"}
+            ],
             "content_keywords": ["AI 产品", "工作流", "内容总结"],
             "content_boundaries": ["当前结论只覆盖给定内容文本"],
             "quotes": [
@@ -96,9 +104,15 @@ class SummarizeServiceTests(unittest.TestCase):
         self.assertEqual(response.summary.topics, ["AI 产品", "工作流"])
         self.assertEqual(response.summary.timeline, [])
         self.assertEqual(
-            response.summary.application_clues,
-            ["可用于复习 AI 产品工作流的关键步骤"],
+            response.summary.methods,
+            ["先验证用户需求，再确定产品定位。"],
         )
+        self.assertEqual(response.summary.summary_profile, "viewpoint")
+        self.assertEqual(response.summary.key_points_title, "核心观点")
+        self.assertEqual(response.summary.content_outline, ["先讨论 AI 产品定位", "再分析工作流"])
+        self.assertEqual(response.summary.method_title, "可借鉴的方法")
+        self.assertEqual(response.summary.deep_dive_sections[0].title, "论证与依据")
+        self.assertIn("## 论证与依据", response.summary.structured_analysis_markdown)
         self.assertEqual(
             response.summary.content_keywords,
             ["AI 产品", "工作流", "内容总结"],
@@ -107,7 +121,7 @@ class SummarizeServiceTests(unittest.TestCase):
             "当前结论只覆盖给定内容文本",
             response.summary.content_boundaries,
         )
-        self.assertEqual(response.summary.takeaways, response.summary.application_clues)
+        self.assertEqual(response.summary.takeaways, response.summary.methods)
         self.assertEqual(response.summary.search_keywords, response.summary.content_keywords)
         self.assertEqual(response.summary.personal_relevance, [])
         self.assertEqual(response.summary.transformation_ideas, [])
@@ -256,9 +270,11 @@ class SummarizeServiceTests(unittest.TestCase):
         self.assertIn("shownotes 只能代表公开内容简介", prompt)
         self.assertIn('"content_type": "视频或播客"', prompt)
         self.assertIn('"quotes"', prompt)
-        self.assertIn('"draft_version": "1.0"', prompt)
+        self.assertIn('"draft_version": "1.1"', prompt)
         self.assertIn('"content_keywords"', prompt)
-        self.assertIn('"application_clues"', prompt)
+        self.assertIn('"summary_profile"', prompt)
+        self.assertIn('"methods"', prompt)
+        self.assertIn('"deep_dive_sections"', prompt)
         self.assertIn('"content_boundaries"', prompt)
         self.assertIn("mindmap_meta", prompt)
         self.assertNotIn("视频字幕", prompt)

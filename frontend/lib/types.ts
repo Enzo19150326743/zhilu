@@ -170,6 +170,11 @@ export interface NoteDraft {
   updated_at?: string | null;
 }
 
+export interface SummaryDetailSection {
+  title: string;
+  markdown: string;
+}
+
 export interface VideoSummary {
   draft_version?: string;
   content_type?: string | null;
@@ -183,6 +188,12 @@ export interface VideoSummary {
   content_keywords?: string[];
   application_clues?: string[];
   content_boundaries?: string[];
+  summary_profile?: string;
+  key_points_title?: string;
+  content_outline?: string[];
+  method_title?: string | null;
+  methods?: string[];
+  deep_dive_sections?: SummaryDetailSection[];
   // 旧个性化草稿字段仅用于兼容历史记录，新版通用总结不再生成。
   reason_for_saving?: string | null;
   personal_relevance?: string[];
