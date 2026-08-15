@@ -48,9 +48,6 @@ export function getTranscriptVariantLabel(variantKey: string): string {
   if (variantKey === "sensevoice_small") {
     return "SenseVoiceSmall";
   }
-  if (variantKey === "fun_asr_flash") {
-    return "Fun-ASR-Flash";
-  }
   return variantKey;
 }
 
@@ -60,9 +57,6 @@ export function inferTranscriptVariantKey(
   const engine = transcript.asr_meta?.engine?.toLowerCase() ?? "";
   if (engine.includes("sensevoice")) {
     return "sensevoice_small";
-  }
-  if (engine.includes("fun-asr")) {
-    return "fun_asr_flash";
   }
   return "local_whisper";
 }

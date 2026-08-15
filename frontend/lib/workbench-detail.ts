@@ -125,9 +125,7 @@ export function buildTranscribedDetail(
     const existingEngine = baseDetail.transcript.asr_meta.engine.toLowerCase();
     const existingKey = existingEngine.includes("sensevoice")
       ? "sensevoice_small"
-      : existingEngine.includes("fun-asr")
-        ? "fun_asr_flash"
-        : "local_whisper";
+      : "local_whisper";
     existingVariants[existingKey] = baseDetail.transcript;
   }
   existingVariants[transcriptVariantKey] = transcript;

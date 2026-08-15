@@ -54,14 +54,6 @@ class SummarizeRequestSchemaTests(unittest.TestCase):
 
         self.assertEqual(request.asr_engine, "local_whisper")
 
-    def test_transcribe_request_accepts_fun_asr_flash(self) -> None:
-        request = TranscribeRequest(
-            url="https://example.com/video",
-            asr_engine="fun_asr_flash",
-        )
-
-        self.assertEqual(request.asr_engine, "fun_asr_flash")
-
     def test_transcribe_request_accepts_sensevoice_small(self) -> None:
         request = TranscribeRequest(
             url="https://example.com/video",
@@ -75,6 +67,13 @@ class SummarizeRequestSchemaTests(unittest.TestCase):
             TranscribeRequest(
                 url="https://example.com/video",
                 asr_engine="unknown",  # type: ignore[arg-type]
+            )
+
+    def test_transcribe_request_rejects_removed_cloud_engine(self) -> None:
+        with self.assertRaises(ValidationError):
+            TranscribeRequest(
+                url="https://example.com/video",
+                asr_engine="fun_asr_flash",  # type: ignore[arg-type]
             )
 
 

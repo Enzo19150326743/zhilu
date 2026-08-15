@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, Cpu, FileAudio, HardDrive, Loader2 } from "lucide-react";
+import { Cpu, FileAudio, HardDrive, Loader2 } from "lucide-react";
 import { ModalDialog } from "./ModalDialog";
 import { TranscribeSettingsPanel } from "./TranscribeSettingsPanel";
 import type { AsrEngine, TranscribeContextSettings } from "@/lib/types";
@@ -10,7 +10,6 @@ interface TranscribeSettingsDialogProps {
   isTranscribing: boolean;
   settings: TranscribeContextSettings;
   asrEngine: AsrEngine;
-  cloudAvailable: boolean;
   sensevoiceAvailable: boolean;
   correctionAvailable: boolean;
   onChange: (settings: TranscribeContextSettings) => void;
@@ -37,7 +36,6 @@ export function TranscribeSettingsDialog({
   isTranscribing,
   settings,
   asrEngine,
-  cloudAvailable,
   sensevoiceAvailable,
   correctionAvailable,
   onChange,
@@ -50,8 +48,7 @@ export function TranscribeSettingsDialog({
   }
 
   const selectedEngineUnavailable =
-    (asrEngine === "fun_asr_flash" && !cloudAvailable) ||
-    (asrEngine === "sensevoice_small" && !sensevoiceAvailable);
+    asrEngine === "sensevoice_small" && !sensevoiceAvailable;
 
   return (
     <ModalDialog
@@ -79,7 +76,7 @@ export function TranscribeSettingsDialog({
     >
       <div className="mb-5 space-y-2">
         <p className="text-xs font-medium text-[var(--muted)]">识别方式</p>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           <button
             aria-label="SenseVoice（推荐）"
             className={`${ENGINE_OPTION_BASE_CLASS_NAME} ${
@@ -128,29 +125,6 @@ export function TranscribeSettingsDialog({
             </span>
           </button>
 
-          <button
-            aria-label="云端快速识别"
-            className={`${ENGINE_OPTION_BASE_CLASS_NAME} ${
-              asrEngine === "fun_asr_flash"
-                ? ENGINE_OPTION_SELECTED_CLASS_NAME
-                : ENGINE_OPTION_IDLE_CLASS_NAME
-            }`}
-            disabled={isTranscribing || !cloudAvailable}
-            type="button"
-            onClick={() => onChangeAsrEngine("fun_asr_flash")}
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold">
-              <Cloud className="h-4 w-4" aria-hidden="true" />
-              云端快速识别
-            </span>
-            <span
-              className={getEngineDescriptionClassName(
-                asrEngine === "fun_asr_flash"
-              )}
-            >
-              {cloudAvailable ? "较快 · 按量计费" : "当前未启用"}
-            </span>
-          </button>
         </div>
       </div>
 

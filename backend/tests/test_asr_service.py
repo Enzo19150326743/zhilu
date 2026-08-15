@@ -90,7 +90,11 @@ class AsrServiceTests(unittest.TestCase):
 
             # NOTE: 全量测试可能由其他模块加载本机 .env；这里显式清空密钥，
             # 保证该用例只验证 ASR 载荷组装，不意外调用真实校对服务。
-            with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+            with patch.dict(
+                os.environ,
+                {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
+                clear=False,
+            ):
                 response = transcribe_media_audio(
                     "https://example.com/video",
                     audio_downloader=fake_download,
@@ -116,7 +120,11 @@ class AsrServiceTests(unittest.TestCase):
                     plain_text="敏感正文",
                 )
 
-            with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+            with patch.dict(
+                os.environ,
+                {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
+                clear=False,
+            ):
                 with self.assertLogs(
                     "app.services.asr_service",
                     level="INFO",
@@ -394,40 +402,6 @@ class AsrServiceTests(unittest.TestCase):
             [speaker.name for speaker in response.transcript.asr_meta.speaker_profiles],
             ["主持人", "嘉宾"],
         )
-
-    def test_fun_asr_does_not_receive_user_correction_terms(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            audio_path = Path(temporary_directory) / "sample.m4a"
-            audio_path.write_text("fake audio", encoding="utf-8")
-
-            def fake_download(_: str) -> Path:
-                return audio_path
-
-            cloud_result = SimpleNamespace(
-                transcript=TranscriptPayload(
-                    segments=[TranscriptSegment(start=0, end=1, text="原始内容")],
-                    plain_text="原始内容",
-                ),
-                model="fun-asr-flash",
-                provider="aliyun",
-                chunk_count=1,
-                timestamp_source="fun-asr-word",
-            )
-            with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
-                with patch(
-                    "app.services.asr_service.transcribe_audio_with_fun_asr",
-                    return_value=cloud_result,
-                ) as cloud_transcribe:
-                    transcribe_media_audio(
-                        "https://example.com/video",
-                        audio_downloader=fake_download,
-                        asr_engine="fun_asr_flash",
-                        context_settings=TranscribeContextSettings(
-                            correction_terms=["DeepSeek", "Cursor"]
-                        ),
-                    )
-
-        self.assertEqual(cloud_transcribe.call_args.kwargs["glossary_terms"], [])
 
     def test_platform_rejected_audio_download_uses_specific_error(self) -> None:
         """

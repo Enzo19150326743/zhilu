@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="350" viewBox="0 0 1200 350" role="img" aria-labelledby="title desc">
+  <title id="title">知录的三种典型用法</title>
+  <desc id="desc">快速理解长视频与播客，拆解竞品和创作者内容，并沉淀 Obsidian 本地知识库。</desc>
+  <rect x="2" y="2" width="1196" height="346" fill="#f4efe6" stroke="#181713" stroke-width="4"/>
+  <text x="44" y="62" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="36" font-weight="900" fill="#181713">不只是“总结一下”，而是把内容真正用起来</text>
+
+  <g transform="translate(44 106)" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
+    <g>
+      <rect x="7" y="7" width="342" height="178" fill="#181713"/><rect width="342" height="178" fill="#f4c95d" stroke="#181713" stroke-width="3"/>
+      <text x="26" y="47" font-size="23" font-weight="800">快速理解</text>
+      <text x="26" y="94" font-size="33" font-weight="900">看懂长视频</text>
+      <text x="26" y="137" font-size="33" font-weight="900">和播客内容</text>
+    </g>
+    <g transform="translate(381)">
+      <rect x="7" y="7" width="342" height="178" fill="#181713"/><rect width="342" height="178" fill="#d84a2d" stroke="#181713" stroke-width="3"/>
+      <text x="26" y="47" fill="#fff" font-size="23" font-weight="800">内容研究</text>
+      <text x="26" y="94" fill="#fff" font-size="33" font-weight="900">拆解竞品</text>
+      <text x="26" y="137" fill="#fff" font-size="33" font-weight="900">与创作者观点</text>
+    </g>
+    <g transform="translate(762)">
+      <rect x="7" y="7" width="342" height="178" fill="#181713"/><rect width="342" height="178" fill="#776fd2" stroke="#181713" stroke-width="3"/>
+      <text x="26" y="47" fill="#fff" font-size="23" font-weight="800">长期沉淀</text>
+      <text x="26" y="94" fill="#fff" font-size="33" font-weight="900">建立自己的</text>
+      <text x="26" y="137" fill="#fff" font-size="33" font-weight="900">本地知识库</text>
+    </g>
+  </g>
+</svg>

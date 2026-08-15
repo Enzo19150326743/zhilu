@@ -169,7 +169,6 @@ export function useTranscribeWorkflow({
     }
 
     setPendingTranscribeSettings(getDefaultTranscribeSettings(activeDetail.video));
-    // 云端仍需用户明确选择；本地模型按后端能力状态选择推荐项。
     setPendingAsrEngine(getRecommendedLocalAsrEngine(asrStatus));
     setIsTranscribeSettingsOpen(true);
   };
@@ -295,25 +294,9 @@ export function useTranscribeWorkflow({
     void startTranscribe(pendingTranscribeSettings, pendingAsrEngine);
   };
 
-  const handleRetryTranscribeLocally = (taskId: string) => {
-    const task = transcribeTasks.find((item) => item.id === taskId);
-    if (
-      !task ||
-      task.asrEngine !== "fun_asr_flash" ||
-      task.sourceUrl !== activeSourceUrl
-    ) {
-      return;
-    }
-    void startTranscribe(
-      task.contextSettings,
-      getRecommendedLocalAsrEngine(asrStatus)
-    );
-  };
-
   return {
     activeTranscribeTask,
     handleConfirmTranscribeSettings,
-    handleRetryTranscribeLocally,
     handleTranscribeRequest,
     setIsTranscribeSettingsOpen,
     setPendingAsrEngine,

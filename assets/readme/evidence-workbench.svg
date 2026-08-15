@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">一份内容，可以继续总结、提问、画导图和摘录</title>
+  <desc id="desc">同一份内容可以继续生成结构化总结、AI 内容问答、思维导图，以及 AI 金句和手动摘录。</desc>
+  <rect x="2" y="2" width="1196" height="356" fill="#f4efe6" stroke="#181713" stroke-width="4"/>
+  <text x="44" y="64" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="36" font-weight="900" fill="#181713">不只总结，也能继续整理</text>
+
+  <g transform="translate(44 106)" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-weight="900">
+    <rect x="7" y="7" width="264" height="188" fill="#181713"/><rect width="264" height="188" fill="#fffdf8" stroke="#181713" stroke-width="3"/>
+    <rect x="24" y="27" width="216" height="15" fill="#d84a2d"/>
+    <rect x="24" y="61" width="169" height="12" fill="#b8aea0"/><rect x="24" y="89" width="203" height="12" fill="#b8aea0"/><rect x="24" y="117" width="147" height="12" fill="#b8aea0"/>
+    <text x="24" y="166" font-size="30">当前内容</text>
+
+    <path d="M292 94h62" stroke="#181713" stroke-width="5"/><path d="m340 80 16 14-16 14" fill="none" stroke="#181713" stroke-width="5"/>
+
+    <g transform="translate(380)">
+      <rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#776fd2" stroke="#181713" stroke-width="3"/><text x="28" y="53" fill="#fff" font-size="30">AI 内容问答</text>
+      <g transform="translate(0 106)"><rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#71c7b8" stroke="#181713" stroke-width="3"/><text x="28" y="53" font-size="30">思维导图</text></g>
+    </g>
+    <g transform="translate(694)">
+      <rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#f4c95d" stroke="#181713" stroke-width="3"/><text x="28" y="53" font-size="30">结构化总结</text>
+      <g transform="translate(0 106)"><rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#d84a2d" stroke="#181713" stroke-width="3"/><text x="20" y="53" fill="#fff" font-size="27">AI 金句 · 手动摘录</text></g>
+    </g>
+  </g>
+</svg>

@@ -134,7 +134,6 @@ export function useWorkbenchController() {
   const {
     activeTranscribeTask,
     handleConfirmTranscribeSettings,
-    handleRetryTranscribeLocally,
     handleTranscribeRequest,
     setIsTranscribeSettingsOpen,
     setPendingAsrEngine,
@@ -620,7 +619,6 @@ export function useWorkbenchController() {
     onHomeClick: handleGoHome,
     transcribeSettingsDialogProps: {
       asrEngine: pendingAsrEngine,
-      cloudAvailable: asrStatus?.cloud_available ?? false,
       sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,
       correctionAvailable: asrStatus?.correction_available ?? false,
       isOpen: isTranscribeSettingsOpen,
@@ -632,10 +630,8 @@ export function useWorkbenchController() {
       onConfirm: handleConfirmTranscribeSettings
     },
     transcribeTaskToastsProps: {
-      activeSourceUrl,
       tasks: visibleTasks,
-      onDismiss: handleDismissWorkbenchTask,
-      onRetryLocally: handleRetryTranscribeLocally
+      onDismiss: handleDismissWorkbenchTask
     },
     workbenchWorkspaceProps
   };

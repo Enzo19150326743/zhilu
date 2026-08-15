@@ -236,8 +236,6 @@ def _get_transcript_variant_key(transcript: TranscriptPayload) -> str:
         return "local_whisper"
     if engine in {"sensevoice", "sensevoice-small", "sensevoice_small"}:
         return "sensevoice_small"
-    if engine in {"fun-asr-flash", "fun_asr_flash"}:
-        return "fun_asr_flash"
     return engine or "local_whisper"
 
 

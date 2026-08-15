@@ -121,7 +121,7 @@ class TranscribeContextSettings(BaseModel):
 
 
 class TranscriptAsrMeta(BaseModel):
-    """本地或云端 ASR 转写元信息。"""
+    """本地 ASR 转写元信息。"""
 
     engine: str = "faster-whisper"
     model: str
@@ -140,7 +140,6 @@ class TranscriptAsrMeta(BaseModel):
     provider: str | None = None
     chunk_count: int | None = None
     timestamp_source: str | None = None
-    cloud_correction_status: str | None = None
     audio_download_seconds: float | None = None
     transcription_seconds: float | None = None
     correction_seconds: float | None = None
@@ -204,7 +203,6 @@ class TranscribeRequest(BaseModel):
     asr_engine: Literal[
         "local_whisper",
         "sensevoice_small",
-        "fun_asr_flash",
     ] = "local_whisper"
 
 
@@ -212,9 +210,6 @@ class AsrStatusResponse(BaseModel):
     """前端选择转写引擎时需要的非敏感能力状态。"""
 
     success: bool = True
-    cloud_available: bool
-    cloud_provider: str = "aliyun"
-    cloud_model: str
     recommended_engine: Literal["local_whisper", "sensevoice_small"] = (
         "local_whisper"
     )

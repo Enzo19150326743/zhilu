@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
+  <title id="title">首次运行的 AI API 配置窗口</title>
+  <desc id="desc">首次启动会提示选择 AI 服务商、填写自己的 API Key 和模型名称，并将配置保存到本机。</desc>
+  <rect x="2" y="2" width="1196" height="456" fill="#f4efe6" stroke="#181713" stroke-width="4"/>
+  <g transform="translate(150 34)" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif">
+    <rect x="10" y="10" width="900" height="372" fill="#181713"/>
+    <rect width="900" height="372" fill="#fffdf8" stroke="#181713" stroke-width="3"/>
+    <rect width="900" height="52" fill="#181713"/>
+    <circle cx="26" cy="26" r="8" fill="#d84a2d"/><circle cx="52" cy="26" r="8" fill="#f4c95d"/><circle cx="78" cy="26" r="8" fill="#71c7b8"/>
+    <text x="105" y="34" fill="#fff" font-size="22" font-weight="800">配置你自己的 AI API</text>
+
+    <text x="34" y="100" fill="#181713" font-size="34" font-weight="900">首次运行配置</text>
+    <text x="34" y="137" fill="#61584d" font-size="21">Key 只保存到本机 backend/.env</text>
+
+    <g transform="translate(34 162)" font-size="22" font-weight="700">
+      <text x="0" y="30">AI 服务</text><rect x="154" y="0" width="290" height="43" fill="#f4efe6" stroke="#181713" stroke-width="2"/><text x="172" y="29">选择服务商</text>
+      <text x="0" y="88">API Key</text><rect x="154" y="58" width="290" height="43" fill="#f4efe6" stroke="#181713" stroke-width="2"/><text x="172" y="88">••••••••••••••••</text>
+      <text x="488" y="30">总结模型</text><rect x="626" y="0" width="206" height="43" fill="#f4efe6" stroke="#181713" stroke-width="2"/><text x="644" y="29">自定义模型</text>
+      <text x="488" y="88">快速模型</text><rect x="626" y="58" width="206" height="43" fill="#f4efe6" stroke="#181713" stroke-width="2"/><text x="644" y="87">自定义模型</text>
+    </g>
+
+    <g transform="translate(538 296)" font-size="21" font-weight="900">
+      <rect width="136" height="46" fill="#fffdf8" stroke="#181713" stroke-width="3"/><text x="26" y="30">暂不配置</text>
+      <g transform="translate(154)"><rect x="5" y="5" width="170" height="46" fill="#181713"/><rect width="170" height="46" fill="#d84a2d" stroke="#181713" stroke-width="3"/><text x="31" y="30" fill="#fff">保存到本机</text></g>
+    </g>
+  </g>
+</svg>

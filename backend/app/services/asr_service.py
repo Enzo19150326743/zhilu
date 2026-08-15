@@ -19,11 +19,6 @@ from app.schemas import (
     TranscriptSegment,
 )
 from app.services import cuda_runtime
-from app.services.fun_asr_service import (
-    FunAsrContext,
-    FunAsrError,
-    transcribe_audio_with_fun_asr,
-)
 from app.services.sensevoice_service import (
     SenseVoiceError,
     transcribe_audio_with_sensevoice,
@@ -139,7 +134,7 @@ def transcribe_media_audio(
     asr_engine: str = "local_whisper",
 ) -> TranscribeResponse:
     """
-    下载公开视频音频并按用户选择使用本地 Whisper、SenseVoice 或 Fun-ASR-Flash。
+    下载公开视频音频并按用户选择使用本地 Whisper 或 SenseVoice。
 
     NOTE: yt-dlp 只负责拿到公开音频资源，不根据平台名称猜测实际媒体格式。
     """
@@ -179,39 +174,7 @@ def transcribe_media_audio(
         )
         try:
             recognition_started_at = monotonic()
-            if asr_engine == "fun_asr_flash":
-                try:
-                    cloud_result = transcribe_audio_with_fun_asr(
-                        audio_path,
-                        # AI 校对术语不得改变云端原始识别结果。
-                        glossary_terms=[],
-                        context=FunAsrContext(
-                            title=prompt_context.title,
-                            author=prompt_context.author,
-                            platform=prompt_context.platform,
-                            media_type=prompt_context.media_type,
-                            context_settings=prompt_context.context_settings,
-                        ),
-                        output_dir=temporary_path,
-                    )
-                except FunAsrError as error:
-                    raise _build_transcribe_error(
-                        error.error_code,
-                        error.message,
-                        status_code=error.status_code,
-                    ) from error
-                transcription_result = WhisperTranscriptionResult(
-                    transcript=cloud_result.transcript,
-                    model=cloud_result.model,
-                    device="cloud",
-                    compute_type="remote",
-                    language=None,
-                    engine="fun-asr-flash",
-                    provider=cloud_result.provider,
-                    chunk_count=cloud_result.chunk_count,
-                    timestamp_source=cloud_result.timestamp_source,
-                )
-            elif asr_engine == "sensevoice_small":
+            if asr_engine == "sensevoice_small":
                 try:
                     sensevoice_result = transcribe_audio_with_sensevoice(
                         audio_path,
@@ -267,13 +230,7 @@ def transcribe_media_audio(
                     "asr timing: stage=%s elapsed_seconds=%.2f "
                     "engine=%s model=%s device=%s segment_count=%s"
                 ),
-                (
-                    "fun_asr"
-                    if asr_engine == "fun_asr_flash"
-                    else "sensevoice"
-                    if asr_engine == "sensevoice_small"
-                    else "whisper"
-                ),
+                "sensevoice" if asr_engine == "sensevoice_small" else "whisper",
                 transcription_seconds,
                 transcription_result.engine,
                 transcription_result.model,
@@ -334,9 +291,7 @@ def transcribe_media_audio(
         transcript=transcript,
         transcript_variant_key=asr_engine,
         message=(
-            "Fun-ASR-Flash 已生成云端 AI 转写稿。"
-            if transcription_result.engine == "fun-asr-flash"
-            else "本地 SenseVoiceSmall 已生成 AI 转写稿。"
+            "本地 SenseVoiceSmall 已生成 AI 转写稿。"
             if transcription_result.engine == "sensevoice-small"
             else "本地 Whisper 已生成 AI 转写稿。"
         ),
@@ -657,11 +612,6 @@ def _build_final_transcript(
                 provider=transcription_result.provider,
                 chunk_count=transcription_result.chunk_count,
                 timestamp_source=transcription_result.timestamp_source,
-                cloud_correction_status=(
-                    correction_result.status
-                    if transcription_result.engine == "fun-asr-flash"
-                    else None
-                ),
             ),
         }
     )

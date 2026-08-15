@@ -183,9 +183,6 @@ async function installApiMocks(page: Page, libraryDelayMs = 0) {
     }
     if (path === "/api/asr/status") {
       return json(route, {
-        cloud_available: false,
-        cloud_model: "fun-asr-flash",
-        cloud_provider: "aliyun",
         correction_available: true,
         correction_message: null,
         recommended_engine: "sensevoice_small",
@@ -459,7 +456,6 @@ test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({
   await installApiMocks(page);
   await page.goto("/");
 
-  await page.getByRole("button", { name: "需转写 1" }).click();
   await page.getByRole("button", { name: "需转写演示", exact: true }).click();
   await expect(page.getByRole("heading", { name: "未生成总结" })).toBeVisible();
   await expect(page.getByText("不应展示的旧总结")).toHaveCount(0);
@@ -478,11 +474,9 @@ test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({
   await expect(transcribeDialog.getByText("推荐", { exact: true })).toHaveCount(0);
   await expect(transcribeDialog.getByText("iic/SenseVoiceSmall", { exact: true })).toHaveCount(0);
   await expect(transcribeDialog.getByText("large-v3-turbo", { exact: true })).toHaveCount(0);
-  await expect(transcribeDialog.getByText(/DASHSCOPE_API_KEY/)).toHaveCount(0);
   await expect(
     transcribeDialog.getByRole("button", { name: "云端快速识别", exact: true })
-  ).toBeVisible();
-  await expect(transcribeDialog.getByText("当前未启用", { exact: true })).toBeVisible();
+  ).toHaveCount(0);
   await expect(transcribeDialog.getByText(/用于改善标点、断句/)).toHaveCount(0);
   await expect(transcribeDialog.getByText("本期术语", { exact: true })).toBeVisible();
   await expect(transcribeDialog.getByText("已选 0/120", { exact: true })).toHaveCount(0);

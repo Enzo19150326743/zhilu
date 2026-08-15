@@ -134,10 +134,9 @@ ai-video-insight-workspace/
 - `backend/app/services/demo_cover_service.py`：推荐内容封面解析；稳定封面直接复用，临时签名封面按需刷新。
 - `backend/app/services/xiaoyuzhou_service.py`：小宇宙公开单集 RSS / 网页解析。
 - `backend/app/services/transcript_service.py`：平台字幕和 VTT/SRT 字幕解析。
-- `backend/app/services/asr_service.py`：Whisper、SenseVoiceSmall 与云端 ASR 分流、模型 fallback、耗时元数据和双稿串联。
+- `backend/app/services/asr_service.py`：本地 Whisper 与 SenseVoiceSmall 分流、模型 fallback、耗时元数据和双稿串联。
 - `backend/app/services/sensevoice_service.py`：本地 SenseVoiceSmall、ffmpeg 规范化、FSMN-VAD 长音频识别和时间戳映射。
 - `backend/app/services/transcript_segment_service.py`：按停顿、标点、时长和字符数规范化 ASR 相邻碎片；当前用于 Whisper 校对前整理。
-- `backend/app/services/fun_asr_service.py`：手动选择的 Fun-ASR-Flash 云端转写、ffmpeg 规范化分段、并发请求和时间戳合并。
 - `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；生产 Whisper 目前保持中性解码。
 - `backend/app/services/correction_term_service.py`：本地 AI 校对术语库、文件夹、一次性旧词迁移和使用统计。
 - `backend/app/services/transcript_correction_service.py`：DeepSeek ASR 转写稿自动校对，失败时回退原始稿。
@@ -160,7 +159,7 @@ ai-video-insight-workspace/
 - 改小宇宙：先读 `docs/plans/2026-05-10-xiaoyuzhou-podcast-source.md`，再读 `backend/app/services/xiaoyuzhou_service.py`。
 - 改总结 / 导图：先读 `frontend/components/SummaryTab.tsx`、`frontend/components/MindmapTab.tsx`、`backend/app/services/summarize_service.py`。
 - 改 QA：先读 `frontend/components/QaTab.tsx`、`backend/app/services/qa_service.py`。
-- 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/sensevoice_service.py`、`backend/app/services/fun_asr_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
+- 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/sensevoice_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
 - 改 AI 校对术语：先读 `frontend/components/CorrectionTermSelector.tsx` 和 `backend/app/services/correction_term_service.py`；`docs/asr-glossary.md` 只负责首次初始化种子。
 - 改本地历史：先读 `frontend/components/RecentLibrary.tsx`、`backend/app/services/library_service.py`。
 - 改 Obsidian 导出：先读 `docs/plans/2026-06-12-obsidian-note-workflow-prd.md`、`backend/app/services/obsidian_export_service.py`。

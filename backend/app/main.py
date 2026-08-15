@@ -79,10 +79,6 @@ from app.services.douyin_service import (
     is_douyin_url,
 )
 from app.services.xiaohongshu_service import is_xiaohongshu_url
-from app.services.fun_asr_service import (
-    DEFAULT_FUN_ASR_MODEL,
-    is_fun_asr_configured,
-)
 from app.services.sensevoice_service import (
     DEFAULT_SENSEVOICE_MODEL,
     get_sensevoice_status,
@@ -369,14 +365,10 @@ def get_health() -> HealthResponse:
 
 @app.get("/api/asr/status", response_model=AsrStatusResponse)
 def get_asr_status() -> AsrStatusResponse:
-    """返回本地/云端转写能力状态，不向前端暴露任何密钥内容。"""
+    """返回本地转写能力状态。"""
     sensevoice_available, sensevoice_message = get_sensevoice_status()
     correction_available, correction_message = get_transcript_correction_status()
     return AsrStatusResponse(
-        cloud_available=is_fun_asr_configured(),
-        cloud_model=(
-            os.getenv("FUN_ASR_MODEL", "").strip() or DEFAULT_FUN_ASR_MODEL
-        ),
         recommended_engine=(
             "sensevoice_small" if sensevoice_available else "local_whisper"
         ),
@@ -985,7 +977,7 @@ def transcribe_video(
     transcribe_request: TranscribeRequest,
 ) -> TranscribeResponse:
     """
-    当平台没有现成字幕时，按用户选择使用本地或云端 ASR 生成转写稿。
+    当平台没有现成文字时，按用户选择使用本地 ASR 生成转写稿。
     """
     video_url = normalize_public_video_url(transcribe_request.url)
     transcribe_context = _get_transcribe_prompt_context(video_url)

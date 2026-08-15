@@ -6,14 +6,10 @@ export interface HealthResponse {
 
 export type AsrEngine =
   | "local_whisper"
-  | "sensevoice_small"
-  | "fun_asr_flash";
+  | "sensevoice_small";
 
 export interface AsrStatusResponse {
   success: true;
-  cloud_available: boolean;
-  cloud_provider: "aliyun" | string;
-  cloud_model: string;
   recommended_engine: "local_whisper" | "sensevoice_small";
   whisper_model: string;
   sensevoice_available: boolean;
@@ -133,7 +129,6 @@ export interface TranscriptAsrMeta {
   provider?: string | null;
   chunk_count?: number | null;
   timestamp_source?: string | null;
-  cloud_correction_status?: "corrected" | "skipped" | "failed" | string | null;
   audio_download_seconds?: number | null;
   transcription_seconds?: number | null;
   correction_seconds?: number | null;
