@@ -1,5 +1,6 @@
 import json
 import logging
+import json
 import os
 import re
 from collections.abc import Callable
@@ -426,6 +427,19 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
     transcript = summarize_request.transcript_plain_text.strip()
     content_type = _get_obsidian_content_type_label(summarize_request)
     source_boundary = _build_text_source_boundary(summarize_request)
+    shownotes_context = (
+        json.dumps(
+            summarize_request.shownotes_context.model_dump(mode="json"),
+            ensure_ascii=False,
+        )
+        if summarize_request.shownotes_context is not None
+        else "无"
+    )
+    shownotes_plain_text = (
+        _trim_text(summarize_request.shownotes_plain_text, 30000)
+        if summarize_request.shownotes_plain_text
+        else "无"
+    )
 
     return f"""
 请基于以下媒体元数据和内容文本，生成单来源通用知识草稿。
@@ -436,6 +450,18 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 内容类型：{content_type}
 
 {source_boundary}
+
+证据区块与优先级：
+主要证据：完整校对转写稿。总结、事实判断和原文摘录必须主要依据这里。
+{transcript}
+
+辅助人物与术语信息（shownotes_context）：
+{shownotes_context}
+
+辅助节目资料（原始 shownotes）：
+{shownotes_plain_text}
+
+边界要求：完整转写稿与 shownotes 冲突时，以完整转写稿为准。shownotes 只能用于核对人物身份、专有名词、章节结构和背景，不能把 shownotes 宣传文案写成嘉宾实际发言。quotes 原文摘录只能来自完整转写稿，不能来自 shownotes_context 或原始 shownotes。
 
 通用总结规则：
 - 只根据当前媒体元数据和内容文本总结，不引用或推断任何用户的个人背景。
@@ -470,9 +496,6 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 - shownotes 只能代表公开内容简介，不要把它当成完整音频逐字稿。
 - mindmap_markdown 必须使用 Markdown 标题层级，便于前端渲染为树状图；不要输出普通列表作为主体结构。
 - 不虚构内容文本中不存在的主题、时间点或人物关系。
-
-内容文本：
-{transcript}
 
 请只返回 JSON，字段必须为：
 {{

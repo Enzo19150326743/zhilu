@@ -1,4 +1,9 @@
-from app.schemas import TranscribeContextSettings, TranscribeSpeakerProfile
+from app.schemas import (
+    ShownotesContext,
+    ShownotesSpeaker,
+    TranscribeContextSettings,
+    TranscribeSpeakerProfile,
+)
 
 PROGRAM_STRUCTURE_LABELS = {
     "auto": "自动判断",
@@ -21,6 +26,73 @@ CONTENT_TAG_LABELS = {
 
 MAX_CONTENT_TAGS = 12
 MAX_SPEAKERS = 6
+SYSTEM_SPEAKER_NAMES = {"主持人", "嘉宾", "嘉宾 A", "嘉宾 B", "嘉宾 C", "讲者"}
+
+
+def merge_shownotes_context(
+    user_settings: TranscribeContextSettings | None,
+    extracted_context: ShownotesContext | None,
+) -> TranscribeContextSettings:
+    """
+    合并用户设置和 shownotes 提取结果。
+
+    用户明确填写的人名和非 auto 节目结构优先；系统占位标签允许被可靠的
+    shownotes 人物替换。低置信度人物只保留角色标签，不把不确定姓名写入终稿。
+    """
+    user = user_settings or TranscribeContextSettings()
+    extracted = extracted_context or ShownotesContext()
+    program_structure = (
+        user.program_structure
+        if _normalize_key(user.program_structure) not in {"", "auto"}
+        else extracted.program_structure or user.program_structure
+    )
+    if program_structure not in PROGRAM_STRUCTURE_LABELS:
+        program_structure = "auto"
+
+    user_speakers = _normalize_speakers(user.speakers)
+    extracted_speakers = [
+        speaker
+        for speaker in extracted.speakers[:MAX_SPEAKERS]
+        if _is_reliable_shownotes_speaker(speaker)
+    ]
+    merged_speakers: list[TranscribeSpeakerProfile] = []
+    manual_roles: set[str] = set()
+
+    for user_speaker in user_speakers:
+        if _is_system_speaker_placeholder(user_speaker):
+            replacement = _find_shownotes_speaker(
+                extracted_speakers,
+                role=user_speaker.role or user_speaker.name,
+            )
+            if replacement is not None:
+                merged_speakers.append(_to_transcribe_speaker(replacement))
+                continue
+        else:
+            role = _normalize_key(user_speaker.role)
+            if role:
+                manual_roles.add(role)
+        merged_speakers.append(user_speaker)
+
+    for extracted_speaker in extracted_speakers:
+        role_key = _normalize_key(extracted_speaker.role)
+        if role_key in manual_roles:
+            continue
+        profile = _to_transcribe_speaker(extracted_speaker)
+        if any(
+            _normalize_key(existing.name) == _normalize_key(profile.name)
+            for existing in merged_speakers
+        ):
+            continue
+        if len(merged_speakers) >= MAX_SPEAKERS:
+            break
+        merged_speakers.append(profile)
+
+    return TranscribeContextSettings(
+        program_structure=program_structure,
+        content_tags=list(user.content_tags),
+        speakers=merged_speakers[:MAX_SPEAKERS],
+        correction_terms=_merge_terms(user.correction_terms, extracted.terms),
+    )
 
 
 def normalize_transcribe_context_settings(
@@ -285,3 +357,54 @@ def _normalize_key(value: str | None) -> str:
         return ""
 
     return value.strip().lower()
+
+
+def _is_system_speaker_placeholder(speaker: TranscribeSpeakerProfile) -> bool:
+    name = _normalize_text(speaker.name)
+    role = _normalize_text(speaker.role)
+    return bool(
+        (name and name in SYSTEM_SPEAKER_NAMES)
+        or (not name and role and role in SYSTEM_SPEAKER_NAMES)
+    )
+
+
+def _is_reliable_shownotes_speaker(speaker: ShownotesSpeaker) -> bool:
+    return speaker.confidence in {"high", "medium"} or bool(
+        _normalize_text(speaker.role)
+        and _normalize_text(speaker.role) not in {"未区分", "unknown"}
+    )
+
+
+def _find_shownotes_speaker(
+    speakers: list[ShownotesSpeaker],
+    *,
+    role: str,
+) -> ShownotesSpeaker | None:
+    role_key = _normalize_key(role)
+    for speaker in speakers:
+        if _normalize_key(speaker.role) == role_key:
+            return speaker
+    return speakers[0] if speakers and role_key in {"主持人", "嘉宾", "讲者"} else None
+
+
+def _to_transcribe_speaker(speaker: ShownotesSpeaker) -> TranscribeSpeakerProfile:
+    if speaker.confidence == "low":
+        role = _normalize_text(speaker.role) or "未区分"
+        return TranscribeSpeakerProfile(name=role, role=role)
+    return TranscribeSpeakerProfile(
+        name=_normalize_text(speaker.name),
+        role=_normalize_text(speaker.role),
+        description=_normalize_text(speaker.description),
+    )
+
+
+def _merge_terms(user_terms: list[str], extracted_terms: list[str]) -> list[str]:
+    terms: list[str] = []
+    seen: set[str] = set()
+    for raw_term in [*user_terms, *extracted_terms]:
+        term = _normalize_text(raw_term)
+        if not term or term.casefold() in seen:
+            continue
+        seen.add(term.casefold())
+        terms.append(term)
+    return terms[:120]

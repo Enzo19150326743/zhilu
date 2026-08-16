@@ -14,6 +14,7 @@ from app.schemas import (
     NoteDraft,
     ParseResponse,
     SummaryHighlight,
+    ShownotesContext,
     SummarizeResponse,
     TranscriptSegment,
     TranscriptPayload,
@@ -146,6 +147,7 @@ def update_transcript_for_source_url(
     source_url: str | None,
     transcript: TranscriptPayload,
     transcript_variant_key: str | None = None,
+    shownotes_context: ShownotesContext | None = None,
 ) -> None:
     """
     将本地 ASR 生成的内容文本写回对应解析记录；没有历史记录时保持静默。
@@ -168,12 +170,21 @@ def update_transcript_for_source_url(
             logger.info("library payload missing video for transcript update")
             return
 
+        had_shownotes_source = video.get("text_source_type") == "shownotes"
         video["has_transcript"] = True
         video["text_source_type"] = "asr_transcript"
         if not video.get("media_type"):
             video["media_type"] = "video"
 
         payload["video"] = video
+        if not payload.get("shownotes_plain_text") and had_shownotes_source:
+            legacy_shownotes = payload.get("transcript")
+            if isinstance(legacy_shownotes, dict):
+                legacy_text = legacy_shownotes.get("plain_text")
+                if isinstance(legacy_text, str) and legacy_text.strip():
+                    payload["shownotes_plain_text"] = legacy_text.strip()
+        if shownotes_context is not None:
+            payload["shownotes_context"] = shownotes_context.model_dump(mode="json")
         existing_transcript = payload.get("transcript")
         transcript_variants = payload.get("transcript_variants")
         if not isinstance(transcript_variants, dict):

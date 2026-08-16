@@ -403,6 +403,44 @@ class AsrServiceTests(unittest.TestCase):
             ["主持人", "嘉宾"],
         )
 
+    def test_shownotes_extraction_failure_does_not_block_asr(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            audio_path = Path(temporary_directory) / "sample.m4a"
+            audio_path.write_text("fake audio", encoding="utf-8")
+
+            def fake_download(_: str) -> Path:
+                return audio_path
+
+            def fake_transcribe(_: Path) -> TranscriptPayload:
+                return TranscriptPayload(
+                    segments=[TranscriptSegment(start=0, end=2, text="转写仍然完成。")],
+                    plain_text="转写仍然完成。",
+                )
+
+            with patch(
+                "app.services.asr_service.extract_shownotes_context",
+                side_effect=ValueError("invalid JSON"),
+            ) as extract_mock:
+                with patch.dict(
+                    os.environ,
+                    {
+                        "ASR_CORRECTION_ENABLED": "0",
+                        "AI_API_KEY": "",
+                        "DEEPSEEK_API_KEY": "",
+                    },
+                    clear=False,
+                ):
+                    response = transcribe_media_audio(
+                        "https://example.com/podcast",
+                        audio_downloader=fake_download,
+                        transcriber=fake_transcribe,
+                        shownotes_plain_text="主持人和嘉宾信息",
+                    )
+
+        self.assertEqual(response.transcript.plain_text, "转写仍然完成。")
+        self.assertIsNone(response.shownotes_context)
+        extract_mock.assert_called_once()
+
     def test_platform_rejected_audio_download_uses_specific_error(self) -> None:
         """
         B 站音频流接口被拒绝时，应说明是音频流未拿到，而不是笼统提示未公开。

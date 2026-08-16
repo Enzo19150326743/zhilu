@@ -79,6 +79,24 @@ class TranscribeSpeakerProfile(BaseModel):
     description: str | None = Field(default=None, max_length=300)
 
 
+class ShownotesSpeaker(BaseModel):
+    """从 shownotes 提取的说话人信息。"""
+
+    name: str = Field(min_length=1, max_length=80)
+    role: str = Field(default="未区分", max_length=80)
+    description: str | None = Field(default=None, max_length=300)
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class ShownotesContext(BaseModel):
+    """一次 shownotes AI 提取结果，供校对和总结复用。"""
+
+    program_structure: str = Field(default="auto", max_length=40)
+    speakers: list[ShownotesSpeaker] = Field(default_factory=list, max_length=6)
+    terms: list[str] = Field(default_factory=list, max_length=120)
+    content_outline: list[str] = Field(default_factory=list, max_length=12)
+
+
 class TranscribeContextSettings(BaseModel):
     """转写上下文设置，用于改善校对和访谈稿整理。"""
 
@@ -169,6 +187,8 @@ class SummarizeRequest(BaseModel):
     video_author: str | None = Field(default=None, max_length=200)
     media_type: str | None = Field(default=None, max_length=40)
     text_source_type: str | None = Field(default=None, max_length=40)
+    shownotes_plain_text: str | None = Field(default=None, max_length=120000)
+    shownotes_context: ShownotesContext | None = None
 
     @field_validator("video_title", mode="before")
     @classmethod
@@ -477,6 +497,8 @@ class ParseResponse(DemoDetailResponse):
     is_from_cache: bool = False
     library_summary_status: str | None = None
     library_summary_model: str | None = None
+    shownotes_plain_text: str | None = Field(default=None, max_length=120000)
+    shownotes_context: ShownotesContext | None = None
 
 
 class SummarizeResponse(BaseModel):
@@ -526,6 +548,7 @@ class TranscribeResponse(BaseModel):
     video_id: str | None = None
     transcript: TranscriptPayload
     transcript_variant_key: str = "local_whisper"
+    shownotes_context: ShownotesContext | None = None
     message: str
 
 

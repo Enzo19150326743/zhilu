@@ -889,6 +889,7 @@ def summarize_video(
         )
 
     enforce_rate_limit(request, "summarize", SUMMARY_RATE_LIMIT_PER_HOUR)
+    summarize_request = _hydrate_summarize_request_from_library(summarize_request)
     try:
         summarize_response = summarize_transcript(summarize_request)
     except DeepSeekOutputTruncatedError as error:
@@ -999,6 +1000,7 @@ def transcribe_video(
         media_platform=transcribe_context.get("platform"),
         media_type=transcribe_context.get("media_type"),
         context_settings=transcribe_request.context_settings,
+        shownotes_plain_text=transcribe_context.get("shownotes_plain_text"),
         asr_engine=transcribe_request.asr_engine,
     )
     try:
@@ -1006,6 +1008,7 @@ def transcribe_video(
             video_url,
             transcribe_response.transcript,
             transcribe_response.transcript_variant_key,
+            transcribe_response.shownotes_context,
         )
     except (sqlite3.Error, OSError, ValueError) as error:
         logger.warning(
@@ -1030,7 +1033,7 @@ def transcribe_video(
     return transcribe_response
 
 
-def _get_transcribe_prompt_context(source_url: str) -> dict[str, str | None]:
+def _get_transcribe_prompt_context(source_url: str) -> dict[str, object]:
     """
     从本地历史读取媒体上下文，用于 ASR hotwords / prompt；读取失败不阻断转写。
     """
@@ -1046,12 +1049,48 @@ def _get_transcribe_prompt_context(source_url: str) -> dict[str, str | None]:
     if detail is None:
         return {}
 
+    shownotes_plain_text = detail.shownotes_plain_text
+    if (
+        not shownotes_plain_text
+        and detail.video.text_source_type == "shownotes"
+    ):
+        # 兼容功能上线前的旧历史：当时 shownotes 只存在 transcript.plain_text。
+        shownotes_plain_text = detail.transcript.plain_text
+
     return {
         "title": detail.video.title,
         "author": detail.video.author,
         "platform": detail.video.platform,
         "media_type": detail.video.media_type,
+        "shownotes_plain_text": shownotes_plain_text,
     }
+
+
+def _hydrate_summarize_request_from_library(
+    summarize_request: SummarizeRequest,
+) -> SummarizeRequest:
+    """从本地历史补回原始 shownotes 和已提取上下文，不重复调用 AI。"""
+    if not summarize_request.source_url:
+        return summarize_request
+
+    try:
+        detail = get_library_detail_by_source_url(summarize_request.source_url)
+    except (sqlite3.Error, OSError, ValueError) as error:
+        logger.warning(
+            "library shownotes lookup failed for summary: %s",
+            error.__class__.__name__,
+        )
+        return summarize_request
+
+    if detail is None:
+        return summarize_request
+
+    updates: dict[str, object] = {}
+    if detail.shownotes_plain_text:
+        updates["shownotes_plain_text"] = detail.shownotes_plain_text
+    if detail.shownotes_context is not None:
+        updates["shownotes_context"] = detail.shownotes_context
+    return summarize_request.model_copy(update=updates) if updates else summarize_request
 
 
 def _resolve_transcription_source(

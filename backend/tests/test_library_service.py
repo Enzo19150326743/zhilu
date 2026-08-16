@@ -9,6 +9,8 @@ from unittest.mock import patch
 from app.schemas import (
     MindmapMeta,
     ParseResponse,
+    ShownotesContext,
+    ShownotesSpeaker,
     TranscribeSpeakerProfile,
     SummarizeResponse,
     TranscriptAsrMeta,
@@ -380,6 +382,30 @@ class LibraryServiceTests(unittest.TestCase):
         self.assertEqual(detail.transcript.asr_meta.program_structure, "interview")
         self.assertEqual(detail.transcript.asr_meta.content_tags, ["ai_tech"])
         self.assertEqual(detail.transcript.asr_meta.speaker_label_status, "inferred")
+
+    def test_transcript_update_keeps_shownotes_and_context(self) -> None:
+        with self._temporary_library():
+            library_service.upsert_library_item(
+                _build_parse_response(
+                    media_type="podcast",
+                    text_source_type="shownotes",
+                )
+            )
+            shownotes_context = ShownotesContext(
+                program_structure="interview",
+                speakers=[ShownotesSpeaker(name="泓君", role="主持人", confidence="high")],
+                terms=["FDE"],
+            )
+            library_service.update_transcript_for_source_url(
+                "https://example.com/podcast",
+                TranscriptPayload(segments=[], plain_text="完整转写稿。"),
+                shownotes_context=shownotes_context,
+            )
+            detail = library_service.get_library_detail("podcast_001")
+
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail.shownotes_plain_text, "Shownotes 第一段。\n\nShownotes 第二段。")
+        self.assertEqual(detail.shownotes_context.speakers[0].name, "泓君")
 
     def test_transcript_update_invalidates_summary_from_previous_text(self) -> None:
         """

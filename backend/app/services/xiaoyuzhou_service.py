@@ -103,6 +103,7 @@ def parse_xiaoyuzhou_episode(source_url: str) -> ParseResponse:
         summary=_build_summary_placeholder(episode),
         mindmap_markdown=_build_mindmap_placeholder(episode),
         transcription_source_url=episode.audio_url or None,
+        shownotes_plain_text=episode.shownotes_text or None,
     )
 
 

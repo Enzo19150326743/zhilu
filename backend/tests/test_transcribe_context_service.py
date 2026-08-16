@@ -1,6 +1,8 @@
 import unittest
 
 from app.schemas import (
+    ShownotesContext,
+    ShownotesSpeaker,
     TranscribeContextSettings,
     TranscribeRequest,
     TranscribeSpeakerProfile,
@@ -9,11 +11,61 @@ from app.schemas import (
 from app.services.transcribe_context_service import (
     build_correction_context_lines,
     build_whisper_context_lines,
+    merge_shownotes_context,
     normalize_transcribe_context_settings,
 )
 
 
 class TranscribeContextServiceTests(unittest.TestCase):
+    def test_shownotes_replaces_system_speaker_placeholders(self) -> None:
+        merged = merge_shownotes_context(
+            TranscribeContextSettings(
+                program_structure="auto",
+                speakers=[
+                    TranscribeSpeakerProfile(name="主持人", role="主持人"),
+                    TranscribeSpeakerProfile(name="嘉宾", role="嘉宾"),
+                ],
+                correction_terms=["用户术语"],
+            ),
+            ShownotesContext(
+                program_structure="interview",
+                speakers=[
+                    ShownotesSpeaker(name="泓君", role="主持人", confidence="high"),
+                    ShownotesSpeaker(name="朋新宇", role="嘉宾", confidence="high"),
+                ],
+                terms=["FDE", "用户术语"],
+            ),
+        )
+
+        self.assertEqual(merged.program_structure, "interview")
+        self.assertEqual([speaker.name for speaker in merged.speakers], ["泓君", "朋新宇"])
+        self.assertEqual(merged.correction_terms, ["用户术语", "FDE"])
+
+    def test_manual_speaker_name_is_not_overridden_by_ai(self) -> None:
+        merged = merge_shownotes_context(
+            TranscribeContextSettings(
+                program_structure="interview",
+                speakers=[TranscribeSpeakerProfile(name="用户填写的主持人", role="主持人")],
+            ),
+            ShownotesContext(
+                program_structure="interview",
+                speakers=[ShownotesSpeaker(name="泓君", role="主持人", confidence="high")],
+            ),
+        )
+
+        self.assertEqual(merged.speakers[0].name, "用户填写的主持人")
+
+    def test_low_confidence_speaker_keeps_role_only(self) -> None:
+        merged = merge_shownotes_context(
+            None,
+            ShownotesContext(
+                program_structure="interview",
+                speakers=[ShownotesSpeaker(name="不确定的人", role="嘉宾", confidence="low")],
+            ),
+        )
+
+        self.assertEqual(merged.speakers[0].name, "嘉宾")
+
     def test_transcribe_request_keeps_legacy_body_compatible(self) -> None:
         """
         旧前端只传 url / video_id 时仍必须通过校验，避免破坏同步转写入口。

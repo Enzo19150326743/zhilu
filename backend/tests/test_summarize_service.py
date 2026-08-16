@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app.schemas import SummarizeRequest, TranscriptSegment
+from app.schemas import ShownotesContext, ShownotesSpeaker, SummarizeRequest, TranscriptSegment
 from app.services.deepseek_client import (
     DeepSeekClientError,
     DeepSeekOutputTruncatedError,
@@ -278,6 +278,29 @@ class SummarizeServiceTests(unittest.TestCase):
         self.assertIn('"content_boundaries"', prompt)
         self.assertIn("mindmap_meta", prompt)
         self.assertNotIn("视频字幕", prompt)
+
+    def test_prompt_separates_transcript_from_shownotes_evidence(self) -> None:
+        request = SummarizeRequest(
+            source_url="https://example.com/podcast",
+            transcript_plain_text="转写稿中的真实发言。",
+            shownotes_plain_text="节目宣传文案，不是嘉宾发言。",
+            shownotes_context=ShownotesContext(
+                program_structure="interview",
+                speakers=[ShownotesSpeaker(name="泓君", role="主持人", confidence="high")],
+                terms=["FDE"],
+            ),
+            media_type="podcast",
+            text_source_type="asr_transcript",
+        )
+
+        prompt = _build_deepseek_prompt(request)
+
+        self.assertIn("主要证据：完整校对转写稿", prompt)
+        self.assertIn("辅助人物与术语信息（shownotes_context）", prompt)
+        self.assertIn("辅助节目资料（原始 shownotes）", prompt)
+        self.assertIn("quotes 原文摘录只能来自完整转写稿", prompt)
+        self.assertIn("转写稿中的真实发言", prompt)
+        self.assertIn("节目宣传文案，不是嘉宾发言", prompt)
 
     def test_prompt_is_generic_and_excludes_personal_avatar_context(self) -> None:
         """

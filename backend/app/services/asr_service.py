@@ -2,6 +2,7 @@ import logging
 import os
 import tempfile
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
@@ -12,6 +13,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError, ExtractorError
 
 from app.schemas import (
+    ShownotesContext,
     TranscribeContextSettings,
     TranscribeResponse,
     TranscriptAsrMeta,
@@ -23,6 +25,7 @@ from app.services.sensevoice_service import (
     SenseVoiceError,
     transcribe_audio_with_sensevoice,
 )
+from app.services.shownotes_context_service import extract_shownotes_context
 from app.services.text_normalization_service import to_simplified_chinese
 from app.services.transcript_segment_service import (
     SegmentNormalizationConfig,
@@ -35,6 +38,7 @@ from app.services.transcript_correction_service import (
 )
 from app.services.transcribe_context_service import (
     get_speaker_label_status,
+    merge_shownotes_context,
     normalize_transcribe_context_settings,
 )
 from app.services.ytdlp_service import (
@@ -64,6 +68,7 @@ DEFAULT_SENSEVOICE_SEGMENT_MAX_CHARACTERS = 120
 DEFAULT_SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS = 2
 TRANSCRIBE_AUDIO_TEMPLATE = "transcribe-audio.%(ext)s"
 TEMP_SUFFIXES = {".part", ".ytdl", ".tmp", ".temp"}
+SHOWNOTES_CONTEXT_WAIT_TIMEOUT_SECONDS = 30
 AudioDownloader = Callable[[str], Path]
 AudioDownloaderFactory = Callable[[Path], AudioDownloader]
 AudioTranscriber = Callable[[Path], TranscriptPayload]
@@ -131,6 +136,7 @@ def transcribe_media_audio(
     media_platform: str | None = None,
     media_type: str | None = None,
     context_settings: TranscribeContextSettings | None = None,
+    shownotes_plain_text: str | None = None,
     asr_engine: str = "local_whisper",
 ) -> TranscribeResponse:
     """
@@ -140,19 +146,20 @@ def transcribe_media_audio(
     """
     total_started_at = monotonic()
     asr_config = get_asr_config()
-    normalized_context_settings = normalize_transcribe_context_settings(
-        context_settings,
-        platform=media_platform,
-        media_type=media_type,
-    )
-    correction_terms = normalized_context_settings.correction_terms
-    prompt_context = AsrPromptContext(
-        title=_optional_text(media_title),
-        author=_optional_text(media_author),
-        platform=_optional_text(media_platform),
-        media_type=_optional_text(media_type),
-        context_settings=normalized_context_settings,
-    )
+    shownotes_context_future: Future[ShownotesContext | None] | None = None
+    shownotes_executor: ThreadPoolExecutor | None = None
+    extracted_shownotes_context: ShownotesContext | None = None
+    if _optional_text(shownotes_plain_text):
+        shownotes_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="shownotes-context",
+        )
+        shownotes_context_future = shownotes_executor.submit(
+            extract_shownotes_context,
+            shownotes_plain_text,
+            title=media_title,
+            author=media_author,
+        )
 
     with tempfile.TemporaryDirectory(prefix="zhilu-asr-") as temporary_directory:
         temporary_path = Path(temporary_directory)
@@ -240,6 +247,28 @@ def transcribe_media_audio(
         finally:
             _remove_file(audio_path)
 
+    extracted_shownotes_context = _resolve_shownotes_context_future(
+        shownotes_context_future
+    )
+    if shownotes_context_future is not None:
+        shownotes_context_future.cancel()
+    if shownotes_executor is not None:
+        shownotes_executor.shutdown(wait=False, cancel_futures=True)
+
+    normalized_context_settings = normalize_transcribe_context_settings(
+        merge_shownotes_context(context_settings, extracted_shownotes_context),
+        platform=media_platform,
+        media_type=media_type,
+    )
+    correction_terms = normalized_context_settings.correction_terms
+    prompt_context = AsrPromptContext(
+        title=_optional_text(media_title),
+        author=_optional_text(media_author),
+        platform=_optional_text(media_platform),
+        media_type=_optional_text(media_type),
+        context_settings=normalized_context_settings,
+    )
+
     correction_started_at = monotonic()
     transcript = _build_final_transcript(
         transcription_result=transcription_result,
@@ -290,6 +319,7 @@ def transcribe_media_audio(
         video_id=video_id,
         transcript=transcript,
         transcript_variant_key=asr_engine,
+        shownotes_context=extracted_shownotes_context,
         message=(
             "本地 SenseVoiceSmall 已生成 AI 转写稿。"
             if transcription_result.engine == "sensevoice-small"
@@ -814,6 +844,25 @@ def _build_speaker_label_status(
 def _normalize_segment_text(text: str) -> str:
     normalized_text = " ".join(text.strip().split())
     return to_simplified_chinese(normalized_text)
+
+
+def _resolve_shownotes_context_future(
+    future: Future[ShownotesContext | None] | None,
+) -> ShownotesContext | None:
+    if future is None:
+        return None
+
+    try:
+        return future.result(timeout=SHOWNOTES_CONTEXT_WAIT_TIMEOUT_SECONDS)
+    except FutureTimeoutError:
+        logger.warning("shownotes context extraction timed out")
+    except Exception as error:
+        # 提取是可选增强能力，任何线程异常都必须降级到原有转写流程。
+        logger.warning(
+            "shownotes context future failed: error=%s",
+            error.__class__.__name__,
+        )
+    return None
 
 
 def _get_env_text(name: str, default_value: str) -> str:
