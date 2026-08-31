@@ -15,9 +15,9 @@ ai-video-insight-workspace/
 ## 先读顺序
 
 1. `docs/code-map.md`：当前这份快速定位地图。
-2. `docs/project-context.md`：项目级稳定事实、技术栈、红线和文档索引。
+2. `docs/project-context.md`（本地存在时）：项目级稳定事实、技术栈、红线和文档索引；公开仓库不依赖该文件。
 3. 相关 `docs/architecture/*.md`：模块架构。
-4. 相关 `docs/handoffs/*.md`：近期开发收口和下一步。
+4. 相关 `docs/handoffs/*.md`（本地存在时）：近期开发收口和下一步。
 5. 最后再读前后端具体代码。
 
 ## 常用快速搜索命令
@@ -126,7 +126,7 @@ ai-video-insight-workspace/
 
 ## 后端服务地图
 
-- `backend/app/services/media_source_service.py`：媒体源 Adapter 分发入口；抖音、小宇宙、默认 yt-dlp 的顺序分派。
+- `backend/app/services/media_source_service.py`：媒体源 Adapter 分发入口；当前按抖音、小宇宙、B 站、小红书、默认 yt-dlp 的顺序分派。
 - `backend/app/services/ytdlp_service.py`：默认视频源元数据解析、格式标准化、下载。
 - `backend/app/services/bilibili_service.py`：B 站专用认证状态、播放流、转写源和下载链路。
 - `backend/app/services/douyin_service.py`：抖音公开链接实验解析和专用下载。
