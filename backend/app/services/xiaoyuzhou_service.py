@@ -289,7 +289,7 @@ def _build_episode_from_page_payload(
         audio_url=_extract_audio_url_from_payload(episode_payload),
         title=title,
         podcast_title=podcast_title,
-        author=_as_text(podcast_payload.get("author")) or podcast_title,
+        author=_get_page_podcast_author(podcast_payload) or podcast_title,
         duration=_parse_duration(_as_text(episode_payload.get("duration"))),
         thumbnail=(
             _get_picture_url(_as_dict(episode_payload.get("image")))
@@ -346,6 +346,23 @@ def _as_text(value: object) -> str:
         return ""
 
     return str(value).strip()
+
+
+def _get_page_podcast_author(podcast_payload: dict[str, object]) -> str:
+    """
+    优先使用公开页标注的节目作者；“佚名”等占位值时回退到主播昵称。
+    """
+    author = _as_text(podcast_payload.get("author"))
+    if author.lower() not in {"", "unknown", "\u672a\u77e5", "\u4f5a\u540d", "\u672a\u77e5\u4f5c\u8005"}:
+        return author
+
+    podcaster_names: list[str] = []
+    for podcaster in podcast_payload.get("podcasters", []):
+        nickname = _as_text(_as_dict(podcaster).get("nickname"))
+        if nickname and nickname not in podcaster_names:
+            podcaster_names.append(nickname)
+
+    return "\u3001".join(podcaster_names)
 
 
 def _extract_audio_url_from_payload(payload: dict[str, object]) -> str:

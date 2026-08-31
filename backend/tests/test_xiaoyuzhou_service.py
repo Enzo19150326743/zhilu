@@ -2,12 +2,34 @@ import unittest
 from unittest.mock import patch
 
 from app.services.xiaoyuzhou_service import (
+    _build_episode_from_page_payload,
     _build_shownotes_transcript,
     _fetch_episode_page,
 )
 
 
 class XiaoyuzhouServiceTests(unittest.TestCase):
+    def test_uses_podcaster_nickname_when_podcast_author_is_anonymous(self) -> None:
+        """
+        小宇宙公开页会把节目作者标为“佚名”，真实主播则位于 podcasters。
+        """
+        episode = _build_episode_from_page_payload(
+            "https://www.xiaoyuzhoufm.com/episode/example",
+            "example",
+            {
+                "eid": "example",
+                "title": "示例单集",
+                "duration": "60",
+                "podcast": {
+                    "title": "示例播客",
+                    "author": "佚名",
+                    "podcasters": [{"nickname": "真实主播"}],
+                },
+            },
+        )
+
+        self.assertEqual(episode.author, "真实主播")
+
     def test_build_shownotes_transcript_splits_readable_segments(self) -> None:
         """
         shownotes 应按段落进入前端展示，避免整段内容被塞进一条 00:00 字幕。
