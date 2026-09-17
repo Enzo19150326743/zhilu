@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import parse_qs, urlparse
 
 from app.schemas import (
     LibraryItem,
@@ -30,6 +31,15 @@ BILIBILI_BVID_PATTERN = re.compile(r"(BV[a-zA-Z0-9]+)")
 LibraryFilter = Literal["all", "ready", "summarized", "noTranscript"]
 
 
+def _same_content_identity(left_url: str, right_url: str, platform: str) -> bool:
+    """同一稳定视频 ID 下，B 站分 P 仍视为不同内容。"""
+    if platform.lower() not in {"bilibili", "b站"}:
+        return True
+    left_part = parse_qs(urlparse(left_url).query).get("p", ["1"])[0] or "1"
+    right_part = parse_qs(urlparse(right_url).query).get("p", ["1"])[0] or "1"
+    return left_part == right_part
+
+
 def upsert_library_item(parse_response: ParseResponse) -> None:
     """
     保存完整解析结果。
@@ -38,8 +48,58 @@ def upsert_library_item(parse_response: ParseResponse) -> None:
     """
     payload = simplify_text_payload(parse_response.model_dump(mode="json"))
     timestamp = _get_now_iso()
-    with _connect() as connection:
+    with _connect(immediate=True) as connection:
         _ensure_schema(connection)
+        existing = _find_library_row_for_source_url(connection, parse_response.source_url)
+        if existing is None:
+            identity_rows = connection.execute(
+                """SELECT * FROM library_items WHERE video_id=?
+                   ORDER BY has_transcript DESC,
+                     CASE summary_status WHEN 'ai_generated' THEN 2 WHEN 'local_fallback' THEN 1 ELSE 0 END DESC,
+                     updated_at DESC""",
+                (parse_response.video.video_id,),
+            ).fetchall()
+            existing = next(
+                (
+                    row
+                    for row in identity_rows
+                    if _same_content_identity(
+                        str(row["source_url"]),
+                        parse_response.source_url,
+                        parse_response.video.platform,
+                    )
+                ),
+                None,
+            )
+        storage_source_url = (
+            str(existing["source_url"]) if existing is not None else parse_response.source_url
+        )
+        payload["source_url"] = storage_source_url
+        summary_status = "none"
+        summary_model = None
+        if existing is not None:
+            existing_payload = json.loads(str(existing["payload_json"]))
+            # 平台刷新只更新解析元数据，用户生成内容继续以库内最新值为准。
+            for key in (
+                "transcript",
+                "transcript_variants",
+                "active_transcript_variant",
+                "shownotes_plain_text",
+                "shownotes_context",
+                "summary",
+                "mindmap_markdown",
+                "mindmap_meta",
+                "note_draft",
+                "summary_fallback_reason",
+            ):
+                if key in existing_payload:
+                    payload[key] = existing_payload[key]
+            existing_video = existing_payload.get("video")
+            if isinstance(existing_video, dict) and existing_video.get("has_transcript"):
+                payload["video"]["has_transcript"] = True
+                payload["video"]["text_source_type"] = existing_video.get("text_source_type")
+            summary_status = str(existing["summary_status"])
+            summary_model = existing["summary_model"]
         connection.execute(
             """
             INSERT INTO library_items (
@@ -65,12 +125,14 @@ def upsert_library_item(parse_response: ParseResponse) -> None:
                 platform = excluded.platform,
                 thumbnail = excluded.thumbnail,
                 duration = excluded.duration,
-                has_transcript = excluded.has_transcript,
+                has_transcript = MAX(library_items.has_transcript, excluded.has_transcript),
+                summary_status = excluded.summary_status,
+                summary_model = excluded.summary_model,
                 payload_json = excluded.payload_json,
                 updated_at = excluded.updated_at
             """,
             (
-                parse_response.source_url,
+                storage_source_url,
                 parse_response.video.video_id,
                 parse_response.video.title,
                 parse_response.video.author,
@@ -78,8 +140,8 @@ def upsert_library_item(parse_response: ParseResponse) -> None:
                 parse_response.video.thumbnail,
                 parse_response.video.duration,
                 int(parse_response.video.has_transcript),
-                "none",
-                None,
+                summary_status,
+                summary_model,
                 json.dumps(payload, ensure_ascii=False),
                 timestamp,
                 timestamp,
@@ -90,26 +152,26 @@ def upsert_library_item(parse_response: ParseResponse) -> None:
 def update_summary_for_source_url(
     source_url: str | None,
     summarize_response: SummarizeResponse,
-) -> None:
+) -> bool:
     """
     将总结结果写回对应解析记录；没有历史记录时保持静默。
     """
     if not source_url:
-        return
+        return False
 
     with _connect() as connection:
         _ensure_schema(connection)
         row = _find_library_row_for_source_url(connection, source_url)
         if row is None:
             logger.info("library item not found for summary update")
-            return
+            return False
 
         if (
             row["summary_status"] == "ai_generated"
             and not summarize_response.is_ai_generated
         ):
             logger.info("skip local fallback summary overwrite for ai-generated item")
-            return
+            return True
 
         payload = json.loads(str(row["payload_json"]))
         payload["summary"] = summarize_response.summary.model_dump(mode="json")
@@ -141,6 +203,7 @@ def update_summary_for_source_url(
                 str(row["source_url"]),
             ),
         )
+        return True
 
 
 def update_transcript_for_source_url(
@@ -148,27 +211,27 @@ def update_transcript_for_source_url(
     transcript: TranscriptPayload,
     transcript_variant_key: str | None = None,
     shownotes_context: ShownotesContext | None = None,
-) -> None:
+) -> bool:
     """
     将本地 ASR 生成的内容文本写回对应解析记录；没有历史记录时保持静默。
 
     NOTE: 内容文本来源变成 AI 转写稿后，旧总结和导图不再可信，必须失效后重新生成。
     """
     if not source_url:
-        return
+        return False
 
     with _connect() as connection:
         _ensure_schema(connection)
         row = _find_library_row_for_source_url(connection, source_url)
         if row is None:
             logger.info("library item not found for transcript update")
-            return
+            return False
 
         payload = json.loads(str(row["payload_json"]))
         video = payload.get("video")
         if not isinstance(video, dict):
             logger.info("library payload missing video for transcript update")
-            return
+            return False
 
         had_shownotes_source = video.get("text_source_type") == "shownotes"
         video["has_transcript"] = True
@@ -235,6 +298,7 @@ def update_transcript_for_source_url(
                 str(row["source_url"]),
             ),
         )
+        return True
 
 
 def _get_transcript_variant_key(transcript: TranscriptPayload) -> str:
@@ -367,7 +431,7 @@ def list_recent_library_items(
         """,
     }
     filter_clause = filter_clauses[library_filter]
-    with _connect() as connection:
+    with _connect(immediate=True) as connection:
         _ensure_schema(connection)
         rows = connection.execute(
             f"""
@@ -398,7 +462,7 @@ def get_library_stats() -> LibraryStatsResponse:
     """
     返回本地内容库统计信息。
     """
-    with _connect() as connection:
+    with _connect(immediate=True) as connection:
         _ensure_schema(connection)
         row = connection.execute(
             """
@@ -464,6 +528,10 @@ def get_library_detail(video_id: str) -> ParseResponse | None:
             SELECT source_url, payload_json, summary_status, summary_model
             FROM library_items
             WHERE video_id = ?
+            ORDER BY has_transcript DESC,
+              CASE summary_status WHEN 'ai_generated' THEN 2 WHEN 'local_fallback' THEN 1 ELSE 0 END DESC,
+              updated_at DESC
+            LIMIT 1
             """,
             (video_id,),
         ).fetchone()
@@ -510,16 +578,25 @@ def _find_library_row_for_source_url(
     if video_id is None:
         return None
 
-    return connection.execute(
+    rows = connection.execute(
         """
         SELECT source_url, payload_json, summary_status, summary_model
         FROM library_items
         WHERE video_id = ?
         ORDER BY updated_at DESC
-        LIMIT 1
         """,
         (video_id,),
-    ).fetchone()
+    ).fetchall()
+    return next(
+        (
+            candidate
+            for candidate in rows
+            if _same_content_identity(
+                str(candidate["source_url"]), source_url, "bilibili"
+            )
+        ),
+        None,
+    )
 
 
 def _extract_bilibili_video_id(source_url: str) -> str | None:
@@ -555,11 +632,13 @@ def clear_library_items() -> int:
 
 
 @contextmanager
-def _connect() -> Iterator[sqlite3.Connection]:
+def _connect(*, immediate: bool = False) -> Iterator[sqlite3.Connection]:
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH)
+    connection = sqlite3.connect(DATABASE_PATH, timeout=5, isolation_level=None)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA busy_timeout = 5000")
     try:
+        connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
         yield connection
         connection.commit()
     except Exception:

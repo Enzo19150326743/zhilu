@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field, field_validator
 MAX_SUMMARY_VIDEO_TITLE_LENGTH = 300
 MAX_CORRECTION_TERMS = 120
 MAX_CORRECTION_TERM_LENGTH = 80
+MAX_BATCH_ITEMS = 49
+MAX_BATCH_INPUT_LENGTH = 64 * 1024
 
 
 class HealthResponse(BaseModel):
@@ -603,3 +605,96 @@ class LibraryClearResponse(BaseModel):
 
     success: bool = True
     deleted_count: int
+
+
+class TaskBatchCreateRequest(BaseModel):
+    """创建持久化批处理批次。"""
+
+    client_request_id: str = Field(min_length=8, max_length=120)
+    urls: list[str] = Field(min_length=1)
+    target: Literal["parse_only", "analyze"] = "analyze"
+    asr_engine: Literal["local_whisper", "sensevoice_small"] = "local_whisper"
+    context_settings: TranscribeContextSettings | None = None
+
+    @field_validator("urls")
+    @classmethod
+    def validate_urls(cls, values: list[str]) -> list[str]:
+        if sum(len(value) for value in values) > MAX_BATCH_INPUT_LENGTH:
+            raise ValueError("批量输入内容过长")
+        if any(not value.strip() for value in values):
+            raise ValueError("链接不能为空")
+        return values
+
+
+class TaskBatchActionRequest(BaseModel):
+    """批次中的单项操作。"""
+
+    batch_id: str = Field(min_length=8, max_length=80)
+
+
+class ProcessingTaskItem(BaseModel):
+    """批次列表中的单项任务快照。"""
+
+    task_id: str
+    input_index: int
+    source_url: str
+    status: str
+    stage: str
+    title: str | None = None
+    author: str | None = None
+    platform: str | None = None
+    thumbnail: str | None = None
+    video_id: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    warning: str | None = None
+    cancelled: bool = False
+    result_available: bool = False
+    updated_at: str
+
+
+class TaskBatchStats(BaseModel):
+    """从任务关联实时派生的批次统计。"""
+
+    total: int
+    active: int
+    succeeded: int
+    failed: int
+    cancelled: int
+
+
+class TaskBatchResponse(BaseModel):
+    """批次及其任务的同一快照。"""
+
+    success: bool = True
+    batch_id: str
+    client_request_id: str
+    target: str
+    created_at: str
+    stats: TaskBatchStats
+    items: list[ProcessingTaskItem]
+
+
+class TaskBatchSummary(BaseModel):
+    """最近批次列表项。"""
+
+    batch_id: str
+    target: str
+    created_at: str
+    stats: TaskBatchStats
+
+
+class TaskBatchListResponse(BaseModel):
+    """最近批次和全局活跃任务统计。"""
+
+    success: bool = True
+    active_task_count: int
+    active_video_ids: list[str] = Field(default_factory=list)
+    batches: list[TaskBatchSummary]
+
+
+class TaskActionResponse(BaseModel):
+    """取消或重试后的任务快照。"""
+
+    success: bool = True
+    task: ProcessingTaskItem

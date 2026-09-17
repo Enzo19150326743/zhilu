@@ -143,9 +143,11 @@ def get_rate_limit_items(
 @contextmanager
 def _connect() -> Iterator[sqlite3.Connection]:
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH)
+    connection = sqlite3.connect(DATABASE_PATH, timeout=5, isolation_level=None)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA busy_timeout = 5000")
     try:
+        connection.execute("BEGIN IMMEDIATE")
         yield connection
         connection.commit()
     except Exception:

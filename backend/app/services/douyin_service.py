@@ -24,6 +24,7 @@ from app.services.douyin_adapter import (
 )
 from app.services.http_fetch_service import DEFAULT_USER_AGENT, validate_public_http_url
 from app.services.ytdlp_service import PLACEHOLDER_THUMBNAIL
+from app.services.processing_resources import BROWSER_SLOT
 
 logger = logging.getLogger(__name__)
 
@@ -339,40 +340,41 @@ class DouyinPublicClient:
         if not DOUYIN_BROWSER_SCRIPT.exists():
             raise OSError("douyin browser helper not found")
 
-        for attempt in range(DOUYIN_BROWSER_MAX_ATTEMPTS):
-            try:
-                result = subprocess.run(
-                    [node_executable, str(DOUYIN_BROWSER_SCRIPT), *arguments],
-                    capture_output=True,
-                    check=False,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=timeout_seconds,
-                )
-            except (OSError, subprocess.TimeoutExpired) as error:
-                result = None
-                failure_reason = error.__class__.__name__
-            else:
-                if result.returncode == 0:
-                    return result
-                failure_reason = _read_browser_failure_reason(result.stderr)
+        with BROWSER_SLOT:
+            for attempt in range(DOUYIN_BROWSER_MAX_ATTEMPTS):
+                try:
+                    result = subprocess.run(
+                        [node_executable, str(DOUYIN_BROWSER_SCRIPT), *arguments],
+                        capture_output=True,
+                        check=False,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=timeout_seconds,
+                    )
+                except (OSError, subprocess.TimeoutExpired) as error:
+                    result = None
+                    failure_reason = error.__class__.__name__
+                else:
+                    if result.returncode == 0:
+                        return result
+                    failure_reason = _read_browser_failure_reason(result.stderr)
 
-            if failed_target_path is not None:
-                failed_target_path.unlink(missing_ok=True)
-            if attempt == DOUYIN_BROWSER_MAX_ATTEMPTS - 1:
-                raise OSError(
-                    "douyin browser request failed after retries: "
-                    f"{failure_reason}"
-                )
+                if failed_target_path is not None:
+                    failed_target_path.unlink(missing_ok=True)
+                if attempt == DOUYIN_BROWSER_MAX_ATTEMPTS - 1:
+                    raise OSError(
+                        "douyin browser request failed after retries: "
+                        f"{failure_reason}"
+                    )
 
-            delay_seconds = DOUYIN_BROWSER_RETRY_DELAYS_SECONDS[attempt]
-            logger.warning(
-                "douyin browser request failed; retry=%s/%s reason=%s",
-                attempt + 1,
-                DOUYIN_BROWSER_MAX_ATTEMPTS,
-                failure_reason,
-            )
-            time.sleep(delay_seconds)
+                delay_seconds = DOUYIN_BROWSER_RETRY_DELAYS_SECONDS[attempt]
+                logger.warning(
+                    "douyin browser request failed; retry=%s/%s reason=%s",
+                    attempt + 1,
+                    DOUYIN_BROWSER_MAX_ATTEMPTS,
+                    failure_reason,
+                )
+                time.sleep(delay_seconds)
 
     def _request(
         self,

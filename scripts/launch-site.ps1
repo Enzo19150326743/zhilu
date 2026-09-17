@@ -200,7 +200,7 @@ if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
 
 Write-Host "[Backend] Starting FastAPI: http://127.0.0.1:8000"
 Write-LaunchLog "Starting backend"
-$backendCommand = "cd /d `"$backendDir`" && `".venv\Scripts\python.exe`" -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
+$backendCommand = "cd /d `"$backendDir`" && `".venv\Scripts\python.exe`" -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/k", $backendCommand
 
 Write-Host "[Backend] Waiting for FastAPI..."

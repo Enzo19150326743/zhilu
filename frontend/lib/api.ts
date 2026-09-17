@@ -22,6 +22,10 @@ import type {
   SummarizeResponse,
   TranscribeRequest,
   TranscribeResponse
+  ,TaskActionResponse
+  ,TaskBatchCreateRequest
+  ,TaskBatchListResponse
+  ,TaskBatchResponse
 } from "./types";
 
 const BACKEND_BASE_URL =
@@ -364,6 +368,37 @@ export const apiClient = {
       body: payload,
       method: "POST",
       timeoutMs: 1800000
+    });
+  },
+  createTaskBatch(payload: TaskBatchCreateRequest): Promise<TaskBatchResponse> {
+    return requestJson<TaskBatchResponse>("/api/task-batches", {
+      body: payload,
+      method: "POST",
+      timeoutMs: 15000
+    });
+  },
+  getTaskBatches(limit = 10): Promise<TaskBatchListResponse> {
+    return requestJson<TaskBatchListResponse>(`/api/task-batches?limit=${limit}`, {
+      timeoutMs: 5000
+    });
+  },
+  getTaskBatch(batchId: string): Promise<TaskBatchResponse> {
+    return requestJson<TaskBatchResponse>(`/api/task-batches/${batchId}`, {
+      timeoutMs: 5000
+    });
+  },
+  cancelTask(taskId: string, batchId: string): Promise<TaskActionResponse> {
+    return requestJson<TaskActionResponse>(`/api/tasks/${taskId}/cancel`, {
+      body: { batch_id: batchId },
+      method: "POST",
+      timeoutMs: 5000
+    });
+  },
+  retryTask(taskId: string, batchId: string): Promise<TaskActionResponse> {
+    return requestJson<TaskActionResponse>(`/api/tasks/${taskId}/retry`, {
+      body: { batch_id: batchId },
+      method: "POST",
+      timeoutMs: 5000
     });
   },
   downloadVideo(

@@ -476,6 +476,43 @@ class LibraryServiceTests(unittest.TestCase):
         self.assertIsNotNone(detail)
         self.assertTrue(detail.is_from_cache)
 
+    def test_same_video_id_with_alias_url_updates_one_library_item(self) -> None:
+        """短链和长链解析到同一内容身份时不能生成两份档案。"""
+        with self._temporary_library():
+            first = _build_parse_response("video", "content")
+            first.video.has_transcript = False
+            first.transcript = TranscriptPayload(segments=[], plain_text="")
+            library_service.upsert_library_item(first)
+
+            alias = first.model_copy(deep=True)
+            alias.source_url = "https://example.com/redirected-podcast"
+            alias.video.url = alias.source_url
+            alias.video.title = "刷新后的标题"
+            library_service.upsert_library_item(alias)
+
+            items = library_service.list_recent_library_items(limit=10)
+            detail = library_service.get_library_detail("podcast_001")
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(detail.source_url, "https://example.com/podcast")
+        self.assertEqual(detail.video.title, "刷新后的标题")
+
+    def test_bilibili_parts_with_same_video_id_remain_separate(self) -> None:
+        with self._temporary_library():
+            first = _build_parse_response("video", "content")
+            first.source_url = "https://www.bilibili.com/video/BV123?p=1"
+            first.video.url = first.source_url
+            first.video.platform = "bilibili"
+            first.video.video_id = "BV123"
+            second = first.model_copy(deep=True)
+            second.source_url = "https://www.bilibili.com/video/BV123?p=2"
+            second.video.url = second.source_url
+            library_service.upsert_library_item(first)
+            library_service.upsert_library_item(second)
+            items = library_service.list_recent_library_items(limit=10)
+
+        self.assertEqual(len(items), 2)
+
     @contextmanager
     def _temporary_library(self) -> Iterator[Path]:
         with tempfile.TemporaryDirectory() as temporary_directory:

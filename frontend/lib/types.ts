@@ -428,3 +428,69 @@ export interface SummaryGenerationMeta {
 export type LibraryFilter = "all" | "ready" | "summarized" | "noTranscript";
 
 export type AppStatus = "idle" | "loading" | "parsed" | "error";
+
+export type BatchTarget = "parse_only" | "analyze";
+
+export interface ProcessingTaskItem {
+  task_id: string;
+  input_index: number;
+  source_url: string;
+  status: "queued" | "running" | "waiting_retry" | "succeeded" | "failed" | "cancelled" | string;
+  stage: "parse" | "download" | "recognize" | "correct" | "summarize" | "done" | string;
+  title?: string | null;
+  author?: string | null;
+  platform?: string | null;
+  thumbnail?: string | null;
+  video_id?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  warning?: string | null;
+  cancelled: boolean;
+  result_available: boolean;
+  updated_at: string;
+}
+
+export interface TaskBatchStats {
+  total: number;
+  active: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+}
+
+export interface TaskBatchResponse {
+  success: true;
+  batch_id: string;
+  client_request_id: string;
+  target: BatchTarget;
+  created_at: string;
+  stats: TaskBatchStats;
+  items: ProcessingTaskItem[];
+}
+
+export interface TaskBatchSummary {
+  batch_id: string;
+  target: BatchTarget;
+  created_at: string;
+  stats: TaskBatchStats;
+}
+
+export interface TaskBatchListResponse {
+  success: true;
+  active_task_count: number;
+  active_video_ids: string[];
+  batches: TaskBatchSummary[];
+}
+
+export interface TaskBatchCreateRequest {
+  client_request_id: string;
+  urls: string[];
+  target: BatchTarget;
+  asr_engine: AsrEngine;
+  context_settings?: TranscribeContextSettings | null;
+}
+
+export interface TaskActionResponse {
+  success: true;
+  task: ProcessingTaskItem;
+}

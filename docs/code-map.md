@@ -111,8 +111,11 @@ ai-video-insight-workspace/
 - `frontend/components/TranscribeSettingsPanel.tsx`：生成转写稿前的节目结构、内容标签和说话人辅助设置。
 - `frontend/components/TranscribeSettingsDialog.tsx`：所有生成 AI 转写稿入口共用的转写设置确认弹窗。
 - `frontend/components/TranscribeTaskToasts.tsx`：解析、总结、转写后台任务提示。
+- `frontend/components/BatchAddDialog.tsx`：多链接提取、去重、目标和转写引擎设置。
+- `frontend/components/BatchWorkspace.tsx`：批次统计、最近批次、任务筛选、单项取消/重试与结果回看。
 - `frontend/components/Header.tsx`：顶部导航和品牌区。
 - `frontend/hooks/use-library-processing-workflows.ts`：转写与自动总结期间的统一“处理中”标记、当前标签页刷新恢复和会话清理。
+- `frontend/hooks/use-task-workspace.ts`：批次提交、服务端快照轮询、URL 恢复和单项操作。
 
 ## 后端入口
 
@@ -148,6 +151,11 @@ ai-video-insight-workspace/
 - `backend/app/services/http_fetch_service.py`：统一公开 HTTP(S) 抓取。
 - `backend/app/services/obsidian_export_service.py`：Obsidian Markdown 导出。
 - `backend/app/services/text_normalization_service.py`：文本清理和规范化。
+- `backend/app/services/task_store.py`：批次、任务、关联、幂等、容量和检查点的 SQLite 存储。
+- `backend/app/services/task_runner.py`：单进程有界调度、阶段恢复、取消和资源编排。
+- `backend/app/services/processing_service.py`：批量任务复用的解析、转写、总结和严格写回服务。
+- `backend/app/routers/tasks.py`：批量任务 HTTP API。
+- `docs/architecture/batch-processing.md`：多视频批量处理的状态、资源和恢复合同。
 
 ## 常见任务定位
 
@@ -162,6 +170,7 @@ ai-video-insight-workspace/
 - 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/sensevoice_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
 - 改 AI 校对术语：先读 `frontend/components/CorrectionTermSelector.tsx` 和 `backend/app/services/correction_term_service.py`；`docs/asr-glossary.md` 只负责首次初始化种子。
 - 改本地历史：先读 `frontend/components/RecentLibrary.tsx`、`backend/app/services/library_service.py`。
+- 改批量处理：先读 `docs/architecture/batch-processing.md`，再读 `backend/app/services/task_store.py`、`task_runner.py`、`frontend/hooks/use-task-workspace.ts` 和 `frontend/components/BatchWorkspace.tsx`。
 - 改 Obsidian 导出：先读 `docs/plans/2026-06-12-obsidian-note-workflow-prd.md`、`backend/app/services/obsidian_export_service.py`。
 - 改启动器：先读 `启动网站.bat`、`scripts/launch-site.ps1`、`scripts/wait-for-url.ps1`。
 - 改公开安装说明：先读 `README.md`、`docs/installation.md`、`docs/configuration.md`、`docs/troubleshooting.md`。

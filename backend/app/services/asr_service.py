@@ -23,6 +23,7 @@ from app.schemas import (
 from app.services import cuda_runtime
 from app.services.sensevoice_service import (
     SenseVoiceError,
+    release_sensevoice_models,
     transcribe_audio_with_sensevoice,
 )
 from app.services.shownotes_context_service import extract_shownotes_context
@@ -123,6 +124,172 @@ class WhisperTranscriptionResult:
     raw_transcript: TranscriptPayload | None = None
 
 
+@dataclass(frozen=True)
+class PreparedTranscriptionMedia:
+    """下载阶段产物；只允许位于调用方提供的任务目录。"""
+
+    path: Path
+    audio_download_seconds: float
+
+
+@dataclass(frozen=True)
+class RecognizedTranscription:
+    """识别阶段产物；校对可以在释放 GPU 名额后继续。"""
+
+    result: WhisperTranscriptionResult
+    transcription_seconds: float
+
+
+def prepare_transcription_media(
+    video_url: str,
+    output_dir: Path,
+    *,
+    http_headers: dict[str, str] | None = None,
+    audio_downloader: AudioDownloader | None = None,
+    audio_downloader_factory: AudioDownloaderFactory | None = None,
+) -> PreparedTranscriptionMedia:
+    """把转写媒体下载到受控任务目录，成功后返回稳定文件路径。"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    active_downloader = audio_downloader or (
+        audio_downloader_factory(output_dir)
+        if audio_downloader_factory is not None
+        else lambda url: _download_audio_for_transcription(url, output_dir, http_headers=http_headers)
+    )
+    started_at = monotonic()
+    audio_path = active_downloader(video_url).resolve()
+    root = output_dir.resolve()
+    if root not in audio_path.parents or audio_path.suffix.lower() in TEMP_SUFFIXES or not audio_path.is_file():
+        raise _build_transcribe_error(
+            "ASR_MEDIA_INVALID",
+            "转写媒体没有完整保存到任务目录，请稍后重试。",
+            status_code=500,
+        )
+    return PreparedTranscriptionMedia(
+        path=audio_path,
+        audio_download_seconds=monotonic() - started_at,
+    )
+
+
+def recognize_transcription_media(
+    prepared: PreparedTranscriptionMedia,
+    *,
+    asr_engine: str = "local_whisper",
+    transcriber: AudioTranscriber | None = None,
+) -> RecognizedTranscription:
+    """只执行本地识别，不进行网络校对。"""
+    started_at = monotonic()
+    asr_config = get_asr_config()
+    if asr_engine == "sensevoice_small":
+        try:
+            sensevoice_result = transcribe_audio_with_sensevoice(
+                prepared.path,
+                output_dir=prepared.path.parent,
+            )
+        except SenseVoiceError as error:
+            raise _build_transcribe_error(
+                error.error_code, error.message, status_code=error.status_code
+            ) from error
+        raw_transcript = _normalize_transcript_plain_text(sensevoice_result.transcript)
+        segments = _normalize_sensevoice_segments(raw_transcript.segments)
+        result = WhisperTranscriptionResult(
+            transcript=TranscriptPayload(segments=segments, plain_text=_join_segment_text(segments)),
+            model=sensevoice_result.model,
+            device=sensevoice_result.device,
+            compute_type=sensevoice_result.compute_type,
+            language=sensevoice_result.language,
+            engine="sensevoice-small",
+            provider="local",
+            timestamp_source=(
+                f"{sensevoice_result.timestamp_source}-normalized"
+                if len(segments) < len(raw_transcript.segments)
+                else sensevoice_result.timestamp_source
+            ),
+            raw_transcript=raw_transcript.model_copy(deep=True),
+        )
+    elif transcriber is None:
+        release_sensevoice_models()
+        result = _transcribe_audio_with_whisper(prepared.path, asr_config=asr_config)
+    else:
+        result = WhisperTranscriptionResult(
+            transcript=transcriber(prepared.path),
+            model=asr_config.model,
+            device=asr_config.device,
+            compute_type=asr_config.compute_type,
+            language=asr_config.language,
+        )
+    return RecognizedTranscription(result=result, transcription_seconds=monotonic() - started_at)
+
+
+def finalize_transcription(
+    recognized: RecognizedTranscription,
+    prepared: PreparedTranscriptionMedia,
+    *,
+    source_url: str,
+    video_id: str | None = None,
+    media_title: str | None = None,
+    media_author: str | None = None,
+    media_platform: str | None = None,
+    media_type: str | None = None,
+    context_settings: TranscribeContextSettings | None = None,
+    shownotes_plain_text: str | None = None,
+    asr_engine: str = "local_whisper",
+) -> TranscribeResponse:
+    """基于已保存的原始识别结果执行上下文合并和校对。"""
+    started_at = monotonic()
+    shownotes_context = None
+    if _optional_text(shownotes_plain_text):
+        shownotes_context = extract_shownotes_context(
+            shownotes_plain_text,
+            title=media_title,
+            author=media_author,
+        )
+    normalized_settings = normalize_transcribe_context_settings(
+        merge_shownotes_context(context_settings, shownotes_context),
+        platform=media_platform,
+        media_type=media_type,
+    )
+    transcript = _build_final_transcript(
+        transcription_result=recognized.result,
+        correction_terms=normalized_settings.correction_terms,
+        prompt_context=AsrPromptContext(
+            title=_optional_text(media_title),
+            author=_optional_text(media_author),
+            platform=_optional_text(media_platform),
+            media_type=_optional_text(media_type),
+            context_settings=normalized_settings,
+        ),
+    )
+    correction_seconds = monotonic() - started_at
+    if transcript.asr_meta:
+        transcript = transcript.model_copy(
+            update={
+                "asr_meta": transcript.asr_meta.model_copy(
+                    update={
+                        "audio_download_seconds": round(prepared.audio_download_seconds, 3),
+                        "transcription_seconds": round(recognized.transcription_seconds, 3),
+                        "correction_seconds": round(correction_seconds, 3),
+                        "total_seconds": round(
+                            prepared.audio_download_seconds + recognized.transcription_seconds + correction_seconds,
+                            3,
+                        ),
+                    }
+                )
+            }
+        )
+    return TranscribeResponse(
+        source_url=source_url,
+        video_id=video_id,
+        transcript=transcript,
+        transcript_variant_key=asr_engine,
+        shownotes_context=shownotes_context,
+        message=(
+            "本地 SenseVoiceSmall 已生成 AI 转写稿。"
+            if recognized.result.engine == "sensevoice-small"
+            else "本地 Whisper 已生成 AI 转写稿。"
+        ),
+    )
+
+
 def transcribe_media_audio(
     video_url: str,
     video_id: str | None = None,
@@ -219,6 +386,7 @@ def transcribe_media_audio(
                     raw_transcript=raw_sensevoice_transcript.model_copy(deep=True),
                 )
             elif transcriber is None:
+                release_sensevoice_models()
                 transcription_result = _transcribe_audio_with_whisper(
                     audio_path,
                     asr_config=asr_config,

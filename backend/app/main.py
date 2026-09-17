@@ -1,11 +1,11 @@
 import logging
 import os
-import re
 import sqlite3
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -111,6 +111,14 @@ from app.services.transcript_correction_service import (
     get_transcript_correction_status,
 )
 from app.services.ytdlp_service import download_video_format
+from app.routers.tasks import router as tasks_router
+from app.services.task_runner import get_task_store, start_task_runner, stop_task_runner
+from app.services.processing_resources import DOWNLOAD_SLOTS, RECOGNITION_SLOT, AI_WORK_SLOTS
+from app.services.url_normalization_service import (
+    extract_public_url,
+    normalize_bilibili_video_url,
+    normalize_public_video_url,
+)
 
 
 def read_int_env(name: str, default_value: int) -> int:
@@ -125,19 +133,16 @@ def read_int_env(name: str, default_value: int) -> int:
 
 APP_VERSION = "0.1.0"
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
-PARSE_RATE_LIMIT_PER_HOUR = read_int_env("PARSE_RATE_LIMIT_PER_HOUR", 20)
-SUMMARY_RATE_LIMIT_PER_HOUR = read_int_env("SUMMARY_RATE_LIMIT_PER_HOUR", 10)
+PARSE_RATE_LIMIT_PER_HOUR = read_int_env("PARSE_RATE_LIMIT_PER_HOUR", 50)
+SUMMARY_RATE_LIMIT_PER_HOUR = read_int_env("SUMMARY_RATE_LIMIT_PER_HOUR", 50)
 QA_RATE_LIMIT_PER_HOUR = read_int_env("QA_RATE_LIMIT_PER_HOUR", 10)
-TRANSCRIBE_RATE_LIMIT_PER_HOUR = read_int_env("TRANSCRIBE_RATE_LIMIT_PER_HOUR", 3)
+TRANSCRIBE_RATE_LIMIT_PER_HOUR = read_int_env("TRANSCRIBE_RATE_LIMIT_PER_HOUR", 50)
 IMAGE_PROXY_TIMEOUT_SECONDS = 15
 IMAGE_PROXY_MAX_BYTES = 8 * 1024 * 1024
 IMAGE_PROXY_ACCEPT_HEADER = (
     "image/avif,image/webp,image/apng,image/png,image/jpeg,"
     "image/*;q=0.8,*/*;q=0.5"
 )
-PUBLIC_URL_PATTERN = re.compile(r"https?://[^\s，。；;、]+")
-BILIBILI_VIDEO_PATH_PATTERN = re.compile(r"^/video/(BV[a-zA-Z0-9]+)")
-BILIBILI_ALLOWED_QUERY_KEYS = {"p", "t"}
 logger = logging.getLogger(__name__)
 FRONTEND_ORIGINS = {
     FRONTEND_ORIGIN,
@@ -145,10 +150,20 @@ FRONTEND_ORIGINS = {
     "http://127.0.0.1:3000",
 }
 
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    start_task_runner()
+    try:
+        yield
+    finally:
+        stop_task_runner()
+
 app = FastAPI(
     title="AI Media Insight Workspace API",
     version=APP_VERSION,
     description="本地优先的 AI 媒体内容解析总结工作台后端服务。",
+    lifespan=app_lifespan,
 )
 
 app.add_middleware(
@@ -159,6 +174,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
+app.include_router(tasks_router)
 
 
 def build_api_error_response(
@@ -205,69 +221,6 @@ def handle_request_validation_error(
         error_code="VALIDATION_ERROR",
         message="请求参数不完整或格式不正确。",
     )
-
-
-def normalize_public_video_url(raw_url: str) -> str:
-    """
-    从用户输入中提取并规范化媒体 URL。
-    """
-    video_url = extract_public_url(raw_url)
-    parsed_url = urlparse(video_url)
-    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "error_code": "INVALID_URL",
-                "message": "请输入以 http:// 或 https:// 开头的公开媒体链接。",
-            },
-        )
-
-    return normalize_bilibili_video_url(video_url)
-
-
-def normalize_bilibili_video_url(video_url: str) -> str:
-    """
-    清理 B 站分享链接里的跟踪参数，降低公开解析被平台快速拒绝的概率。
-    """
-    parsed_url = urlparse(video_url)
-    hostname = parsed_url.hostname or ""
-    if not (
-        hostname.endswith("bilibili.com") or hostname.endswith("b23.tv")
-    ):
-        return video_url
-
-    match = BILIBILI_VIDEO_PATH_PATTERN.search(parsed_url.path)
-    if not match:
-        return video_url
-
-    safe_query = [
-        (key, value)
-        for key, value in parse_qsl(parsed_url.query, keep_blank_values=True)
-        if key in BILIBILI_ALLOWED_QUERY_KEYS and value
-    ]
-    return urlunparse(
-        (
-            parsed_url.scheme,
-            parsed_url.netloc,
-            f"/video/{match.group(1)}",
-            "",
-            urlencode(safe_query),
-            "",
-        )
-    )
-
-
-def extract_public_url(raw_text: str) -> str:
-    """
-    支持抖音分享口令这类整段文案输入，优先提取其中第一个公开链接。
-    """
-    stripped_text = raw_text.strip()
-    match = PUBLIC_URL_PATTERN.search(stripped_text)
-    if not match:
-        return stripped_text
-
-    return match.group(0).rstrip(").,，。；;、")
 
 
 def get_client_key(request: Request) -> str:
@@ -735,6 +688,11 @@ def clear_local_library() -> LibraryClearResponse:
     """
     清空本地内容库历史记录。
     """
+    if get_task_store().has_active_tasks():
+        raise HTTPException(
+            status_code=409,
+            detail={"success": False, "error_code": "ACTIVE_TASKS_EXIST", "message": "仍有批量任务在处理，完成或取消后才能清空档案。"},
+        )
     return LibraryClearResponse(deleted_count=clear_library_items())
 
 
@@ -762,6 +720,11 @@ def delete_library_history_item(video_id: str) -> LibraryDeleteResponse:
     """
     删除本地内容库中的单条历史记录。
     """
+    if get_task_store().has_active_tasks(video_id=video_id):
+        raise HTTPException(
+            status_code=409,
+            detail={"success": False, "error_code": "ACTIVE_TASK_EXISTS", "message": "这条档案仍在处理，完成或取消后才能删除。"},
+        )
     deleted = delete_library_item(video_id)
     if not deleted:
         raise HTTPException(
@@ -856,6 +819,14 @@ def parse_video(request: Request, parse_request: ParseRequest) -> ParseResponse:
         upsert_library_item(parse_response)
     except (sqlite3.Error, OSError, ValueError) as error:
         logger.warning("library upsert failed: %s", error.__class__.__name__)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error_code": "LIBRARY_SAVE_FAILED",
+                "message": "解析成功，但结果写入本地档案失败，请稍后重试。",
+            },
+        ) from error
 
     return parse_response
 
@@ -891,7 +862,8 @@ def summarize_video(
     enforce_rate_limit(request, "summarize", SUMMARY_RATE_LIMIT_PER_HOUR)
     summarize_request = _hydrate_summarize_request_from_library(summarize_request)
     try:
-        summarize_response = summarize_transcript(summarize_request)
+        with AI_WORK_SLOTS:
+            summarize_response = summarize_transcript(summarize_request)
     except DeepSeekOutputTruncatedError as error:
         logger.warning("AI summary output truncated")
         raise HTTPException(
@@ -906,7 +878,7 @@ def summarize_video(
             },
         ) from error
     try:
-        update_summary_for_source_url(
+        saved = update_summary_for_source_url(
             summarize_request.source_url,
             summarize_response,
         )
@@ -914,6 +886,23 @@ def summarize_video(
         logger.warning(
             "library summary update failed: %s",
             error.__class__.__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error_code": "SUMMARY_SAVE_FAILED",
+                "message": "总结已生成，但写入本地档案失败，请稍后重试。",
+            },
+        ) from error
+    if summarize_request.source_url and not saved:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error_code": "LIBRARY_ITEM_NOT_FOUND",
+                "message": "总结已生成，但没有找到对应的本地档案。",
+            },
         )
 
     return summarize_response
@@ -987,24 +976,25 @@ def transcribe_video(
         video_url
     )
     enforce_rate_limit(request, "transcribe", TRANSCRIBE_RATE_LIMIT_PER_HOUR)
-    transcribe_response = transcribe_media_audio(
-        video_url=transcribe_source_url,
-        video_id=transcribe_request.video_id,
-        http_headers=transcribe_http_headers,
-        audio_downloader_factory=(
-            create_douyin_transcription_downloader if is_douyin_source else None
-        ),
-        response_source_url=video_url,
-        media_title=transcribe_context.get("title"),
-        media_author=transcribe_context.get("author"),
-        media_platform=transcribe_context.get("platform"),
-        media_type=transcribe_context.get("media_type"),
-        context_settings=transcribe_request.context_settings,
-        shownotes_plain_text=transcribe_context.get("shownotes_plain_text"),
-        asr_engine=transcribe_request.asr_engine,
-    )
+    with RECOGNITION_SLOT:
+        transcribe_response = transcribe_media_audio(
+            video_url=transcribe_source_url,
+            video_id=transcribe_request.video_id,
+            http_headers=transcribe_http_headers,
+            audio_downloader_factory=(
+                create_douyin_transcription_downloader if is_douyin_source else None
+            ),
+            response_source_url=video_url,
+            media_title=transcribe_context.get("title"),
+            media_author=transcribe_context.get("author"),
+            media_platform=transcribe_context.get("platform"),
+            media_type=transcribe_context.get("media_type"),
+            context_settings=transcribe_request.context_settings,
+            shownotes_plain_text=transcribe_context.get("shownotes_plain_text"),
+            asr_engine=transcribe_request.asr_engine,
+        )
     try:
-        update_transcript_for_source_url(
+        saved = update_transcript_for_source_url(
             video_url,
             transcribe_response.transcript,
             transcribe_response.transcript_variant_key,
@@ -1014,6 +1004,23 @@ def transcribe_video(
         logger.warning(
             "library transcript update failed: %s",
             error.__class__.__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error_code": "TRANSCRIPT_SAVE_FAILED",
+                "message": "转写已完成，但写入本地档案失败，请稍后重试。",
+            },
+        ) from error
+    if not saved:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "error_code": "LIBRARY_ITEM_NOT_FOUND",
+                "message": "转写已完成，但没有找到对应的本地档案。",
+            },
         )
 
     correction_terms = (
@@ -1137,21 +1144,22 @@ def _remove_completed_download(file_path: Path) -> None:
 def _prepare_video_download(download_request: DownloadRequest) -> DownloadResponse:
     """复用各平台下载实现，返回后端已准备好的文件信息。"""
     video_url = normalize_public_video_url(download_request.url)
-    if is_bilibili_url(video_url):
-        return download_bilibili_video_format(
-            source_url=video_url,
+    with DOWNLOAD_SLOTS:
+        if is_bilibili_url(video_url):
+            return download_bilibili_video_format(
+                source_url=video_url,
+                format_id=download_request.format_id,
+                merge_with_audio=download_request.merge_with_audio,
+            )
+
+        if is_douyin_url(video_url):
+            return download_douyin_video(video_url)
+
+        return download_video_format(
+            video_url=video_url,
             format_id=download_request.format_id,
             merge_with_audio=download_request.merge_with_audio,
         )
-
-    if is_douyin_url(video_url):
-        return download_douyin_video(video_url)
-
-    return download_video_format(
-        video_url=video_url,
-        format_id=download_request.format_id,
-        merge_with_audio=download_request.merge_with_audio,
-    )
 
 
 @app.post("/api/download", response_model=DownloadResponse)

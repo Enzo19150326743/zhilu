@@ -65,6 +65,21 @@ _MODEL_CACHE: dict[tuple[str, str], Any] = {}
 _MODEL_CACHE_LOCK = threading.Lock()
 
 
+def release_sensevoice_models() -> None:
+    """切换到其他识别引擎前释放 SenseVoice 模型及 CUDA 缓存。"""
+    with _MODEL_CACHE_LOCK:
+        had_cuda_model = any(device.startswith("cuda") for _, device in _MODEL_CACHE)
+        _MODEL_CACHE.clear()
+    if not had_cuda_model:
+        return
+    try:
+        import torch
+
+        torch.cuda.empty_cache()
+    except (ImportError, RuntimeError):
+        return
+
+
 def get_sensevoice_status() -> tuple[bool, str | None]:
     """只检查可选依赖，不触发模型下载或 GPU 初始化。"""
     missing_packages = [

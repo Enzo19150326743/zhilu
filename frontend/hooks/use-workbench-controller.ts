@@ -5,10 +5,12 @@ import { useDemoLibrary } from "@/hooks/use-demo-library";
 import { useLibraryProcessingWorkflows } from "@/hooks/use-library-processing-workflows";
 import { useLibraryWorkspace } from "@/hooks/use-library-workspace";
 import { useSummaryWorkflow } from "@/hooks/use-summary-workflow";
+import { useTaskWorkspace } from "@/hooks/use-task-workspace";
 import { useTranscribeWorkflow } from "@/hooks/use-transcribe-workflow";
 import { apiClient } from "@/lib/api";
 import { LIBRARY_PROCESSING_TIMEOUT_MS } from "@/lib/library-processing";
 import { getMediaType, getTextSourceType } from "@/lib/media";
+import { parseBatchInput } from "@/lib/batch-input";
 import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
 import {
   getSummaryMetaFromDetail,
@@ -38,6 +40,7 @@ function hasPersistedSummary(detail: ParseResponse): boolean {
 }
 
 export function useWorkbenchController() {
+  const taskWorkspace = useTaskWorkspace();
   const { demos, isReady: areDemosReady } = useDemoLibrary();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const {
@@ -279,6 +282,11 @@ export function useWorkbenchController() {
       return;
     }
 
+    if (parseBatchInput(trimmedUrl).urls.length > 1) {
+      taskWorkspace.openDialog();
+      return;
+    }
+
     const runningSameUrlTask = parseTasks.some(
       (task) => task.sourceUrl === trimmedUrl && task.status === "running"
     );
@@ -445,6 +453,27 @@ export function useWorkbenchController() {
     }
   };
 
+  const handleOpenTaskResult = async (videoId: string) => {
+    taskWorkspace.closeWorkspace();
+    setStatus("loading");
+    setErrorMessage(null);
+    setLoadingLibraryVideoId(videoId);
+    try {
+      const response = await apiClient.getLibraryDetail(videoId);
+      setDetail(response);
+      setUrl(response.source_url);
+      setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
+      setActiveTab("summary");
+      setStatus("parsed");
+      window.scrollTo({ behavior: "auto", left: 0, top: 0 });
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage(error instanceof Error ? error.message : "任务结果打开失败，请稍后重试。");
+    } finally {
+      setLoadingLibraryVideoId(null);
+    }
+  };
+
   const handleConfirmLibraryAction = async () => {
     const confirmedAction = await confirmPendingLibraryAction();
     if (!confirmedAction) {
@@ -534,7 +563,7 @@ export function useWorkbenchController() {
     isRefreshing: isRefreshingLibrary,
     items: libraryItems,
     loadingVideoId: loadingLibraryVideoId,
-    processingVideoIds,
+    processingVideoIds: new Set([...processingVideoIds, ...taskWorkspace.activeVideoIds]),
     stats: libraryStats,
     onChangeFilter: setLibraryFilter,
     onClearAll: handleClearLibraryItems,
@@ -553,6 +582,7 @@ export function useWorkbenchController() {
       loadingDemoId,
       url,
       onAnalyze: handleAnalyze,
+      onBatchAdd: taskWorkspace.openDialog,
       onChangeUrl: setUrl,
       onLoadDemo: handleLoadDemo
     },
@@ -596,6 +626,7 @@ export function useWorkbenchController() {
           isParsing,
           value: url,
           onAnalyze: handleAnalyze,
+          onBatchAdd: taskWorkspace.openDialog,
           onChange: setUrl
         }
       }
@@ -615,8 +646,44 @@ export function useWorkbenchController() {
       onConfirm: handleConfirmLibraryAction
     },
     homeWorkspaceProps,
+    taskWorkspaceProps: taskWorkspace.activeBatch
+      ? {
+          batch: taskWorkspace.activeBatch,
+          busyTaskIds: taskWorkspace.busyTaskIds,
+          errorMessage: taskWorkspace.errorMessage,
+          recentBatches: taskWorkspace.recentBatches,
+          onAdd: taskWorkspace.openDialog,
+          onBack: taskWorkspace.closeWorkspace,
+          onCancel: taskWorkspace.cancelTask,
+          onOpenBatch: taskWorkspace.openBatch,
+          onOpenResult: handleOpenTaskResult,
+          onRetry: taskWorkspace.retryTask
+        }
+      : null,
+    batchDialogProps: {
+      errorMessage: taskWorkspace.errorMessage,
+      initialValue: url,
+      isOpen: taskWorkspace.isDialogOpen,
+      isSubmitting: taskWorkspace.isSubmitting,
+      sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,
+      onClose: taskWorkspace.closeDialog,
+      onSubmit: async (...args: Parameters<typeof taskWorkspace.submitBatch>) => {
+        await taskWorkspace.submitBatch(...args);
+        setUrl("");
+      }
+    },
+    activeTaskCount: taskWorkspace.activeTaskCount,
+    isTaskWorkspaceOpen: taskWorkspace.isWorkspaceOpen,
+    onTasksClick: () => {
+      const firstBatchId = taskWorkspace.activeBatch?.batch_id ?? taskWorkspace.recentBatches[0]?.batch_id;
+      if (firstBatchId) void taskWorkspace.openBatch(firstBatchId);
+      else taskWorkspace.openDialog();
+    },
     isHomeWorkspaceReady: areDemosReady && !isLibraryLoading,
-    onHomeClick: handleGoHome,
+    onHomeClick: () => {
+      taskWorkspace.closeWorkspace();
+      handleGoHome();
+    },
     transcribeSettingsDialogProps: {
       asrEngine: pendingAsrEngine,
       sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,

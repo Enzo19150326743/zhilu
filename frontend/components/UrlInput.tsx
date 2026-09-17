@@ -5,6 +5,7 @@ interface UrlInputProps {
   value: string;
   errorMessage: string | null;
   onAnalyze: () => void;
+  onBatchAdd?: () => void;
   onChange: (value: string) => void;
 }
 
@@ -13,6 +14,7 @@ export function UrlInput({
   value,
   errorMessage,
   onAnalyze,
+  onBatchAdd,
   onChange
 }: UrlInputProps) {
   return (
@@ -52,6 +54,16 @@ export function UrlInput({
             {isParsing ? "提取中" : "提取内容"}
           </button>
         </form>
+
+        {onBatchAdd ? (
+          <button
+            className="mt-2 text-xs font-semibold text-[var(--muted)] underline decoration-2 underline-offset-4 hover:text-[var(--accent)]"
+            type="button"
+            onClick={onBatchAdd}
+          >
+            批量添加多个链接
+          </button>
+        ) : null}
 
         {errorMessage ? (
           <div className="shadow-hard-sm mt-4 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--ink)]">

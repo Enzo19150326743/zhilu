@@ -11,6 +11,7 @@ from app.services.http_fetch_service import (
     DEFAULT_USER_AGENT,
     validate_public_http_url,
 )
+from app.services.processing_resources import DEEPSEEK_HTTP_SLOTS
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,13 @@ class DeepSeekOutputTruncatedError(DeepSeekClientError):
     """模型因输出长度限制而没有返回完整结果。"""
 
 
-def post_deepseek_chat_completion(
+def post_deepseek_chat_completion(**kwargs: Any) -> dict[str, Any]:
+    """全应用共享两个 DeepSeek 实际 HTTP 请求名额。"""
+    with DEEPSEEK_HTTP_SLOTS:
+        return _post_deepseek_chat_completion(**kwargs)
+
+
+def _post_deepseek_chat_completion(
     *,
     api_key: str,
     base_url: str,

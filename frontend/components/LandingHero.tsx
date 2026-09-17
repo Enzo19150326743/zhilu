@@ -10,6 +10,7 @@ interface LandingHeroProps {
   loadingDemoId: string | null;
   url: string;
   onAnalyze: () => void;
+  onBatchAdd: () => void;
   onChangeUrl: (value: string) => void;
   onLoadDemo: (demoId: string) => void;
 }
@@ -98,6 +99,7 @@ export function LandingHero({
   loadingDemoId,
   url,
   onAnalyze,
+  onBatchAdd,
   onChangeUrl,
   onLoadDemo
 }: LandingHeroProps) {
@@ -190,6 +192,14 @@ export function LandingHero({
                 {isParsing ? "提取中" : "提取内容"}
               </button>
             </div>
+
+            <button
+              className="mt-3 text-sm font-semibold text-[var(--muted)] underline decoration-2 underline-offset-4 hover:text-[var(--accent)]"
+              type="button"
+              onClick={onBatchAdd}
+            >
+              批量添加多个链接
+            </button>
 
             {errorMessage ? (
               <div className="shadow-hard-sm mt-4 border-2 border-[var(--line-ink)] bg-[var(--accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--ink)]">
