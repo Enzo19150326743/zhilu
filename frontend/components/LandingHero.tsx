@@ -1,5 +1,4 @@
 import { ArrowUpRight, FileText, Link2, Loader2, Search } from "lucide-react";
-import SplitText from "@/components/SplitText";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import type { DemoItem } from "@/lib/types";
 
@@ -34,7 +33,7 @@ function RecommendationDeck({
         </h2>
       </div>
 
-      <div className="shadow-hard-md divide-y-2 divide-[var(--line-ink)] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)]">
+      <div className="divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] bg-[var(--paper-raised)] shadow-[0_10px_28px_rgba(54,45,32,0.06)]">
         {items.slice(0, 3).map((item) => {
           const isLoading = loadingItemId === item.demo_id;
           const thumbnailUrl = getDisplayThumbnailUrl(item.thumbnail);
@@ -47,7 +46,7 @@ function RecommendationDeck({
               type="button"
               onClick={() => onOpenItem(item.demo_id)}
             >
-              <span className="aspect-video overflow-hidden border-2 border-[var(--line-ink)] bg-[var(--ink)]">
+              <span className="aspect-video overflow-hidden rounded-md bg-[var(--ink)]">
                 {thumbnailUrl ? (
                   <img
                     alt=""
@@ -104,60 +103,19 @@ export function LandingHero({
   onLoadDemo
 }: LandingHeroProps) {
   return (
-    <section className="border-b-2 border-[var(--line-ink)] bg-[var(--paper)]">
-      <div className="mx-auto grid max-w-[90rem] gap-9 px-4 pb-10 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(330px,0.75fr)] lg:items-start lg:gap-12 lg:px-10 lg:pb-11 lg:pt-9">
+    <section className="border-b border-[var(--line)] bg-[var(--paper)]">
+      <div className="mx-auto grid max-w-[82rem] gap-8 px-4 pb-8 pt-7 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:items-start lg:gap-10 lg:px-10 lg:pb-9 lg:pt-8">
         <div className="min-w-0">
-          <h1 className="font-display text-balance text-[clamp(2.7rem,5.3vw,4.8rem)] leading-[1.07] text-[var(--ink)]">
-            <span className="block">
-              <SplitText
-                tag="span"
-                text="看见的，"
-                className="mr-[0.16em]"
-                delay={45}
-                duration={1.10}
-                ease="power3.out"
-                splitType="words"
-                from={{ opacity: 0, y: 48 }}
-                to={{ opacity: 1, y: 0 }}
-                rootMargin="0px"
-		startDelay={0.10}
-                textAlign="left"
-              />
-              <SplitText
-                tag="span"
-                text="听见的，"
-                delay={45}
-                duration={1.00}
-                ease="power3.out"
-                splitType="words"
-                from={{ opacity: 0, y: 48 }}
-                to={{ opacity: 1, y: 0 }}
-                rootMargin="0px"
-                startDelay={0.32}
-                textAlign="left"
-              />
-            </span>
-            <span className="mt-2 block">
-              <span className="shadow-hard-md inline-block border-2 border-[var(--line-ink)] bg-[var(--accent)] px-2 pb-1 text-[var(--paper-raised)]">
-                <SplitText
-                  tag="span"
-                  text="都变成你的知识。"
-                  delay={45}
-                  duration={1.10}
-                  ease="power3.out"
-                  splitType="words"
-                  from={{ opacity: 0, y: 48 }}
-                  to={{ opacity: 1, y: 0 }}
-                  rootMargin="0px"
-                  startDelay={0.56}
-                  textAlign="left"
-                />
-              </span>
-            </span>
+          <h1 className="text-balance text-[clamp(2.25rem,4.2vw,3.9rem)] font-bold leading-[1.12] tracking-[-0.04em] text-[var(--ink)]">
+            把公开内容提炼成
+            <span className="text-[var(--accent)]">可编辑的知识稿</span>
           </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)] sm:text-base">
+            一次提交会按需提取全文、本地转写并生成总结；AI 未配置时会明确显示可用的基础结果。
+          </p>
 
-          <div className="editorial-enter editorial-enter-delay-1 mt-5 max-w-[760px]">
-            <div className="shadow-hard-md flex min-h-[54px] min-w-0 items-stretch border-2 border-[var(--line-ink)] bg-[var(--paper-raised)]">
+          <div className="mt-5 max-w-[760px]">
+            <div className="flex min-h-[54px] min-w-0 items-stretch overflow-hidden rounded-lg border border-[var(--line-strong)] bg-[var(--paper-raised)] shadow-[0_10px_28px_rgba(54,45,32,0.07)] focus-within:border-[var(--accent)]">
               <div className="relative min-w-0 flex-1">
                 <Link2
                   aria-hidden="true"
@@ -179,7 +137,7 @@ export function LandingHero({
                 />
               </div>
               <button
-                className="inline-flex min-h-[54px] shrink-0 items-center justify-center gap-2 border-l-2 border-[var(--line-ink)] bg-[var(--accent)] px-5 text-sm font-bold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
+                className="inline-flex min-h-[54px] shrink-0 cursor-pointer items-center justify-center gap-2 border-l border-[var(--line)] bg-[var(--accent)] px-5 text-sm font-bold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
                 disabled={isParsing || !url.trim()}
                 type="button"
                 onClick={onAnalyze}
@@ -189,7 +147,7 @@ export function LandingHero({
                 ) : (
                   <Search className="h-4 w-4" aria-hidden="true" />
                 )}
-                {isParsing ? "提取中" : "提取内容"}
+                {isParsing ? "提炼中" : "提炼内容"}
               </button>
             </div>
 
@@ -198,7 +156,7 @@ export function LandingHero({
               type="button"
               onClick={onBatchAdd}
             >
-              批量添加多个链接
+              处理设置或批量添加
             </button>
 
             {errorMessage ? (

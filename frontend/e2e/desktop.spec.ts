@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { LIBRARY_PROCESSING_STORAGE_KEY } from "../lib/library-processing";
 
 const verticalThumbnail = `data:image/svg+xml,${encodeURIComponent(
@@ -110,18 +110,29 @@ const summarizedDetail = {
   summary: {
     ...emptySummary,
     key_points: ["关键结论"],
+    key_point_evidence: [
+      {
+        excerpt: "用于验证导图工具提示位置。",
+        point_index: 0,
+        segment_ids: ["seg-0001-test"],
+        transcript_fingerprint: "sha256:test"
+      }
+    ],
+    transcript_fingerprint: "sha256:test",
     structured_analysis_markdown:
       "## 论证与方法\n1. **提升判断力** → 通过调查研究看清方向。",
     tldr: "用于验证导图工具提示位置。"
   },
   transcript: {
     asr_meta: { correction_status: "corrected", engine: "sensevoice" },
+    fingerprint: "sha256:test",
     plain_text: "用于验证导图工具提示位置。",
     segments: [{ start: 0, text: "用于验证导图工具提示位置。" }]
   },
   transcript_variants: {
     corrected: {
       asr_meta: { correction_status: "corrected", engine: "sensevoice" },
+      fingerprint: "sha256:test",
       plain_text: "用于验证导图工具提示位置。",
       segments: [{ start: 0, text: "用于验证导图工具提示位置。" }]
     }
@@ -197,8 +208,17 @@ async function installApiMocks(page: Page, libraryDelayMs = 0) {
       if (libraryDelayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, libraryDelayMs));
       }
+      const filter = requestUrl.searchParams.get("filter") ?? "all";
+      const items =
+        filter === "summarized"
+          ? [summarizedItem]
+          : filter === "noTranscript"
+            ? [needsTranscriptItem]
+            : filter === "ready"
+              ? []
+              : [needsTranscriptItem, summarizedItem];
       return json(route, {
-        items: [needsTranscriptItem, summarizedItem],
+        items,
         success: true
       });
     }
@@ -206,7 +226,7 @@ async function installApiMocks(page: Page, libraryDelayMs = 0) {
       return json(route, {
         ai_summary_count: 1,
         fallback_summary_count: 0,
-        needs_transcript_count: 0,
+        needs_transcript_count: 1,
         ready_count: 0,
         no_transcript_count: 1,
         success: true,
@@ -240,6 +260,15 @@ function watchBrowserErrors(page: Page) {
   return errors;
 }
 
+async function getRenderedTextCenter(locator: Locator) {
+  return locator.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const box = range.getBoundingClientRect();
+    return box.x + box.width / 2;
+  });
+}
+
 test("最近档案先显示加载态，并保持已总结与需转写互斥", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await installApiMocks(page, 450);
@@ -258,6 +287,118 @@ test("最近档案先显示加载态，并保持已总结与需转写互斥", as
   await page.getByRole("button", { name: "需转写 1" }).click();
   await expect(page.getByRole("button", { name: "需转写演示", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "已总结演示", exact: true })).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
+test("最近档案的辅助列与操作列表头和内容共用中心线", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  const needsTranscriptRow = page.getByRole("button", { name: "需转写演示", exact: true }).locator("..");
+  await expect(needsTranscriptRow).toBeVisible();
+  const sourceHeader = page.getByText("来源", { exact: true });
+  const sourceCell = needsTranscriptRow.locator(":scope > span").nth(0);
+  const statusHeader = page.getByText("状态", { exact: true });
+  const statusCell = needsTranscriptRow.locator(":scope > span").nth(1);
+  const timeHeader = page.getByText("时间", { exact: true });
+  const timeCell = needsTranscriptRow.locator(":scope > span").nth(2);
+  const operationHeader = page.getByText("操作", { exact: true });
+  const [sourceHeaderCenter, sourceCellCenter, statusHeaderCenter, statusCellCenter, timeHeaderCenter, timeCellCenter, operationHeaderCenter, copyButton, deleteButton] =
+    await Promise.all([
+      getRenderedTextCenter(sourceHeader),
+      getRenderedTextCenter(sourceCell),
+      getRenderedTextCenter(statusHeader),
+      getRenderedTextCenter(statusCell),
+      getRenderedTextCenter(timeHeader),
+      getRenderedTextCenter(timeCell),
+      getRenderedTextCenter(operationHeader),
+      page.getByRole("button", { name: "复制源链接", exact: true }).first().boundingBox(),
+      page.getByRole("button", { name: "删除《需转写演示》", exact: true }).boundingBox()
+    ]);
+
+  expect(copyButton).not.toBeNull();
+  expect(deleteButton).not.toBeNull();
+
+  expect(Math.abs(sourceHeaderCenter - sourceCellCenter)).toBeLessThanOrEqual(1);
+  expect(Math.abs(statusHeaderCenter - statusCellCenter)).toBeLessThanOrEqual(1);
+  expect(Math.abs(timeHeaderCenter - timeCellCenter)).toBeLessThanOrEqual(1);
+  expect(Math.abs(operationHeaderCenter - ((copyButton!.x + deleteButton!.x + deleteButton!.width) / 2))).toBeLessThanOrEqual(1);
+  expect(browserErrors).toEqual([]);
+});
+
+test("批量添加默认使用 SenseVoice 并沿用品牌选中色", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "处理设置或批量添加", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "批量添加" });
+  const analyzeRadio = dialog.getByRole("radio", { name: /提炼内容/ });
+
+  await expect(dialog.getByLabel("缺少逐字稿时使用")).toHaveValue("sensevoice_small");
+  await expect(analyzeRadio).toBeChecked();
+  await expect(analyzeRadio).toHaveCSS("accent-color", "rgb(209, 75, 49)");
+  expect(browserErrors).toEqual([]);
+});
+
+test("从批量任务打开转写中的详情时只显示转写状态", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  const batchId = "batch-running-transcription";
+  const batchSnapshot = {
+    batch_id: batchId,
+    client_request_id: "request-running-transcription",
+    created_at: "2026-09-20T08:00:00Z",
+    items: [
+      {
+        cancelled: false,
+        input_index: 0,
+        result_available: true,
+        source_url: needsTranscriptItem.source_url,
+        stage: "recognize",
+        status: "running",
+        task_id: "processing-running-transcription",
+        title: needsTranscriptItem.title,
+        updated_at: "2026-09-20T08:00:01Z",
+        video_id: needsTranscriptItem.video_id
+      }
+    ],
+    stats: { active: 1, cancelled: 0, failed: 0, succeeded: 0, total: 1 },
+    success: true,
+    target: "analyze"
+  };
+
+  await installApiMocks(page);
+  await page.route("http://127.0.0.1:8000/api/task-batches**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/task-batches") {
+      return json(route, {
+        active_task_count: 1,
+        active_video_ids: [needsTranscriptItem.video_id],
+        batches: [
+          {
+            batch_id: batchId,
+            created_at: batchSnapshot.created_at,
+            stats: batchSnapshot.stats,
+            target: batchSnapshot.target
+          }
+        ],
+        success: true
+      });
+    }
+    if (path === `/api/task-batches/${batchId}`) {
+      return json(route, batchSnapshot);
+    }
+    return route.fallback();
+  });
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "任务 · 1", exact: true }).click();
+  await page.getByRole("button", { name: "查看", exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "正在生成转写稿" })).toBeVisible();
+  await expect(page.getByText("转写任务正在后台处理，完成后会自动更新当前内容。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成转写稿", exact: true })).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
 
@@ -677,7 +818,7 @@ test("资料库危险操作使用站内确认并可取消", async ({ page }) => 
   expect(browserErrors).toEqual([]);
 });
 
-test("一句话概览使用顶部横向强调线", async ({ page }) => {
+test("一句话结论使用顶部横向强调线", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await installApiMocks(page);
   await page.goto("/");
@@ -685,7 +826,7 @@ test("一句话概览使用顶部横向强调线", async ({ page }) => {
   await page.getByRole("button", { name: "已总结 1" }).click();
   await page.getByRole("button", { name: "已总结演示", exact: true }).click();
 
-  const tldrRegion = page.getByRole("region", { name: "一句话概览" });
+  const tldrRegion = page.getByRole("region", { name: "一句话结论" });
   const accent = tldrRegion.locator('[data-summary-accent="true"]');
   const accentBox = await accent.boundingBox();
   expect(accentBox).not.toBeNull();
@@ -816,13 +957,41 @@ test("导图工具提示只在悬停时向下展开", async ({ page }) => {
   expect(browserErrors).toEqual([]);
 });
 
-test("工作台链接输入框明确可编辑并只执行普通提取", async ({ page }) => {
+test("工作台链接输入框提交单条持久提炼任务", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
-  let parseBody: unknown = null;
+  let taskBody: Record<string, unknown> | null = null;
   await installApiMocks(page);
-  await page.route("http://127.0.0.1:8000/api/parse", async (route) => {
-    parseBody = route.request().postDataJSON();
-    return json(route, summarizedDetail);
+  await page.route("http://127.0.0.1:8000/api/task-batches", async (route) => {
+    if (route.request().method() === "GET") {
+      return json(route, {
+        active_task_count: 0,
+        active_video_ids: [],
+        batches: [],
+        success: true
+      });
+    }
+    taskBody = route.request().postDataJSON();
+    return json(route, {
+      batch_id: "single-batch-001",
+      client_request_id: String(taskBody?.client_request_id ?? "request"),
+      created_at: "2026-09-18T08:00:00Z",
+      items: [
+        {
+          cancelled: false,
+          input_index: 0,
+          result_available: true,
+          source_url: summarizedItem.source_url,
+          stage: "done",
+          status: "succeeded",
+          task_id: "single-task-001",
+          updated_at: "2026-09-18T08:00:01Z",
+          video_id: summarizedItem.video_id
+        }
+      ],
+      stats: { active: 0, cancelled: 0, failed: 0, succeeded: 1, total: 1 },
+      success: true,
+      target: "analyze"
+    });
   });
   await page.goto("/");
 
@@ -841,18 +1010,18 @@ test("工作台链接输入框明确可编辑并只执行普通提取", async ({
   ).toHaveCount(0);
   const urlInput = page.getByRole("textbox", { name: "公开媒体链接" });
   const inputFrame = urlInput.locator("xpath=ancestor::form[1]");
-  await expect(inputFrame).toHaveCSS("border-top-width", "2px");
+  await expect(inputFrame).toHaveCSS("border-top-width", "1px");
   const inputFrameColor = await inputFrame.evaluate(
     (element) => getComputedStyle(element).borderTopColor
   );
   await urlInput.focus();
   await expect(urlInput).toHaveCSS("outline-style", "none");
-  await expect(inputFrame).toHaveCSS("border-top-color", inputFrameColor);
+  await expect(inputFrame).not.toHaveCSS("border-top-color", inputFrameColor);
   const inputSection = urlInput.locator("xpath=ancestor::section[1]");
   await expect(inputSection).toHaveCSS("border-bottom-width", "0px");
 
   const extractButton = page.getByRole("button", {
-    name: "提取内容",
+    name: "提炼内容",
     exact: true
   });
   await expect(extractButton).toHaveCSS("background-color", "rgb(209, 75, 49)");
@@ -877,12 +1046,18 @@ test("工作台链接输入框明确可编辑并只执行普通提取", async ({
     "复制这段分享文案 😄 https://www.xiaohongshu.com/discovery/item/6a2761520000000008032277?source=webshare";
   await urlInput.fill(shareText);
   await extractButton.click();
-  await expect.poll(() => parseBody).not.toBeNull();
-  expect(parseBody).toEqual({ url: shareText });
+  await expect.poll(() => taskBody).not.toBeNull();
+  expect(taskBody).toMatchObject({
+    asr_engine: "local_whisper",
+    context_settings: null,
+    target: "analyze",
+    urls: [shareText]
+  });
+  await expect(page.getByRole("heading", { name: summarizedItem.title })).toBeVisible();
   expect(browserErrors).toEqual([]);
 });
 
-test("工作台视频封面使用克制固定画布并完整缩放", async ({ page }) => {
+test("总结观点可核对原文并带入就地追问", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await installApiMocks(page);
   await page.goto("/");
@@ -890,25 +1065,108 @@ test("工作台视频封面使用克制固定画布并完整缩放", async ({ pa
   await page.getByRole("button", { name: "已总结 1" }).click();
   await page.getByRole("button", { name: "已总结演示", exact: true }).click();
 
+  const evidenceButton = page.getByRole("button", { name: "查看依据", exact: true });
+  await evidenceButton.hover();
+  await expect(page.getByText("用于验证导图工具提示位置。", { exact: true }).first()).toBeVisible();
+  await evidenceButton.click();
+  await expect(page.getByRole("heading", { name: "原文依据", exact: true })).toBeVisible();
+  await expect(page.getByText("不代表外部事实已核实", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "追问这条", exact: true }).click();
+  const questionInput = page.getByRole("textbox", { name: "使用快速模式向内容提问..." });
+  await expect(questionInput).toHaveValue(/关键结论/);
+  await expect(questionInput).toHaveValue(/区分作者表达与 AI 推导/);
+  expect(browserErrors).toEqual([]);
+});
+
+test("编辑我的整理后立即导出会先保存最新文字", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  let savedText: string | null = null;
+  let exportRequested = false;
+  await installApiMocks(page);
+  await page.route(
+    `http://127.0.0.1:8000/api/library/${summarizedItem.video_id}`,
+    (route) =>
+      json(route, {
+        ...summarizedDetail,
+        note_draft: {
+          highlights: [
+            {
+              id: "manual-1",
+              source: "manual",
+              source_type: "asr_transcript",
+              tags: [],
+              text: "原整理内容"
+            }
+          ],
+          updated_at: "2026-09-18T08:00:00Z"
+        }
+      })
+  );
+  await page.route("http://127.0.0.1:8000/api/library/note-draft", (route) => {
+    const body = route.request().postDataJSON() as {
+      highlights: Array<{ text: string }>;
+    };
+    savedText = body.highlights[0]?.text ?? null;
+    return json(route, {
+      note_draft: {
+        highlights: body.highlights,
+        updated_at: "2026-09-18T08:00:01Z"
+      },
+      success: true
+    });
+  });
+  await page.route("http://127.0.0.1:8000/api/exports/obsidian-note", (route) => {
+    exportRequested = true;
+    return json(route, {
+      file_path: null,
+      filename: "知识稿.md",
+      markdown: "# 知识稿\n\n## 我的整理\n\n最新整理内容\n",
+      message: "已生成 Markdown。",
+      success: true,
+      written_to_vault: false
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+  await page.getByRole("tab", { name: "内容文本" }).click();
+  await page.getByRole("button", { name: "编辑摘录", exact: true }).click();
+  await page.getByRole("textbox", { name: "编辑摘录文字" }).fill("最新整理内容");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出知识稿", exact: true }).click();
+  await downloadPromise;
+  await expect.poll(() => savedText).toBe("最新整理内容");
+  expect(exportRequested).toBe(true);
+  expect(browserErrors).toEqual([]);
+});
+
+test("工作台来源条使用紧凑缩略图并完整缩放", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "已总结 1" }).click();
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+
+  await page.getByText("来源与下载", { exact: true }).click();
+
   const coverFrame = page.getByTestId("media-cover-frame");
   const coverImage = coverFrame.getByRole("img", {
-    name: "已总结演示 封面",
+    name: "内容封面",
     exact: true
   });
   const backgroundImage = coverFrame.locator('img[aria-hidden="true"]');
   const coverBox = await coverFrame.boundingBox();
 
   expect(coverBox).not.toBeNull();
-  expect(coverBox!.width).toBeGreaterThanOrEqual(298);
-  expect(coverBox!.width).toBeLessThanOrEqual(302);
-  expect(coverBox!.height).toBeGreaterThanOrEqual(223);
-  expect(coverBox!.height).toBeLessThanOrEqual(227);
-  await expect(backgroundImage).toHaveCount(1);
-  await expect(backgroundImage).toHaveCSS("object-fit", "cover");
-  await expect(backgroundImage).toHaveCSS("opacity", "0.3");
+  expect(coverBox!.width).toBe(64);
+  expect(coverBox!.height).toBe(64);
+  await expect(backgroundImage).toHaveCount(0);
   await expect(coverImage).toHaveCSS("object-fit", "contain");
   await expect(coverImage).toHaveCSS("opacity", "1");
   await expect(coverImage).toHaveCSS("filter", "none");
-  await expect(coverImage).toHaveCSS("z-index", "10");
+  await expect(page.getByText("原始标题", { exact: true })).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });

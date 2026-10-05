@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -63,6 +64,25 @@ class TaskApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
         self.assertEqual(self.store.list_batches()["batches"], [])
+
+    def test_omitted_engine_persists_sensevoice_for_auto_transcription(self) -> None:
+        response = self.client.post(
+            "/api/task-batches",
+            json={
+                "client_request_id": "default-asr-engine",
+                "urls": ["https://example.com/video"],
+                "target": "analyze",
+            },
+        )
+
+        self.assertEqual(response.status_code, 202)
+        task_id = response.json()["items"][0]["task_id"]
+        with self.store.connect() as connection:
+            row = connection.execute(
+                "SELECT settings_json FROM processing_tasks WHERE id=?", (task_id,)
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(json.loads(row["settings_json"])["asr_engine"], "sensevoice_small")
 
 
 if __name__ == "__main__":

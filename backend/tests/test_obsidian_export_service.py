@@ -43,8 +43,8 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail)
 
-        self.assertIn("## 原文摘录", markdown)
-        self.assertIn("> [!quote] 原文金句", markdown)
+        self.assertIn("## 我的整理", markdown)
+        self.assertIn("### 整理 1", markdown)
         self.assertIn(confirmed_text, markdown)
         self.assertNotIn(ai_candidate_text, markdown)
         self.assertNotIn("## AI 候选摘录", markdown)
@@ -67,7 +67,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail)
 
-        self.assertIn("暂无原文金句", markdown)
+        self.assertNotIn("## 我的整理", markdown)
         self.assertNotIn(ai_candidate_text, markdown)
         self.assertNotIn("## AI 候选摘录", markdown)
 
@@ -98,7 +98,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         self.assertIn("- 摘录说明：这句话很重要", markdown)
         self.assertIn("- 应用场景：写作引用", markdown)
-        self.assertIn("> “手动摘录内容。”", markdown)
+        self.assertIn("手动摘录内容。", markdown)
         self.assertNotIn("用户手动加入摘录草稿", markdown)
 
     def test_content_structure_flat_and_hidden_when_empty(self) -> None:
@@ -158,7 +158,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail)
 
-        self.assertIn('草稿版本: "1.1"', markdown)
+        self.assertIn('草稿版本: "1.2"', markdown)
         self.assertIn('标题: "示例内容"', markdown)
         self.assertIn('内容类型: "视频"', markdown)
         self.assertIn('平台: "example"', markdown)
@@ -187,7 +187,7 @@ class ObsidianExportServiceTests(unittest.TestCase):
 
         markdown = build_obsidian_markdown(detail, include_full_text=True)
 
-        self.assertIn("## 一句话摘要", markdown)
+        self.assertIn("## 一句话结论", markdown)
         self.assertNotIn("## 内容结构", markdown)
         self.assertIn("## 内容要点", markdown)
         self.assertNotIn("## 可应用场景", markdown)

@@ -2,7 +2,7 @@ import unittest
 
 from pydantic import ValidationError
 
-from app.schemas import ParseRequest, QaRequest, SummarizeRequest, TranscribeRequest
+from app.schemas import ParseRequest, QaRequest, SummarizeRequest, TaskBatchCreateRequest, TranscribeRequest
 
 
 class SummarizeRequestSchemaTests(unittest.TestCase):
@@ -49,10 +49,18 @@ class SummarizeRequestSchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             QaRequest(question="问题", transcript_plain_text=transcript)
 
-    def test_transcribe_request_defaults_to_local_whisper(self) -> None:
+    def test_transcribe_request_defaults_to_sensevoice(self) -> None:
         request = TranscribeRequest(url="https://example.com/video")
 
-        self.assertEqual(request.asr_engine, "local_whisper")
+        self.assertEqual(request.asr_engine, "sensevoice_small")
+
+    def test_batch_request_defaults_to_sensevoice(self) -> None:
+        request = TaskBatchCreateRequest(
+            client_request_id="default-asr-engine",
+            urls=["https://example.com/video"],
+        )
+
+        self.assertEqual(request.asr_engine, "sensevoice_small")
 
     def test_transcribe_request_accepts_sensevoice_small(self) -> None:
         request = TranscribeRequest(

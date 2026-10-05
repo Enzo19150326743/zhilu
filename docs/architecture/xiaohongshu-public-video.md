@@ -80,4 +80,4 @@ yt-dlp 继续负责已经成熟的视频和格式解析。当前上游 `XiaoHong
 - `frontend/e2e/desktop.spec.ts`：固定 4:3 双层封面、占位字幕与统一转写入口。
 - `frontend` 生产构建：列表和详情共同使用 `platform-display.ts`。
 
-产品决策与方案比较见 `docs/plans/2026-08-11-xiaohongshu-public-video-support-design.md`。
+本地若保留 `docs/plans/2026-08-11-xiaohongshu-public-video-support-design.md`，可将其作为产品决策的补充；公开协作以本文合同和对应代码为准。

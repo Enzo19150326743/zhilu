@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api";
-import type { AsrEngine, BatchTarget, TaskBatchResponse, TaskBatchSummary } from "@/lib/types";
+import type { AsrEngine, BatchTarget, TaskBatchResponse, TaskBatchSummary, TranscribeContextSettings } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -14,6 +14,7 @@ export function useTaskWorkspace() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [activeBatch, setActiveBatch] = useState<TaskBatchResponse | null>(null);
+  const [activeSingleBatch, setActiveSingleBatch] = useState<TaskBatchResponse | null>(null);
   const [recentBatches, setRecentBatches] = useState<TaskBatchSummary[]>([]);
   const [activeTaskCount, setActiveTaskCount] = useState(0);
   const [activeVideoIds, setActiveVideoIds] = useState<string[]>([]);
@@ -24,9 +25,9 @@ export function useTaskWorkspace() {
 
   const refreshList = useCallback(async () => {
     const response = await apiClient.getTaskBatches();
-    setRecentBatches(response.batches);
-    setActiveTaskCount(response.active_task_count);
-    setActiveVideoIds(response.active_video_ids);
+    setRecentBatches(response.batches ?? []);
+    setActiveTaskCount(response.active_task_count ?? 0);
+    setActiveVideoIds(response.active_video_ids ?? []);
   }, []);
 
   const openBatch = useCallback(async (batchId: string) => {
@@ -48,7 +49,7 @@ export function useTaskWorkspace() {
   }, [openBatch, refreshList]);
 
   useEffect(() => {
-    if (!isWorkspaceOpen || !activeBatch || activeBatch.stats.active === 0) return;
+    if (!activeBatch || activeBatch.stats.active === 0) return;
     let cancelled = false;
     let timer: number | undefined;
     const poll = async () => {
@@ -73,7 +74,39 @@ export function useTaskWorkspace() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [activeBatch?.batch_id, activeBatch?.stats.active, isWorkspaceOpen, refreshList]);
+  }, [activeBatch?.batch_id, activeBatch?.stats.active, refreshList]);
+
+  useEffect(() => {
+    if (!activeSingleBatch || activeSingleBatch.stats.active === 0) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const response = await apiClient.getTaskBatch(activeSingleBatch.batch_id);
+        if (cancelled) return;
+        setErrorMessage(null);
+        setActiveSingleBatch(response);
+        await refreshList();
+        if (!cancelled && response.stats.active > 0) {
+          timer = window.setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "单条任务状态刷新失败，正在等待重连。"
+          );
+          timer = window.setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      }
+    };
+    timer = window.setTimeout(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [activeSingleBatch?.batch_id, activeSingleBatch?.stats.active, refreshList]);
 
   useEffect(() => {
     if (activeTaskCount === 0 || isWorkspaceOpen) return;
@@ -83,7 +116,12 @@ export function useTaskWorkspace() {
     return () => window.clearInterval(timer);
   }, [activeTaskCount, isWorkspaceOpen, refreshList]);
 
-  const submitBatch = async (urls: string[], target: BatchTarget, asrEngine: AsrEngine) => {
+  const submitBatch = async (
+    urls: string[],
+    target: BatchTarget,
+    asrEngine: AsrEngine,
+    contextSettings: TranscribeContextSettings | null = null
+  ) => {
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
@@ -92,7 +130,7 @@ export function useTaskWorkspace() {
         urls,
         target,
         asr_engine: asrEngine,
-        context_settings: null
+        context_settings: contextSettings
       });
       setActiveBatch(response);
       setIsDialogOpen(false);
@@ -104,6 +142,34 @@ export function useTaskWorkspace() {
       await refreshList().catch(() => undefined);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "批次提交失败，请稍后重试。");
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitSingle = async (
+    sourceUrl: string,
+    asrEngine: AsrEngine = "sensevoice_small"
+  ): Promise<TaskBatchResponse> => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const response = await apiClient.createTaskBatch({
+        client_request_id: createRequestId(),
+        urls: [sourceUrl],
+        target: "analyze",
+        asr_engine: asrEngine,
+        context_settings: null
+      });
+      setActiveSingleBatch(response);
+      setIsWorkspaceOpen(false);
+      await refreshList().catch(() => undefined);
+      return response;
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "提炼任务提交失败，请稍后重试。"
+      );
       throw error;
     } finally {
       setIsSubmitting(false);
@@ -132,7 +198,7 @@ export function useTaskWorkspace() {
   };
 
   return {
-    activeBatch, activeTaskCount, activeVideoIds, busyTaskIds, errorMessage, isDialogOpen, isSubmitting,
+    activeBatch, activeSingleBatch, activeTaskCount, activeVideoIds, busyTaskIds, errorMessage, isDialogOpen, isSubmitting,
     isWorkspaceOpen, recentBatches,
     closeDialog: () => !isSubmitting && setIsDialogOpen(false),
     closeWorkspace: () => {
@@ -144,7 +210,9 @@ export function useTaskWorkspace() {
     openBatch,
     openDialog: () => { setErrorMessage(null); setIsDialogOpen(true); },
     refreshList,
+    submitSingle,
     submitBatch,
+    clearActiveSingleBatch: () => setActiveSingleBatch(null),
     cancelTask: (taskId: string) => runItemAction("cancel", taskId),
     retryTask: (taskId: string) => runItemAction("retry", taskId)
   };

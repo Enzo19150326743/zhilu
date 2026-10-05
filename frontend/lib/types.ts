@@ -138,6 +138,7 @@ export interface TranscriptAsrMeta {
 export interface TranscriptPayload {
   segments: TranscriptSegment[];
   plain_text: string;
+  fingerprint?: string | null;
   raw_segments?: TranscriptSegment[] | null;
   raw_plain_text?: string | null;
   asr_meta?: TranscriptAsrMeta | null;
@@ -170,6 +171,16 @@ export interface SummaryDetailSection {
   markdown: string;
 }
 
+export interface SummaryEvidence {
+  point_index: number;
+  segment_ids: string[];
+  excerpt: string;
+  transcript_fingerprint: string;
+  start?: number | null;
+  end?: number | null;
+  speaker?: string | null;
+}
+
 export interface VideoSummary {
   draft_version?: string;
   content_type?: string | null;
@@ -189,6 +200,8 @@ export interface VideoSummary {
   method_title?: string | null;
   methods?: string[];
   deep_dive_sections?: SummaryDetailSection[];
+  transcript_fingerprint?: string | null;
+  key_point_evidence?: SummaryEvidence[];
   // 旧个性化草稿字段仅用于兼容历史记录，新版通用总结不再生成。
   reason_for_saving?: string | null;
   personal_relevance?: string[];

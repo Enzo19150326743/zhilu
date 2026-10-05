@@ -1,18 +1,22 @@
 import json
 import tempfile
+import threading
 import unittest
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 from app.schemas import (
     MindmapMeta,
+    NoteDraft,
     ParseResponse,
     ShownotesContext,
     ShownotesSpeaker,
     TranscribeSpeakerProfile,
     SummarizeResponse,
+    SummaryHighlight,
     TranscriptAsrMeta,
     TranscriptPayload,
     TranscriptSegment,
@@ -20,9 +24,122 @@ from app.schemas import (
     VideoSummary,
 )
 from app.services import library_service
+from app.services.task_store import TaskStore
+from app.services.transcript_identity_service import build_transcript_fingerprint
 
 
 class LibraryServiceTests(unittest.TestCase):
+    def test_library_writes_wait_for_single_task_scheduler_without_losing_fields(self) -> None:
+        """仅一条任务时，后台调度持有写锁也不能让内容保存失败。"""
+        with self._temporary_library() as database_path:
+            detail = _build_parse_response("podcast", "shownotes")
+            library_service.upsert_library_item(detail)
+            store = TaskStore(database_path)
+            store.create_batch(
+                client_request_id="single-task-lock-regression",
+                urls=[detail.source_url],
+                target="analyze",
+                settings={"asr_engine": "sensevoice_small"},
+            )
+            task = store.claim_next()
+            transcript = _build_asr_transcript(
+                text="已识别的完整正文。", engine="sensevoice-small", model="test-model"
+            )
+            summary = SummarizeResponse(
+                summary=VideoSummary(
+                    tldr="基于正文的新总结",
+                    key_points=[],
+                    timeline=[],
+                    structured_analysis_markdown="## 正文总结",
+                    takeaways=[],
+                ),
+                mindmap_markdown="# 新导图",
+                is_ai_generated=True,
+                model="test-model",
+            )
+            note = NoteDraft(highlights=[SummaryHighlight(id="saved-note", text="我的整理")])
+            writes = {
+                "transcript": lambda: library_service.update_transcript_for_source_url(
+                    detail.source_url, transcript
+                ),
+                "summary": lambda: library_service.update_summary_for_source_url(
+                    detail.source_url, summary
+                ),
+                "note": lambda: library_service.update_note_draft_for_source_url(
+                    detail.source_url, note
+                ),
+            }
+            for name, write in writes.items():
+                with self.subTest(write=name), ThreadPoolExecutor(max_workers=1) as executor:
+                    started = threading.Event()
+
+                    def save():
+                        started.set()
+                        return write()
+
+                    with store.connect(immediate=True) as scheduler_connection:
+                        scheduler_connection.execute(
+                            "UPDATE processing_tasks SET stage='correct' WHERE id=?",
+                            (task["id"],),
+                        )
+                        future = executor.submit(save)
+                        self.assertTrue(started.wait(1))
+                        with self.assertRaises(FutureTimeoutError):
+                            future.result(timeout=0.1)
+                    self.assertTrue(future.result(timeout=2))
+
+            persisted = library_service.get_library_detail(detail.video.video_id)
+
+        self.assertEqual(persisted.transcript.plain_text, transcript.plain_text)
+        self.assertEqual(persisted.summary.tldr, summary.summary.tldr)
+        self.assertEqual(persisted.note_draft.highlights[0].id, "saved-note")
+        self.assertEqual(persisted.shownotes_plain_text, detail.transcript.plain_text)
+
+    def test_long_transcript_conversion_does_not_block_scheduler_write(self) -> None:
+        """长稿文本转换期间，单条任务的调度写入仍能完成。"""
+        with self._temporary_library() as database_path:
+            detail = _build_parse_response("podcast", "shownotes")
+            library_service.upsert_library_item(detail)
+            store = TaskStore(database_path)
+            store.create_batch(
+                client_request_id="long-transcript-lock-regression",
+                urls=[detail.source_url],
+                target="analyze",
+                settings={"asr_engine": "sensevoice_small"},
+            )
+            transcript = _build_asr_transcript(
+                text="长音频识别正文。" * 6000, engine="sensevoice-small", model="test-model"
+            )
+            converting = threading.Event()
+            release_conversion = threading.Event()
+            simplify = library_service.simplify_text_payload
+
+            def slow_conversion(payload):
+                converting.set()
+                if not release_conversion.wait(2):
+                    raise RuntimeError("测试未及时释放文本转换")
+                return simplify(payload)
+
+            with (
+                ThreadPoolExecutor(max_workers=2) as executor,
+                patch.object(library_service, "simplify_text_payload", side_effect=slow_conversion),
+            ):
+                future = executor.submit(
+                    library_service.update_transcript_for_source_url, detail.source_url, transcript
+                )
+                try:
+                    self.assertTrue(converting.wait(1))
+                    scheduler = executor.submit(store.promote_due_retries)
+                    self.assertEqual(scheduler.result(timeout=0.5), 0)
+                finally:
+                    release_conversion.set()
+                self.assertTrue(future.result(timeout=2))
+
+            persisted = library_service.get_library_detail(detail.video.video_id)
+
+        self.assertEqual(persisted.transcript.plain_text, transcript.plain_text)
+        self.assertEqual(persisted.transcript.raw_plain_text, transcript.raw_plain_text)
+
     def test_recent_items_filter_uses_full_library_before_limit(self) -> None:
         """筛选必须先作用于完整内容库，再按当前页面数量截取。"""
         with self._temporary_library():
@@ -475,6 +592,43 @@ class LibraryServiceTests(unittest.TestCase):
 
         self.assertIsNotNone(detail)
         self.assertTrue(detail.is_from_cache)
+
+    def test_library_detail_adds_fingerprints_to_current_and_variant_transcripts(self) -> None:
+        """旧记录读取时补指纹，但不改写或丢失任何转写版本。"""
+        parse_response = _build_parse_response(
+            media_type="video",
+            text_source_type="asr_transcript",
+        )
+        variant = _build_asr_transcript(
+            text="另一版转写稿。",
+            engine="sensevoice",
+            model="test-model",
+        )
+        parse_response.transcript_variants = {"sensevoice_small": variant}
+
+        with self._temporary_library():
+            library_service.upsert_library_item(parse_response)
+            detail = library_service.get_library_detail("podcast_001")
+
+        self.assertIsNotNone(detail)
+        self.assertEqual(
+            detail.transcript.fingerprint,
+            build_transcript_fingerprint(
+                detail.transcript.plain_text,
+                detail.transcript.segments,
+            ),
+        )
+        self.assertEqual(
+            detail.transcript_variants["sensevoice_small"].fingerprint,
+            build_transcript_fingerprint(
+                variant.plain_text,
+                variant.segments,
+            ),
+        )
+        self.assertNotEqual(
+            detail.transcript.fingerprint,
+            detail.transcript_variants["sensevoice_small"].fingerprint,
+        )
 
     def test_same_video_id_with_alias_url_updates_one_library_item(self) -> None:
         """短链和长链解析到同一内容身份时不能生成两份档案。"""

@@ -65,7 +65,7 @@ export function useTranscribeWorkflow({
   const [isTranscribeSettingsOpen, setIsTranscribeSettingsOpen] = useState(false);
   const [asrStatus, setAsrStatus] = useState<AsrStatusResponse | null>(null);
   const [pendingAsrEngine, setPendingAsrEngine] =
-    useState<AsrEngine>("local_whisper");
+    useState<AsrEngine>("sensevoice_small");
   const [pendingTranscribeSettings, setPendingTranscribeSettings] =
     useState<TranscribeContextSettings>(() => getDefaultTranscribeSettings(null));
 
@@ -175,7 +175,7 @@ export function useTranscribeWorkflow({
 
   const startTranscribe = async (
     settings?: TranscribeContextSettings,
-    asrEngine: AsrEngine = "local_whisper"
+    asrEngine: AsrEngine = "sensevoice_small"
   ) => {
     if (!activeDetail || !isParseResponse(activeDetail)) {
       setErrorMessage("当前记录无法生成转写稿，请先解析公开视频链接。");

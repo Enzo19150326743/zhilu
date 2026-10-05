@@ -6,7 +6,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.schemas import ParseResponse, TranscriptPayload
+from app.schemas import (
+    ParseResponse,
+    SummarizeResponse,
+    TranscribeResponse,
+    TranscriptAsrMeta,
+    TranscriptPayload,
+    TranscriptSegment,
+    VideoSummary,
+)
+from app.services import library_service
 from app.services.asr_service import (
     PreparedTranscriptionMedia,
     RecognizedTranscription,
@@ -54,6 +63,112 @@ def build_detail(source_url: str, *, transcript: bool = False) -> ParseResponse:
 
 
 class TaskRunnerTests(unittest.TestCase):
+    def test_single_long_transcript_persists_and_summarizes_with_live_scheduler(self) -> None:
+        """单条长音频复用真实内容库与调度器；只有外部识别和 AI 调用被替代。"""
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "library.sqlite3"
+            with patch.object(library_service, "DATABASE_PATH", database_path):
+                detail = build_detail("https://example.com/long-podcast")
+                library_service.upsert_library_item(detail)
+                store = TaskStore(database_path)
+                batch_id = store.create_batch(
+                    client_request_id="single-long-podcast",
+                    urls=[detail.source_url],
+                    target="analyze",
+                    settings={"asr_engine": "sensevoice_small"},
+                )
+                segments = [
+                    TranscriptSegment(
+                        start=index * 8,
+                        end=(index + 1) * 8,
+                        text=f"第{index}段长音频正文，验证识别结果保存与后台任务调度能同时运行，不遗漏内容。",
+                    )
+                    for index in range(1163)
+                ]
+                transcript = TranscriptPayload(
+                    segments=segments,
+                    plain_text="\n".join(segment.text for segment in segments),
+                    raw_segments=segments,
+                    raw_plain_text="\n".join(segment.text for segment in segments),
+                    asr_meta=TranscriptAsrMeta(
+                        engine="sensevoice-small",
+                        model="test-model",
+                        device="cpu",
+                        compute_type="test",
+                        correction_status="skipped",
+                    ),
+                )
+                recognized = RecognizedTranscription(
+                    result=WhisperTranscriptionResult(
+                        transcript=transcript,
+                        model="test-model",
+                        device="cpu",
+                        compute_type="test",
+                        language="zh",
+                    ),
+                    transcription_seconds=1,
+                )
+                response = TranscribeResponse(
+                    transcript=transcript,
+                    transcript_variant_key="sensevoice_small",
+                    source_url=detail.source_url,
+                    video_id=detail.video.video_id,
+                    message="测试转写稿已生成",
+                )
+                summary = SummarizeResponse(
+                    summary=VideoSummary(
+                        tldr="长音频总结已保存",
+                        key_points=[],
+                        timeline=[],
+                        structured_analysis_markdown="## 长音频总结",
+                        takeaways=[],
+                    ),
+                    mindmap_markdown="# 长音频总结",
+                    is_ai_generated=True,
+                    model="test-model",
+                )
+
+                def prepare(_url, task_dir, **_kwargs):
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                    media_path = task_dir / "audio.m4a"
+                    media_path.write_bytes(b"synthetic audio")
+                    return PreparedTranscriptionMedia(path=media_path, audio_download_seconds=1)
+
+                runner = TaskRunner(
+                    store, poll_seconds=0.005, task_root=Path(directory) / "tasks"
+                )
+                runner._execution_lock = ExecutionLock(Path(directory) / "runner.lock")
+                with (
+                    patch("app.services.task_runner.resolve_transcription_media", return_value=(detail.source_url, None, None)),
+                    patch("app.services.task_runner.prepare_transcription_media", side_effect=prepare),
+                    patch("app.services.task_runner.recognize_transcription_media", return_value=recognized),
+                    patch("app.services.task_runner.finalize_transcription", return_value=response),
+                    patch("app.services.processing_service.summarize_transcript", return_value=summary),
+                    patch("app.services.task_runner.check_and_increment_rate_limit", return_value=SimpleNamespace(allowed=True)),
+                ):
+                    runner.start()
+                    try:
+                        deadline = time.monotonic() + 10
+                        while time.monotonic() < deadline:
+                            snapshot = store.get_batch(batch_id)
+                            if snapshot["stats"]["active"] == 0:
+                                break
+                            time.sleep(0.02)
+                        for future in tuple(runner._futures):
+                            future.result(timeout=2)
+                    finally:
+                        runner.stop()
+
+                snapshot = store.get_batch(batch_id)
+                persisted = library_service.get_library_detail(detail.video.video_id)
+
+            self.assertEqual(snapshot["stats"]["succeeded"], 1, snapshot["items"])
+            self.assertEqual(len(persisted.transcript.segments), 1163)
+            self.assertEqual(persisted.transcript.plain_text, transcript.plain_text)
+            self.assertEqual(persisted.transcript.raw_plain_text, transcript.raw_plain_text)
+            self.assertEqual(persisted.library_summary_status, "ai_generated")
+            self.assertEqual(persisted.summary.tldr, "长音频总结已保存")
+
     def test_one_parse_failure_does_not_block_remaining_items(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = TaskStore(Path(directory) / "tasks.sqlite3")

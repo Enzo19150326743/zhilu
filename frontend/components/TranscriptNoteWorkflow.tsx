@@ -2,8 +2,6 @@
 
 import {
   CheckCircle2,
-  FileDown,
-  Loader2,
   Pencil,
   Plus,
   Quote,
@@ -26,16 +24,13 @@ interface TranscriptNoteWorkflowProps {
   draftErrorMessage: string | null;
   draftHighlights: SummaryHighlight[];
   draftMessage: string | null;
-  isExportingNote: boolean;
   isSavingDraft: boolean;
   recentlyAddedHighlightId: string | null;
   savedHighlightIdentities: Set<string>;
-  sourceUrl?: string | null;
   textSourceType?: string | null;
   onAddCandidate: (highlight: SummaryHighlight) => void;
   onDraftTextBlur: (highlightId: string) => void;
   onDraftTextChange: (highlightId: string, text: string) => void;
-  onExportNote: () => void;
   onRemoveHighlight: (highlightId: string) => void;
 }
 
@@ -55,16 +50,13 @@ export function TranscriptNoteWorkflow({
   draftErrorMessage,
   draftHighlights,
   draftMessage,
-  isExportingNote,
   isSavingDraft,
   recentlyAddedHighlightId,
   savedHighlightIdentities,
-  sourceUrl,
   textSourceType,
   onAddCandidate,
   onDraftTextBlur,
   onDraftTextChange,
-  onExportNote,
   onRemoveHighlight
 }: TranscriptNoteWorkflowProps) {
   const [editingHighlightId, setEditingHighlightId] = useState<string | null>(null);
@@ -88,29 +80,19 @@ export function TranscriptNoteWorkflow({
   };
 
   return (
-    <aside className="min-w-0 border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] shadow-[3px_3px_0_0_var(--accent)] lg:sticky lg:top-[9rem] lg:flex lg:max-h-[calc(100dvh-10rem)] lg:flex-col lg:overflow-hidden">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--line-strong)] p-3">
+    <aside className="min-w-0 rounded-lg border border-[var(--line)] bg-[var(--paper-raised)] shadow-[0_12px_30px_rgba(54,45,32,0.08)] lg:sticky lg:top-[9rem] lg:flex lg:max-h-[calc(100dvh-10rem)] lg:flex-col lg:overflow-hidden">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--line)] p-4">
         <div>
-          <h3 className="font-editorial text-base font-bold text-[var(--ink)]">
-            摘录草稿
+          <h3 className="text-base font-semibold text-[var(--ink)]">
+            我的整理
           </h3>
           <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
-            已收集 {draftHighlights.length} 条，手动与 AI 摘录统一在这里编辑。
+            已收集 {draftHighlights.length} 条，可继续编辑后随知识稿导出。
           </p>
         </div>
-        <button
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isExportingNote || !sourceUrl}
-          type="button"
-          onClick={onExportNote}
-        >
-          {isExportingNote ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <FileDown className="h-4 w-4" aria-hidden="true" />
-          )}
-          {isExportingNote ? "导出中" : "导出知识草稿"}
-        </button>
+        {isSavingDraft ? (
+          <span className="shrink-0 text-xs text-[var(--accent)]">保存中</span>
+        ) : null}
       </header>
 
       <div className="min-h-0 divide-y divide-[var(--line-strong)] lg:flex-1 lg:overflow-y-auto">
@@ -174,7 +156,7 @@ export function TranscriptNoteWorkflow({
                         <IconActionButton
                           disabled={isSavingDraft}
                           icon={Trash2}
-                          label="移出摘录草稿"
+                          label="移出我的整理"
                           tone="danger"
                           onClick={() => onRemoveHighlight(highlight.id)}
                         />
@@ -212,7 +194,7 @@ export function TranscriptNoteWorkflow({
             </div>
           ) : (
             <div className="border border-dashed border-[var(--line-strong)] bg-[var(--paper)] px-3 py-3 text-xs leading-5 text-[var(--muted)]">
-              在左侧原文中框选文字，再点击“加入摘录”。
+              在左侧原文中框选文字，再点击“加入整理”。
             </div>
           )}
         </section>
@@ -257,7 +239,7 @@ export function TranscriptNoteWorkflow({
                         <IconActionButton
                           disabled={isSavingDraft || isSaved}
                           icon={isSaved ? CheckCircle2 : Plus}
-                          label={isSaved ? "已加入摘录草稿" : "加入摘录草稿"}
+                          label={isSaved ? "已加入我的整理" : "加入我的整理"}
                           tone={isSaved ? "accent" : "default"}
                           onClick={() => onAddCandidate(highlight)}
                         />

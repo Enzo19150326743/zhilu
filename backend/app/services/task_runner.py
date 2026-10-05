@@ -183,7 +183,7 @@ class TaskRunner:
                     with self.recognition_slot:
                         recognized = recognize_transcription_media(
                             prepared,
-                            asr_engine=settings.get("asr_engine", "local_whisper"),
+                            asr_engine=settings.get("asr_engine", "sensevoice_small"),
                         )
                     checkpoint["recognition"] = _serialize_recognized(recognized)
                     self.store.update_running(task_id, token, stage="correct", checkpoint_json=checkpoint)
@@ -201,7 +201,7 @@ class TaskRunner:
                         media_type=detail.video.media_type,
                         context_settings=context_settings,
                         shownotes_plain_text=detail.shownotes_plain_text,
-                        asr_engine=settings.get("asr_engine", "local_whisper"),
+                        asr_engine=settings.get("asr_engine", "sensevoice_small"),
                     )
                 detail = persist_transcription(detail, response)
                 checkpoint.pop("ai_inflight", None)

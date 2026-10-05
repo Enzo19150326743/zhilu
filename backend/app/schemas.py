@@ -171,6 +171,7 @@ class TranscriptPayload(BaseModel):
 
     segments: list[TranscriptSegment]
     plain_text: str
+    fingerprint: str | None = Field(default=None, max_length=100)
     raw_segments: list[TranscriptSegment] | None = None
     raw_plain_text: str | None = None
     asr_meta: TranscriptAsrMeta | None = None
@@ -217,7 +218,7 @@ class DownloadRequest(BaseModel):
 
 
 class TranscribeRequest(BaseModel):
-    """ASR 转写请求；旧客户端不传引擎时继续使用本地 Whisper。"""
+    """ASR 转写请求；未指定引擎时默认使用 SenseVoice。"""
 
     url: str = Field(min_length=1, max_length=2048)
     video_id: str | None = Field(default=None, max_length=200)
@@ -225,16 +226,14 @@ class TranscribeRequest(BaseModel):
     asr_engine: Literal[
         "local_whisper",
         "sensevoice_small",
-    ] = "local_whisper"
+    ] = "sensevoice_small"
 
 
 class AsrStatusResponse(BaseModel):
     """前端选择转写引擎时需要的非敏感能力状态。"""
 
     success: bool = True
-    recommended_engine: Literal["local_whisper", "sensevoice_small"] = (
-        "local_whisper"
-    )
+    recommended_engine: Literal["local_whisper", "sensevoice_small"] = "sensevoice_small"
     whisper_model: str = "large-v3-turbo"
     sensevoice_available: bool = False
     sensevoice_model: str = "iic/SenseVoiceSmall"
@@ -373,21 +372,21 @@ class SummaryHighlight(BaseModel):
 
 
 class NoteDraft(BaseModel):
-    """当前媒体的摘录草稿。"""
+    """当前媒体的“我的整理”；字段名保持兼容。"""
 
     highlights: list[SummaryHighlight] = Field(default_factory=list)
     updated_at: str | None = Field(default=None, max_length=80)
 
 
 class NoteDraftUpdateRequest(BaseModel):
-    """保存摘录草稿请求。"""
+    """保存“我的整理”请求。"""
 
     source_url: str = Field(min_length=1, max_length=2048)
     highlights: list[SummaryHighlight] = Field(default_factory=list)
 
 
 class NoteDraftUpdateResponse(BaseModel):
-    """保存摘录草稿响应。"""
+    """保存“我的整理”响应。"""
 
     success: bool = True
     note_draft: NoteDraft
@@ -433,6 +432,18 @@ class SummaryDetailSection(BaseModel):
     markdown: str = Field(min_length=1, max_length=12000)
 
 
+class SummaryEvidence(BaseModel):
+    """一条总结观点经后端校验后的原文依据。"""
+
+    point_index: int = Field(ge=0, le=20)
+    segment_ids: list[str] = Field(default_factory=list, max_length=4)
+    excerpt: str = Field(min_length=1, max_length=6000)
+    transcript_fingerprint: str = Field(min_length=1, max_length=100)
+    start: float | None = None
+    end: float | None = None
+    speaker: str | None = Field(default=None, max_length=120)
+
+
 class VideoSummary(BaseModel):
     """AI 结构化总结。"""
 
@@ -448,13 +459,16 @@ class VideoSummary(BaseModel):
     content_keywords: list[str] = Field(default_factory=list)
     application_clues: list[str] = Field(default_factory=list)
     content_boundaries: list[str] = Field(default_factory=list)
-    # NOTE: 1.1 起由内容文本决定展示结构；旧字段继续保留，保证历史档案可读取。
+    # NOTE: 1.1 起由内容文本决定展示结构；1.2 增加当前转写稿证据关联。
+    # 旧字段继续保留，保证历史档案可读取。
     summary_profile: str = Field(default="generic", max_length=40)
     key_points_title: str = Field(default="内容要点", max_length=80)
     content_outline: list[str] = Field(default_factory=list)
     method_title: str | None = Field(default=None, max_length=80)
     methods: list[str] = Field(default_factory=list)
     deep_dive_sections: list[SummaryDetailSection] = Field(default_factory=list)
+    transcript_fingerprint: str | None = Field(default=None, max_length=100)
+    key_point_evidence: list[SummaryEvidence] = Field(default_factory=list)
     # NOTE: 以下字段只用于兼容旧数字分身草稿记录，新版通用总结不再生成或消费。
     reason_for_saving: str | None = Field(default=None, max_length=1200)
     personal_relevance: list[str] = Field(default_factory=list)
@@ -613,7 +627,7 @@ class TaskBatchCreateRequest(BaseModel):
     client_request_id: str = Field(min_length=8, max_length=120)
     urls: list[str] = Field(min_length=1)
     target: Literal["parse_only", "analyze"] = "analyze"
-    asr_engine: Literal["local_whisper", "sensevoice_small"] = "local_whisper"
+    asr_engine: Literal["local_whisper", "sensevoice_small"] = "sensevoice_small"
     context_settings: TranscribeContextSettings | None = None
 
     @field_validator("urls")

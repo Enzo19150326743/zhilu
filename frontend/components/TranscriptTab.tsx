@@ -12,12 +12,8 @@ import {
   Search
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useTranscriptNoteWorkflow } from "@/hooks/use-transcript-note-workflow";
-import type {
-  NoteDraft,
-  TranscriptPayload,
-  VideoSummary
-} from "@/lib/types";
+import type { TranscriptNoteWorkflowState } from "@/hooks/use-transcript-note-workflow";
+import type { TranscriptPayload } from "@/lib/types";
 import { TranscriptComparisonColumn } from "./TranscriptComparisonColumn";
 import { IconActionButton } from "./IconActionButton";
 import { TranscriptNoteWorkflow } from "./TranscriptNoteWorkflow";
@@ -38,16 +34,14 @@ interface TranscriptTabProps {
   hasTranscript: boolean;
   isTranscribing: boolean;
   mediaType?: string | null;
-  noteDraft?: NoteDraft | null;
+  noteWorkflow: TranscriptNoteWorkflowState;
   sourceUrl?: string | null;
-  summary: VideoSummary | null;
   textSourceType?: string | null;
   transcribeErrorMessage: string | null;
   transcript: TranscriptPayload | null;
   transcriptVariants: Record<string, TranscriptPayload>;
   activeTranscriptVariant?: string | null;
   videoTitle?: string | null;
-  onSaveNoteDraft: (sourceUrl: string, noteDraft: NoteDraft) => Promise<NoteDraft>;
   onTranscribe: () => void;
 }
 export function TranscriptTab({
@@ -55,16 +49,14 @@ export function TranscriptTab({
   hasTranscript,
   isTranscribing,
   mediaType,
-  noteDraft,
+  noteWorkflow,
   sourceUrl,
-  summary,
   textSourceType,
   transcribeErrorMessage,
   transcript,
   transcriptVariants,
   activeTranscriptVariant,
   videoTitle,
-  onSaveNoteDraft,
   onTranscribe
 }: TranscriptTabProps) {
   const [hasCopied, setHasCopied] = useState(false);
@@ -86,21 +78,13 @@ export function TranscriptTab({
     handleDraftTextChange,
     handleExcerptPointerDown,
     handleExcerptPointerUp,
-    handleExportObsidianNote,
     handleRemoveHighlight,
-    isExportingNote,
     isSavingDraft,
     recentlyAddedHighlightId,
     savedHighlightIdentities,
     selectedExcerpt,
     transcriptTextRootRef
-  } = useTranscriptNoteWorkflow({
-    noteDraft,
-    sourceUrl,
-    summary,
-    textSourceType,
-    onSaveNoteDraft
-  });
+  } = noteWorkflow;
   const isShownotes = textSourceType === "shownotes";
   const isPodcast = mediaType === "podcast";
   const normalizedTranscriptVariants = useMemo(() => {
@@ -214,7 +198,7 @@ export function TranscriptTab({
           onClick={() => void handleAddSelectedExcerpt()}
         >
           <Plus className="h-3.5 w-3.5" />
-          加入摘录
+          加入整理
         </button>
       </div>
     ) : null;
@@ -227,16 +211,13 @@ export function TranscriptTab({
       draftErrorMessage={draftErrorMessage}
       draftHighlights={draftHighlights}
       draftMessage={draftMessage}
-      isExportingNote={isExportingNote}
       isSavingDraft={isSavingDraft}
       recentlyAddedHighlightId={recentlyAddedHighlightId}
       savedHighlightIdentities={savedHighlightIdentities}
-      sourceUrl={sourceUrl}
       textSourceType={textSourceType}
       onAddCandidate={(highlight) => void handleAddCandidate(highlight)}
       onDraftTextBlur={handleDraftTextBlur}
       onDraftTextChange={handleDraftTextChange}
-      onExportNote={() => void handleExportObsidianNote()}
       onRemoveHighlight={(highlightId) => void handleRemoveHighlight(highlightId)}
     />
   );
@@ -384,7 +365,7 @@ export function TranscriptTab({
                     原文
                   </h3>
                   <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
-                    选中文本，加入摘录。
+                    选中文本，加入我的整理。
                   </p>
                   {sourceHint ? (
                     <p className="mt-1 text-xs leading-5 text-[var(--muted)]">

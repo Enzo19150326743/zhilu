@@ -18,7 +18,7 @@ interface BatchWorkspaceProps {
 }
 
 const STAGE_LABELS: Record<string, string> = {
-  parse: "提取中",
+  parse: "解析中",
   download: "下载转写素材",
   recognize: "转写中",
   correct: "校对中",

@@ -98,6 +98,7 @@ class AsrServiceTests(unittest.TestCase):
                 response = transcribe_media_audio(
                     "https://example.com/video",
                     audio_downloader=fake_download,
+                    asr_engine="local_whisper",
                     transcriber=fake_transcribe,
                 )
 
@@ -132,6 +133,7 @@ class AsrServiceTests(unittest.TestCase):
                     transcribe_media_audio(
                         "https://example.com/private-video",
                         audio_downloader=fake_download,
+                        asr_engine="local_whisper",
                         transcriber=fake_transcribe,
                     )
 
@@ -161,6 +163,7 @@ class AsrServiceTests(unittest.TestCase):
                 transcribe_media_audio(
                     "https://example.com/video",
                     audio_downloader=fake_download,
+                    asr_engine="local_whisper",
                     transcriber=fake_transcribe,
                 )
 
@@ -386,6 +389,7 @@ class AsrServiceTests(unittest.TestCase):
                 ),
                 media_platform="bilibili",
                 media_type="video",
+                asr_engine="local_whisper",
                 transcriber=fake_transcribe,
             )
 
@@ -433,6 +437,7 @@ class AsrServiceTests(unittest.TestCase):
                     response = transcribe_media_audio(
                         "https://example.com/podcast",
                         audio_downloader=fake_download,
+                        asr_engine="local_whisper",
                         transcriber=fake_transcribe,
                         shownotes_plain_text="主持人和嘉宾信息",
                     )

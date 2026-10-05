@@ -21,14 +21,14 @@ class AsrStatusTests(unittest.TestCase):
         self.assertEqual(response.recommended_engine, "sensevoice_small")
         self.assertEqual(response.whisper_model, "large-v3-turbo")
 
-    def test_whisper_is_recommended_when_sensevoice_is_unavailable(self) -> None:
+    def test_sensevoice_stays_default_when_dependency_is_unavailable(self) -> None:
         with patch(
             "app.main.get_sensevoice_status",
             return_value=(False, "依赖未安装"),
         ):
             response = main.get_asr_status()
 
-        self.assertEqual(response.recommended_engine, "local_whisper")
+        self.assertEqual(response.recommended_engine, "sensevoice_small")
         self.assertFalse(response.sensevoice_available)
 
 

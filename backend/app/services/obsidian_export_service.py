@@ -89,29 +89,27 @@ def build_obsidian_markdown(
     sections = [
         frontmatter,
         f"# {video.title}",
-        "## 一句话摘要",
+        "## 一句话结论",
         summary.tldr,
         f"## {summary.key_points_title or '内容要点'}",
         _format_markdown_list(summary.key_points),
     ]
-    content_outline = _format_content_outline(detail)
-    if content_outline:
-        sections.extend(["## 内容脉络", content_outline])
     methods = _format_methods(detail)
     if methods:
         sections.extend([f"## {summary.method_title or '可借鉴的方法'}", methods])
+    content_outline = _format_content_outline(detail)
+    if content_outline:
+        sections.extend(["## 内容脉络", content_outline])
     if content_structure:
         sections.append(content_structure)
-    sections.extend([
-        "## 原文摘录",
-        _format_highlights(
-            confirmed_highlights,
-            callout_title="原文金句",
-            empty_text="- 暂无原文金句。",
-        ),
-        "## 内容边界与待核实信息",
-        _format_content_boundaries(detail, include_full_text),
-    ])
+    if confirmed_highlights:
+        sections.extend(["## 我的整理", _format_highlights(confirmed_highlights)])
+    sections.extend(
+        [
+            "## 内容边界与待核实信息",
+            _format_content_boundaries(detail, include_full_text),
+        ]
+    )
 
     return "\n\n".join(section.strip() for section in sections if section.strip()) + "\n"
 
@@ -204,18 +202,14 @@ def _format_content_boundaries(
 
 def _format_highlights(
     highlights: list[SummaryHighlight],
-    callout_title: str,
-    empty_text: str,
 ) -> str:
-    if not highlights:
-        return empty_text
-
     blocks = []
-    for highlight in highlights:
+    for index, highlight in enumerate(highlights, start=1):
         blocks.append(
             "\n".join(
                 [
-                    _format_quote_callout(highlight.text, callout_title),
+                    f"### 整理 {index}",
+                    highlight.text.strip(),
                     _format_highlight_reason(highlight),
                 ]
             ).strip()
@@ -283,13 +277,6 @@ def _infer_content_keywords(detail: ParseResponse) -> list[str]:
 
     fallback_keyword = detail.video.title.strip()[:40]
     return [fallback_keyword or "内容摘要"]
-
-
-def _format_quote_callout(text: str, callout_title: str) -> str:
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    quote_lines = lines or [""]
-    quoted_text = "\n".join(f"> “{line}”" for line in quote_lines)
-    return f"> [!quote] {callout_title}\n{quoted_text}"
 
 
 def _write_markdown_if_enabled(filename: str, markdown: str) -> Path | None:

@@ -60,6 +60,7 @@ export function useTranscriptNoteWorkflow({
   const lastSavedTextRef = useRef<Record<string, string>>(
     buildDraftTextMap(noteDraft?.highlights ?? [])
   );
+  const activeSavePromisesRef = useRef<Set<Promise<NoteDraft>>>(new Set());
   const candidateHighlights = useMemo(
     () => summary?.highlights ?? [],
     [summary?.highlights]
@@ -72,6 +73,16 @@ export function useTranscriptNoteWorkflow({
   const readSelectedExcerpt = useCallback(
     () => extractSelectedExcerpt(transcriptTextRootRef.current),
     []
+  );
+
+  const saveDraft = useCallback(
+    (nextSourceUrl: string, nextDraft: NoteDraft): Promise<NoteDraft> => {
+      const request = onSaveNoteDraft(nextSourceUrl, nextDraft);
+      activeSavePromisesRef.current.add(request);
+      void request.finally(() => activeSavePromisesRef.current.delete(request));
+      return request;
+    },
+    [onSaveNoteDraft]
   );
 
   const handleExcerptPointerDown = () => {
@@ -149,7 +160,7 @@ export function useTranscriptNoteWorkflow({
     setIsSavingDraft(true);
     setDraftErrorMessage(null);
     try {
-      const savedDraft = await onSaveNoteDraft(sourceUrl, nextDraft);
+      const savedDraft = await saveDraft(sourceUrl, nextDraft);
       setDraftHighlights(savedDraft.highlights);
       const savedEditValues = buildDraftTextMap(savedDraft.highlights);
       setDraftEditValues(savedEditValues);
@@ -195,7 +206,7 @@ export function useTranscriptNoteWorkflow({
     setDraftErrorMessage(null);
 
     try {
-      const savedDraft = await onSaveNoteDraft(sourceUrl, {
+      const savedDraft = await saveDraft(sourceUrl, {
         highlights: nextHighlights,
         updated_at: new Date().toISOString()
       });
@@ -277,7 +288,7 @@ export function useTranscriptNoteWorkflow({
             : highlight
         )
       );
-      setDraftErrorMessage("摘录不能为空，可继续编辑或移出。");
+      setDraftErrorMessage("整理内容不能为空，可继续编辑或移出。");
       return;
     }
     if (
@@ -292,14 +303,14 @@ export function useTranscriptNoteWorkflow({
   const handleAddCandidate = async (highlight: SummaryHighlight) => {
     const nextHighlight = normalizeCandidateHighlight(highlight, textSourceType);
     if (savedHighlightIdentities.has(getHighlightIdentity(nextHighlight))) {
-      setDraftMessage("这条摘录已经在草稿中。");
+      setDraftMessage("这条内容已经在“我的整理”中。");
       window.setTimeout(() => setDraftMessage(null), 1600);
       return;
     }
 
     await persistDraft(
       [...draftHighlights, nextHighlight],
-      "已加入摘录草稿。",
+      "已加入我的整理。",
       nextHighlight.id
     );
   };
@@ -307,14 +318,14 @@ export function useTranscriptNoteWorkflow({
   const handleAddSelectedExcerpt = async () => {
     const excerpt = readSelectedExcerpt() ?? selectedExcerpt;
     if (!excerpt) {
-      setDraftErrorMessage("请先在正文中选中要加入摘录的文字。");
+      setDraftErrorMessage("请先在原文中选中要加入整理的文字。");
       return;
     }
 
     const nextHighlight = buildManualHighlightFromExcerpt(excerpt, textSourceType);
     await persistDraft(
       [...draftHighlights, nextHighlight],
-      "手动摘录已保存。",
+      "已加入我的整理。",
       nextHighlight.id
     );
     window.getSelection()?.removeAllRanges();
@@ -324,7 +335,7 @@ export function useTranscriptNoteWorkflow({
   const handleRemoveHighlight = async (highlightId: string) => {
     await persistDraft(
       draftHighlights.filter((highlight) => highlight.id !== highlightId),
-      "摘录已移出草稿。"
+      "已从我的整理移出。"
     );
   };
 
@@ -337,6 +348,32 @@ export function useTranscriptNoteWorkflow({
     setIsExportingNote(true);
     setDraftErrorMessage(null);
     try {
+      await Promise.allSettled([...activeSavePromisesRef.current]);
+      Object.values(editSaveTimeoutsRef.current).forEach(window.clearTimeout);
+      editSaveTimeoutsRef.current = {};
+
+      const latestHighlights = draftHighlightsRef.current.map((highlight) => {
+        const editedText = draftEditValues[highlight.id]?.trim();
+        return editedText ? { ...highlight, text: editedText } : highlight;
+      });
+      const latestTextMap = buildDraftTextMap(latestHighlights);
+      const hasUnsavedChanges = latestHighlights.some(
+        (highlight) =>
+          latestTextMap[highlight.id]?.trim() !==
+          (lastSavedTextRef.current[highlight.id] ?? "").trim()
+      );
+      if (hasUnsavedChanges) {
+        setIsSavingDraft(true);
+        const savedDraft = await saveDraft(sourceUrl, {
+          highlights: latestHighlights,
+          updated_at: new Date().toISOString()
+        });
+        setDraftHighlights(savedDraft.highlights);
+        const savedEditValues = buildDraftTextMap(savedDraft.highlights);
+        setDraftEditValues(savedEditValues);
+        lastSavedTextRef.current = savedEditValues;
+      }
+
       const response = await apiClient.exportObsidianNote({ source_url: sourceUrl });
       if (!response.written_to_vault) {
         downloadTextFile(
@@ -352,6 +389,7 @@ export function useTranscriptNoteWorkflow({
     } catch (error) {
       setDraftErrorMessage(getNoteErrorMessage(error, "export"));
     } finally {
+      setIsSavingDraft(false);
       setIsExportingNote(false);
     }
   };
@@ -379,3 +417,7 @@ export function useTranscriptNoteWorkflow({
     transcriptTextRootRef
   };
 }
+
+export type TranscriptNoteWorkflowState = ReturnType<
+  typeof useTranscriptNoteWorkflow
+>;

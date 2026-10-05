@@ -1,4 +1,13 @@
-import { BrainCircuit, GitFork, MessageSquareText, ScrollText } from "lucide-react";
+import {
+  BrainCircuit,
+  FileDown,
+  GitFork,
+  Loader2,
+  MessageSquareText,
+  ScrollText
+} from "lucide-react";
+import { useState } from "react";
+import { useTranscriptNoteWorkflow } from "@/hooks/use-transcript-note-workflow";
 import type {
   MindmapMeta,
   NoteDraft,
@@ -85,14 +94,30 @@ export function AiTabs({
   onTranscribe
 }: AiTabsProps) {
   const visibleSummary = summaryDisplayState === "empty" ? null : summary;
+  const [pointQuestion, setPointQuestion] = useState<string | null>(null);
+  const noteWorkflow = useTranscriptNoteWorkflow({
+    noteDraft,
+    sourceUrl,
+    summary,
+    textSourceType,
+    onSaveNoteDraft
+  });
+
+  const handleAskPoint = (point: string) => {
+    setPointQuestion(
+      `关于这条观点：“${point}”\n依据是什么？适用于什么情况？请区分作者表达与 AI 推导。`
+    );
+    onChangeTab("qa");
+  };
 
   return (
-    <section className="shadow-hard-lg min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4 sm:p-7">
-      <div
-        aria-label="知识稿内容视图"
-        className="sticky top-[4.75rem] z-20 -mx-4 -mt-4 flex gap-6 overflow-x-auto border-b-2 border-[var(--line-ink)] bg-[var(--paper-raised)] px-4 pb-3 pt-4 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pt-5"
-        role="tablist"
-      >
+    <section className="min-w-0 rounded-[10px] border border-[var(--line)] bg-[var(--paper-raised)] p-4 shadow-[0_14px_40px_rgba(54,45,32,0.07)] sm:p-7">
+      <div className="sticky top-[4.75rem] z-20 -mx-4 -mt-4 flex items-end gap-3 border-b border-[var(--line)] bg-[var(--paper-raised)] px-4 pb-3 pt-4 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pt-5">
+        <div
+          aria-label="知识稿内容视图"
+          className="flex min-w-0 flex-1 gap-5 overflow-x-auto"
+          role="tablist"
+        >
         {tabs.map((tab, tabIndex) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -140,7 +165,35 @@ export function AiTabs({
             </button>
           );
         })}
+        </div>
+        <button
+          className="inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-[var(--accent-deep)] active:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
+          disabled={!sourceUrl || noteWorkflow.isExportingNote}
+          type="button"
+          onClick={() => void noteWorkflow.handleExportObsidianNote()}
+        >
+          {noteWorkflow.isExportingNote ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <FileDown className="h-4 w-4" aria-hidden="true" />
+          )}
+          <span className="hidden sm:inline">
+            {noteWorkflow.isExportingNote ? "导出中" : "导出知识稿"}
+          </span>
+        </button>
       </div>
+
+      {noteWorkflow.draftMessage || noteWorkflow.draftErrorMessage ? (
+        <div
+          className={`mt-4 rounded-md px-3 py-2 text-sm ${
+            noteWorkflow.draftErrorMessage
+              ? "bg-[#f7ead9] text-[#7a4a1f]"
+              : "bg-[#e9f2ea] text-[#2f5d3a]"
+          }`}
+        >
+          {noteWorkflow.draftErrorMessage ?? noteWorkflow.draftMessage}
+        </div>
+      ) : null}
 
       <div
         aria-label={`${tabs.find((tab) => tab.key === activeTab)?.label ?? "知识稿"}内容`}
@@ -161,6 +214,8 @@ export function AiTabs({
             summaryGenerationMeta={summaryGenerationMeta}
             transcribeErrorMessage={transcribeErrorMessage}
             textSourceType={textSourceType}
+            transcript={transcript}
+            onAskPoint={handleAskPoint}
             onSummarize={onSummarize}
             onTranscribe={onTranscribe}
           />
@@ -191,6 +246,7 @@ export function AiTabs({
             transcript={transcript}
             videoAuthor={videoAuthor}
             videoTitle={videoTitle}
+            contextualQuestion={pointQuestion}
             onQaComplete={onQaComplete}
             onTranscribe={onTranscribe}
           />
@@ -201,16 +257,14 @@ export function AiTabs({
             hasTranscript={hasTranscript}
             isTranscribing={isTranscribing}
             mediaType={mediaType}
-            noteDraft={noteDraft}
+            noteWorkflow={noteWorkflow}
             sourceUrl={sourceUrl}
-            summary={summary}
             transcribeErrorMessage={transcribeErrorMessage}
             textSourceType={textSourceType}
             transcript={transcript}
             transcriptVariants={transcriptVariants}
             activeTranscriptVariant={activeTranscriptVariant}
             videoTitle={videoTitle}
-            onSaveNoteDraft={onSaveNoteDraft}
             onTranscribe={onTranscribe}
           />
         ) : null}

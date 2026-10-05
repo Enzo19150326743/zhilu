@@ -14,6 +14,7 @@ from app.services.summarize_service import (
     _request_deepseek_summary,
     summarize_transcript,
 )
+from app.services.transcript_identity_service import build_evidence_segments
 
 
 class SummarizeServiceTests(unittest.TestCase):
@@ -28,7 +29,11 @@ class SummarizeServiceTests(unittest.TestCase):
             video_title="示例视频",
         )
 
-        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
+            clear=False,
+        ):
             response = summarize_transcript(request)
 
         self.assertFalse(response.is_ai_generated)
@@ -60,7 +65,7 @@ class SummarizeServiceTests(unittest.TestCase):
             video_title="AI 访谈",
         )
         payload = {
-            "draft_version": "1.1",
+            "draft_version": "1.2",
             "content_type": "播客",
             "topics": ["AI 产品", "工作流"],
             "summary_profile": "viewpoint",
@@ -270,7 +275,7 @@ class SummarizeServiceTests(unittest.TestCase):
         self.assertIn("shownotes 只能代表公开内容简介", prompt)
         self.assertIn('"content_type": "视频或播客"', prompt)
         self.assertIn('"quotes"', prompt)
-        self.assertIn('"draft_version": "1.1"', prompt)
+        self.assertIn('"draft_version": "1.2"', prompt)
         self.assertIn('"content_keywords"', prompt)
         self.assertIn('"summary_profile"', prompt)
         self.assertIn('"methods"', prompt)
@@ -436,10 +441,74 @@ class SummarizeServiceTests(unittest.TestCase):
             ],
         )
 
-        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
+            clear=False,
+        ):
             response = summarize_transcript(request)
 
         self.assertEqual(response.summary.timeline, [])
+
+    def test_key_point_evidence_uses_validated_current_transcript_segments(self) -> None:
+        segments = [
+            TranscriptSegment(start=0, end=3, text="作者先说明结论。", speaker="作者"),
+            TranscriptSegment(start=3, end=8, text="随后给出适用条件和反例。", speaker="作者"),
+        ]
+        segment_ids = [item.id for item in build_evidence_segments(segments)]
+        request = SummarizeRequest(
+            transcript_plain_text="作者先说明结论。 随后给出适用条件和反例。",
+            transcript_segments=segments,
+            video_title="证据关联示例",
+        )
+        payload = {
+            "tldr": "结论需要结合条件理解。",
+            "key_points": ["作者提出结论，并用条件和反例限定适用范围。"],
+            "key_point_evidence": [
+                {"point_index": 0, "segment_ids": segment_ids},
+                {"point_index": 0, "segment_ids": ["伪造片段"]},
+            ],
+            "mindmap_markdown": "# 证据关联示例",
+        }
+
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=False):
+            response = summarize_transcript(
+                request,
+                ai_requester=lambda _: json.dumps(payload, ensure_ascii=False),
+            )
+
+        self.assertEqual(len(response.summary.key_point_evidence), 1)
+        evidence = response.summary.key_point_evidence[0]
+        self.assertEqual(evidence.segment_ids, segment_ids)
+        self.assertEqual(evidence.excerpt, "作者先说明结论。\n随后给出适用条件和反例。")
+        self.assertEqual(evidence.speaker, "作者")
+        self.assertEqual(
+            evidence.transcript_fingerprint,
+            response.summary.transcript_fingerprint,
+        )
+        self.assertIn(f"[{segment_ids[0]}] 作者：作者先说明结论。", _build_deepseek_prompt(request))
+
+    def test_invalid_or_stale_segment_identifiers_are_not_persisted(self) -> None:
+        request = SummarizeRequest(
+            transcript_plain_text="只有这一段原文。",
+            transcript_segments=[TranscriptSegment(start=0, end=2, text="只有这一段原文。")],
+        )
+        payload = {
+            "tldr": "摘要",
+            "key_points": ["观点"],
+            "key_point_evidence": [
+                {"point_index": 0, "segment_ids": ["seg-0001-old-fingerprint"]}
+            ],
+            "mindmap_markdown": "# 摘要",
+        }
+
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=False):
+            response = summarize_transcript(
+                request,
+                ai_requester=lambda _: json.dumps(payload, ensure_ascii=False),
+            )
+
+        self.assertEqual(response.summary.key_point_evidence, [])
 
 
 if __name__ == "__main__":

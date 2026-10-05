@@ -109,8 +109,9 @@ RTX 3050 Laptop 等 4GB 级显卡默认使用更保守的 60 秒 GPU 批量；CP
 300 秒。需要 NVIDIA GPU 时，请先运行项目根目录的
 `scripts/install-sensevoice-cuda.ps1` 安装官方 CUDA 版 PyTorch，然后重启后端。
 同一媒体使用不同引擎重转写时，各版本独立保存在本地历史中；新任务失败不会覆盖旧稿。
-SenseVoice 可用时会成为转写弹窗的推荐默认项；未安装时自动使用 Whisper。短于4秒的
-SenseVoice句段会在校对前继续合并，优先形成4–8秒的校对单元，原始句段仍完整保存。
+自动转写和转写弹窗默认使用 SenseVoice；未安装本地依赖时会提示不可用，不会自动改用
+Whisper。需要时可在转写设置中手动选择 Whisper。短于4秒的 SenseVoice 句段会在
+校对前继续合并，优先形成4–8秒的校对单元，原始句段仍完整保存。
 
 Whisper 默认在识别完成后、DeepSeek 校对前合并过碎的相邻片段：
 

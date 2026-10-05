@@ -154,13 +154,7 @@ export function isRecoverableTranscribeError(error: unknown): boolean {
 export function getRecommendedLocalAsrEngine(
   status: AsrStatusResponse | null
 ): AsrEngine {
-  if (
-    status?.recommended_engine === "sensevoice_small" &&
-    status.sensevoice_available
-  ) {
-    return "sensevoice_small";
-  }
-  return "local_whisper";
+  return status?.recommended_engine ?? "sensevoice_small";
 }
 
 export function getSummaryTaskMessage(response: SummarizeResponse): string {

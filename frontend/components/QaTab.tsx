@@ -7,7 +7,7 @@ import {
   Quote,
   SendHorizontal
 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { ApiClientError, apiClient } from "@/lib/api";
 import type {
   QaMode,
@@ -19,6 +19,7 @@ import { TranscribeRequiredState } from "./TranscribeRequiredState";
 
 interface QaTabProps {
   canTranscribe: boolean;
+  contextualQuestion?: string | null;
   hasTranscript: boolean;
   isTranscribing: boolean;
   mediaType?: string | null;
@@ -93,6 +94,7 @@ function getQaErrorMessage(error: unknown): string {
 
 export function QaTab({
   canTranscribe,
+  contextualQuestion,
   hasTranscript,
   isTranscribing,
   mediaType,
@@ -111,11 +113,28 @@ export function QaTab({
   const [answer, setAnswer] = useState<QaResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
+  const activeSourceUrlRef = useRef(sourceUrl);
   const activeModeDetail =
     qaModes.find((mode) => mode.key === activeMode) ?? qaModes[0];
   const hasContentText = hasTranscript && Boolean(transcript?.plain_text.trim());
   const isShownotes = textSourceType === "shownotes";
   const canAsk = hasContentText && !isShownotes;
+
+  useEffect(() => {
+    activeSourceUrlRef.current = sourceUrl;
+    setAnswer(null);
+    setErrorMessage(null);
+    setQuestion("");
+  }, [sourceUrl]);
+
+  useEffect(() => {
+    if (!contextualQuestion) {
+      return;
+    }
+    setQuestion(contextualQuestion);
+    setAnswer(null);
+    setErrorMessage(null);
+  }, [contextualQuestion]);
 
   const handleAsk = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -141,6 +160,7 @@ export function QaTab({
     setAnswer(null);
 
     try {
+      const requestedSourceUrl = sourceUrl;
       const response = await apiClient.askQuestion({
         media_type: mediaType,
         mode: activeMode,
@@ -153,9 +173,13 @@ export function QaTab({
         video_author: videoAuthor ?? undefined,
         video_title: videoTitle ?? undefined
       });
-      setAnswer(response);
+      if (activeSourceUrlRef.current === requestedSourceUrl) {
+        setAnswer(response);
+      }
     } catch (error) {
-      setErrorMessage(getQaErrorMessage(error));
+      if (activeSourceUrlRef.current === sourceUrl) {
+        setErrorMessage(getQaErrorMessage(error));
+      }
     } finally {
       setIsAsking(false);
       onQaComplete?.();
@@ -300,6 +324,11 @@ export function QaTab({
             </span>
           </div>
           <p className="text-sm leading-6 text-[var(--ink-soft)]">{answer.answer}</p>
+          {answer.is_ai_generated ? (
+            <p className="text-xs leading-5 text-[var(--muted)]">
+              这是基于当前内容生成的 AI 回答；作者原话仅以“引用片段”为准。
+            </p>
+          ) : null}
 
           {answer.references.length > 0 ? (
             <div>

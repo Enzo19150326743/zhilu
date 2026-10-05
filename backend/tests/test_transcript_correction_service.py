@@ -90,7 +90,11 @@ class TranscriptCorrectionServiceTests(unittest.TestCase):
         """
         with patch.dict(
             os.environ,
-            {"ASR_CORRECTION_ENABLED": "1", "DEEPSEEK_API_KEY": ""},
+            {
+                "AI_API_KEY": "",
+                "ASR_CORRECTION_ENABLED": "1",
+                "DEEPSEEK_API_KEY": "",
+            },
             clear=False,
         ):
             result = correct_transcript_payload(

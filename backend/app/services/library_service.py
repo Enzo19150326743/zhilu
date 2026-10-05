@@ -21,6 +21,7 @@ from app.schemas import (
     TranscriptPayload,
 )
 from app.services.text_normalization_service import simplify_text_payload
+from app.services.transcript_identity_service import build_transcript_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +160,7 @@ def update_summary_for_source_url(
     if not source_url:
         return False
 
-    with _connect() as connection:
+    with _connect(immediate=True) as connection:
         _ensure_schema(connection)
         row = _find_library_row_for_source_url(connection, source_url)
         if row is None:
@@ -220,7 +221,14 @@ def update_transcript_for_source_url(
     if not source_url:
         return False
 
-    with _connect() as connection:
+    # 长稿转换在事务外完成，避免持有读锁时与后台调度的写事务相互等待。
+    serialized_transcript = simplify_text_payload(transcript.model_dump(mode="json"))
+    serialized_shownotes_context = (
+        simplify_text_payload(shownotes_context.model_dump(mode="json"))
+        if shownotes_context is not None
+        else None
+    )
+    with _connect(immediate=True) as connection:
         _ensure_schema(connection)
         row = _find_library_row_for_source_url(connection, source_url)
         if row is None:
@@ -247,7 +255,7 @@ def update_transcript_for_source_url(
                 if isinstance(legacy_text, str) and legacy_text.strip():
                     payload["shownotes_plain_text"] = legacy_text.strip()
         if shownotes_context is not None:
-            payload["shownotes_context"] = shownotes_context.model_dump(mode="json")
+            payload["shownotes_context"] = serialized_shownotes_context
         existing_transcript = payload.get("transcript")
         transcript_variants = payload.get("transcript_variants")
         if not isinstance(transcript_variants, dict):
@@ -268,7 +276,6 @@ def update_transcript_for_source_url(
             if isinstance(transcript_variant_key, str) and transcript_variant_key.strip()
             else _get_transcript_variant_key(transcript)
         )
-        serialized_transcript = transcript.model_dump(mode="json")
         transcript_variants[active_variant_key] = serialized_transcript
         payload["transcript"] = serialized_transcript
         payload["transcript_variants"] = transcript_variants
@@ -278,7 +285,6 @@ def update_transcript_for_source_url(
             video
         )
         payload["mindmap_meta"] = None
-        payload = simplify_text_payload(payload)
         connection.execute(
             """
             UPDATE library_items
@@ -319,12 +325,14 @@ def update_note_draft_for_source_url(
     note_draft: NoteDraft,
 ) -> NoteDraft | None:
     """
-    将摘录草稿写回解析记录的 payload_json.note_draft；没有历史记录时返回 None。
+    将“我的整理”写回兼容字段 payload_json.note_draft；没有历史记录时返回 None。
     """
     if not source_url:
         return None
 
-    with _connect() as connection:
+    serialized_note_draft = simplify_text_payload(note_draft.model_dump(mode="json"))
+    persisted_note_draft = NoteDraft.model_validate(serialized_note_draft)
+    with _connect(immediate=True) as connection:
         _ensure_schema(connection)
         row = _find_library_row_for_source_url(connection, source_url)
         if row is None:
@@ -332,9 +340,7 @@ def update_note_draft_for_source_url(
             return None
 
         payload = json.loads(str(row["payload_json"]))
-        payload["note_draft"] = note_draft.model_dump(mode="json")
-        payload = simplify_text_payload(payload)
-        persisted_note_draft = NoteDraft.model_validate(payload["note_draft"])
+        payload["note_draft"] = serialized_note_draft
         connection.execute(
             """
             UPDATE library_items
@@ -638,6 +644,7 @@ def _connect(*, immediate: bool = False) -> Iterator[sqlite3.Connection]:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout = 5000")
     try:
+        # 读后写操作必须提前取得写入权限；读锁升级遇到另一写事务时不会等待 busy_timeout。
         connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
         yield connection
         connection.commit()
@@ -759,8 +766,8 @@ def _row_to_parse_response(row: sqlite3.Row) -> ParseResponse:
         _persist_simplified_payload(str(row["source_url"]), simplified_payload)
         payload = simplified_payload
 
-    parse_response = _with_summary_highlight_fallbacks(
-        ParseResponse.model_validate(payload)
+    parse_response = _with_transcript_fingerprints(
+        _with_summary_highlight_fallbacks(ParseResponse.model_validate(payload))
     )
     return parse_response.model_copy(
         update={
@@ -769,6 +776,31 @@ def _row_to_parse_response(row: sqlite3.Row) -> ParseResponse:
             "library_summary_model": (
                 str(row["summary_model"]) if row["summary_model"] is not None else None
             ),
+        }
+    )
+
+
+def _with_transcript_fingerprints(parse_response: ParseResponse) -> ParseResponse:
+    def add_fingerprint(transcript: TranscriptPayload) -> TranscriptPayload:
+        if transcript.fingerprint:
+            return transcript
+        return transcript.model_copy(
+            update={
+                "fingerprint": build_transcript_fingerprint(
+                    transcript.plain_text,
+                    transcript.segments,
+                )
+            }
+        )
+
+    transcript_variants = {
+        key: add_fingerprint(transcript)
+        for key, transcript in parse_response.transcript_variants.items()
+    }
+    return parse_response.model_copy(
+        update={
+            "transcript": add_fingerprint(parse_response.transcript),
+            "transcript_variants": transcript_variants,
         }
     )
 
@@ -886,7 +918,7 @@ def _persist_simplified_payload(source_url: str, payload: dict[str, Any]) -> Non
     旧记录可能已经落入繁体文本；读取时顺手修正本地库，避免下次仍然返回繁体。
     """
     try:
-        with _connect() as connection:
+        with _connect(immediate=True) as connection:
             _ensure_schema(connection)
             connection.execute(
                 """

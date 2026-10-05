@@ -1,9 +1,12 @@
-import { FileAudio, FileText, Loader2 } from "lucide-react";
+import { Eye, FileAudio, FileText, Loader2, MessageSquareText, X } from "lucide-react";
+import { useState } from "react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { TranscribeRequiredState } from "./TranscribeRequiredState";
 import type {
   SummaryDisplayState,
   SummaryGenerationMeta,
+  SummaryEvidence,
+  TranscriptPayload,
   VideoSummary
 } from "@/lib/types";
 
@@ -20,6 +23,8 @@ interface SummaryTabProps {
   summaryGenerationMeta: SummaryGenerationMeta | null;
   transcribeErrorMessage: string | null;
   textSourceType?: string | null;
+  transcript: TranscriptPayload | null;
+  onAskPoint: (point: string) => void;
   onSummarize: () => void;
   onTranscribe: () => void;
 }
@@ -141,9 +146,12 @@ export function SummaryTab({
   summaryGenerationMeta,
   transcribeErrorMessage,
   textSourceType,
+  transcript,
+  onAskPoint,
   onSummarize,
   onTranscribe
 }: SummaryTabProps) {
+  const [pinnedEvidence, setPinnedEvidence] = useState<SummaryEvidence | null>(null);
   const isShownotes = textSourceType === "shownotes";
   const isPodcast = mediaType === "podcast";
   const needsTranscription = !hasTranscript || (isPodcast && isShownotes);
@@ -214,9 +222,19 @@ export function SummaryTab({
             }
           ]
         : [];
+  const evidenceByPoint = new Map(
+    (summary.key_point_evidence ?? [])
+      .filter(
+        (evidence) =>
+          !transcript?.fingerprint ||
+          evidence.transcript_fingerprint === transcript.fingerprint
+      )
+      .map((evidence) => [evidence.point_index, evidence])
+  );
 
   return (
-    <div className="space-y-5">
+    <div className={pinnedEvidence ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start" : "mx-auto max-w-[58rem]"}>
+      <div className="min-w-0 space-y-6">
       <section className="border-b-2 border-[var(--line-ink)] pb-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
@@ -301,7 +319,7 @@ export function SummaryTab({
         </div>
       ) : null}
 
-      <section aria-label="一句话概览" className="space-y-4 px-1 py-2">
+      <section aria-label="一句话结论" className="space-y-4 px-1 py-2">
         <span
           aria-hidden="true"
           className="block h-1 w-7 bg-[var(--accent)]"
@@ -328,19 +346,49 @@ export function SummaryTab({
       <section className="grid gap-5 lg:grid-cols-[140px_1fr] lg:gap-8">
         <SummarySectionHeading title={keyPointsTitle} />
         <ol className="border-t border-[var(--line-strong)]">
-          {summary.key_points.map((point, index) => (
+          {summary.key_points.map((point, index) => {
+            const evidence = evidenceByPoint.get(index);
+            return (
             <li
-              className="grid grid-cols-[46px_1fr] gap-3 border-b border-[var(--line)] py-4 sm:grid-cols-[58px_1fr] sm:py-5"
+              className="group grid grid-cols-[46px_1fr] gap-3 border-b border-[var(--line)] py-3 sm:grid-cols-[58px_1fr] sm:py-3"
               key={point}
             >
               <span className="font-editorial tabular-nums text-lg font-bold leading-7 text-[var(--accent)]">
                 {String(index + 1).padStart(2, "0")}
               </span>
-              <p className="text-pretty text-sm leading-7 text-[var(--ink-soft)] sm:text-[15px]">
-                {point}
-              </p>
+              <div className="relative min-w-0">
+                <p className="text-pretty text-base leading-8 text-[var(--ink-soft)]">
+                  {point}
+                </p>
+                <div className="mt-2 flex min-h-8 flex-wrap items-center gap-2 transition-opacity duration-150 md:absolute md:left-0 md:top-full md:z-10 md:mt-1 md:rounded-md md:bg-[var(--paper)] md:px-1 md:opacity-0 md:shadow-sm md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                  {evidence ? (
+                    <span className="group/evidence relative">
+                      <button
+                        className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-[var(--muted-strong)] hover:bg-[var(--paper-deep)] hover:text-[var(--ink)]"
+                        type="button"
+                        onClick={() => setPinnedEvidence(evidence)}
+                      >
+                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                        查看依据
+                      </button>
+                      <span className="invisible absolute bottom-[calc(100%+8px)] left-0 z-30 hidden w-72 rounded-md border border-[var(--line)] bg-[var(--paper-raised)] p-3 text-left text-xs font-normal leading-5 text-[var(--ink-soft)] opacity-0 shadow-[0_12px_30px_rgba(54,45,32,0.15)] transition-opacity group-hover/evidence:visible group-hover/evidence:opacity-100 group-focus-within/evidence:visible group-focus-within/evidence:opacity-100 md:block">
+                        {evidence.excerpt}
+                      </span>
+                    </span>
+                  ) : null}
+                  <button
+                    className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-[var(--muted-strong)] hover:bg-[var(--paper-deep)] hover:text-[var(--ink)]"
+                    type="button"
+                    onClick={() => onAskPoint(point)}
+                  >
+                    <MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" />
+                    追问这条
+                  </button>
+                </div>
+              </div>
             </li>
-          ))}
+            );
+          })}
         </ol>
       </section>
 
@@ -356,7 +404,7 @@ export function SummaryTab({
                 <div className="mono px-3 py-3 text-xs text-[var(--muted)]">
                   {String(index + 1).padStart(2, "0")}
                 </div>
-                <div className="border-l border-[var(--line)] px-3 py-3 text-sm leading-6 text-[var(--ink-soft)]">
+                <div className="border-l border-[var(--line)] px-3 py-3 text-base leading-7 text-[var(--ink-soft)]">
                   {item}
                 </div>
               </div>
@@ -377,7 +425,7 @@ export function SummaryTab({
               <span className="font-editorial tabular-nums text-base font-bold text-[var(--accent)]">
                 {String(index + 1).padStart(2, "0")}
               </span>
-              <p className="text-pretty text-sm leading-6 text-[var(--ink-soft)]">
+              <p className="text-pretty text-base leading-7 text-[var(--ink-soft)]">
                 {item}
               </p>
             </li>
@@ -405,6 +453,35 @@ export function SummaryTab({
             ))}
           </ul>
         </section>
+      ) : null}
+      </div>
+      {pinnedEvidence ? (
+        <aside className="fixed inset-x-3 bottom-3 z-40 max-h-[70vh] overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--paper)] p-4 shadow-[0_16px_45px_rgba(54,45,32,0.2)] xl:sticky xl:inset-x-auto xl:bottom-auto xl:top-[9rem] xl:z-auto xl:max-h-none xl:overflow-visible xl:shadow-[0_12px_30px_rgba(54,45,32,0.08)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">原文依据</h3>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                仅表示总结与当前转写片段有关联，不代表外部事实已核实。
+              </p>
+            </div>
+            <button
+              aria-label="关闭原文依据"
+              className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--paper-deep)] hover:text-[var(--ink)]"
+              type="button"
+              onClick={() => setPinnedEvidence(null)}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          {pinnedEvidence.speaker ? (
+            <p className="mt-4 text-xs font-medium text-[var(--accent)]">
+              {pinnedEvidence.speaker}
+            </p>
+          ) : null}
+          <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-[var(--ink-soft)]">
+            {pinnedEvidence.excerpt}
+          </p>
+        </aside>
       ) : null}
     </div>
   );

@@ -1,6 +1,5 @@
 import json
 import logging
-import json
 import os
 import re
 from collections.abc import Callable
@@ -11,6 +10,7 @@ import json_repair
 from app.schemas import (
     MindmapMeta,
     SummaryDetailSection,
+    SummaryEvidence,
     SummaryHighlight,
     SummarizeRequest,
     SummarizeResponse,
@@ -27,6 +27,12 @@ from app.services.text_normalization_service import (
     simplify_text_payload,
     to_simplified_chinese,
 )
+from app.services.transcript_identity_service import (
+    EvidenceSegment,
+    build_evidence_segments,
+    build_transcript_fingerprint,
+    normalize_transcript_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +41,7 @@ DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
 DEFAULT_DEEPSEEK_MAX_TOKENS = 8192
 DEFAULT_DEEPSEEK_THINKING_TYPE = "disabled"
 DEFAULT_DEEPSEEK_TIMEOUT_SECONDS = 180
-UNIVERSAL_KNOWLEDGE_DRAFT_VERSION = "1.1"
+UNIVERSAL_KNOWLEDGE_DRAFT_VERSION = "1.2"
 AiRequester = Callable[[SummarizeRequest], str]
 
 _DEEPSEEK_SYSTEM_PROMPT = (
@@ -420,11 +426,40 @@ def _format_deepseek_error(error: Exception) -> str:
     return detail[:500] if detail else "no detail"
 
 
+def _build_transcript_prompt(
+    transcript: str,
+    evidence_segments: list[EvidenceSegment],
+) -> str:
+    """片段覆盖完整稿时就地标识，避免再复制一份超长原文。"""
+    if not evidence_segments:
+        return transcript
+
+    annotated_text = "\n".join(
+        (
+            f"[{item.id}] "
+            f"{f'{item.segment.speaker}：' if item.segment.speaker else ''}"
+            f"{item.segment.text.strip()}"
+        )
+        for item in evidence_segments
+    )
+    covered_length = len(normalize_transcript_text(annotated_text))
+    transcript_length = max(1, len(normalize_transcript_text(transcript)))
+    if covered_length >= transcript_length * 0.7:
+        return annotated_text
+
+    # 少数来源的 segments 只是稀疏定位点；此时完整正文仍是总结主证据，
+    # 另附受控长度的片段目录供模型选择关联。
+    catalog = annotated_text[:30000]
+    return f"{transcript}\n\n可关联片段目录：\n{catalog}"
+
+
 def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
     title = summarize_request.video_title or "未命名媒体内容"
     author = summarize_request.video_author or "未知作者"
     source_url = summarize_request.source_url or "未提供"
     transcript = summarize_request.transcript_plain_text.strip()
+    evidence_segments = build_evidence_segments(summarize_request.transcript_segments)
+    transcript_for_prompt = _build_transcript_prompt(transcript, evidence_segments)
     content_type = _get_obsidian_content_type_label(summarize_request)
     source_boundary = _build_text_source_boundary(summarize_request)
     shownotes_context = (
@@ -453,7 +488,7 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 
 证据区块与优先级：
 主要证据：完整校对转写稿。总结、事实判断和原文摘录必须主要依据这里。
-{transcript}
+{transcript_for_prompt}
 
 辅助人物与术语信息（shownotes_context）：
 {shownotes_context}
@@ -467,17 +502,19 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
 - 只根据当前媒体元数据和内容文本总结，不引用或推断任何用户的个人背景。
 - 必须完整覆盖内容文本的开头、中段和结尾，不能只抓开头，也不要为了简短遗漏后半段的重要转折或结论。
 - 先判断 summary_profile：information（时讯、事实、变化）、viewpoint（观点、访谈、商业观察）、method（教程、方法论）、narrative（故事、经历）或 generic（无法可靠判断）。
-- key_points 返回 3 到 6 条，必须和 summary_profile 对应：信息类提炼事实、变化和影响；观点类提炼判断、理由和分歧；方法类提炼目标、步骤和条件；叙事类提炼关键经历、转折和启发。不要把外部作者观点等同于任何用户的观点。
+- tldr 直接写最重要的判断或信息，不要使用“本期围绕……展开讨论”等空泛开场。
+- key_points 返回 2 到 7 条并按信息价值排序。信息类提炼事实、变化和影响；观点类写清判断、理由和分歧；方法类写清目标、步骤、条件和限制；叙事类提炼关键经历、转折和启发。不要按章节平均分配篇幅，也不要把外部作者观点等同于任何用户的观点。
 - key_points_title 必须使用对应标题：information 为“关键信息”、viewpoint 为“核心观点”、method 为“关键方法”、narrative 为“重要经历与启发”、generic 为“内容要点”。
 - content_outline 只在文本存在清晰的阶段、论证或叙事推进时返回 3 到 6 条；否则返回空数组。每一条都必须是一句可独立阅读的完整脉络：写明“这一段谈什么 + 得出什么判断/发生什么变化 + 为什么或凭什么”。不要只返回“提出问题”“分析三大支柱”这类目录标题。原文足够时，每条控制在约 35 到 90 个汉字，保留关键对象、因果关系和数据/案例线索。
 - methods 只提取文本中明确出现、可复用的做法，并写清适用条件或限制；没有足够依据时必须返回空数组。不得把常识性劝告、泛泛复习建议或模型自行推导的行动建议写入 methods。
-- deep_dive_sections 只返回有文本依据的深入模块，可使用“论证与依据”“案例与背景”“争议与限制”等具体标题；没有足够信息时返回空数组。不得生成名为“结构化分析”的空泛固定栏目。对于超过 2,000 字、且存在明确观点推进、数据、案例或因果论证的文本，必须返回 2 到 3 个模块；每个模块至少写 2 段或 3 条要点，说明“主张是什么、文本给出的依据是什么、两者如何相连”，并点出具体数据、人物、案例或限制（仅限原文确实出现者）。不要用一句“作者通过历史数据支撑观点”代替证据说明。
+- deep_dive_sections 只返回 key_points 和 methods 尚未覆盖、且有新增信息的辅助模块，可使用“案例与背景”“争议与限制”等具体标题；没有新增信息时返回空数组。不得按字数强制凑模块，也不得生成名为“结构化分析”的空泛固定栏目。
 - 不要强行凑齐原文没有的栏目；证据不足或无法确定的内容写入 content_boundaries，不要编造补全。
 - 内容类型当前只允许“视频”和“播客”；不要输出“文章”，除非后续明确上线文章解析功能。
 - topics 和 content_keywords 只描述当前内容本身，不包含“视频”“播客”这类媒介形态。
 - content_boundaries 记录证据不足、文本来源限制、ASR 误差或需要结合原媒体核实的内容。
 - 不输出个人价值判断、个人表达风格、个人目标、个人选题、固定知识库页面或双链。
 - 不生成时间轴、时间点、开始时间或结束时间；当前转写片段时间不够可靠。
+- key_point_evidence 只为能够被片段直接支持的 key_points 提供关联。point_index 从 0 开始，segment_ids 只能选择主要证据中方括号里的片段 ID；没有片段 ID 或没有直接依据时返回空数组。不要输出引用文字，后端会按 ID 读取原文。
 
 可靠摘录规则：
 - quotes 返回 0 到 6 条来自当前内容文本的可靠原文摘录候选。
@@ -506,6 +543,9 @@ def _build_deepseek_prompt(summarize_request: SummarizeRequest) -> str:
   "tldr": "一句话总结",
   "key_points_title": "关键信息、核心观点、关键方法、重要经历与启发或内容要点",
   "key_points": ["覆盖开头、中段和结尾的 3 到 6 条重点内容"],
+  "key_point_evidence": [
+    {{"point_index": 0, "segment_ids": ["seg-0001-示例ID"]}}
+  ],
   "content_outline": ["一条包含主题、判断和因果/证据线索的完整内容脉络；没有清晰推进时为空数组"],
   "method_title": "存在 methods 时固定为可借鉴的方法，否则为 null",
   "methods": ["文本中明确出现的方法、适用条件和限制；没有则为空数组"],
@@ -593,6 +633,10 @@ def _build_ai_summary_response(
     )
     content_outline = _safe_text_list(payload.get("content_outline"), [])[:6]
     methods = _safe_text_list(payload.get("methods"), [])[:5]
+    key_points = _safe_text_list(
+        payload.get("key_points"),
+        ["内容文本已完成结构化整理。"],
+    )[:7]
     deep_dive_sections = _safe_deep_dive_sections(
         payload.get("deep_dive_sections")
     )
@@ -614,6 +658,10 @@ def _build_ai_summary_response(
         payload.get("content_boundaries"),
         summarize_request,
     )
+    transcript_fingerprint = build_transcript_fingerprint(
+        summarize_request.transcript_plain_text,
+        summarize_request.transcript_segments,
+    )
     summary = VideoSummary(
         draft_version=UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
         content_type=_normalize_content_type(
@@ -622,7 +670,7 @@ def _build_ai_summary_response(
         ),
         topics=_safe_topics(payload.get("topics"), summarize_request),
         tldr=_safe_text(payload.get("tldr"), "AI 已生成总结。"),
-        key_points=_safe_text_list(payload.get("key_points"), ["内容文本已完成结构化整理。"]),
+        key_points=key_points,
         timeline=[],
         structured_analysis_markdown=_build_deep_dive_markdown(deep_dive_sections),
         takeaways=methods,
@@ -639,6 +687,13 @@ def _build_ai_summary_response(
         method_title=("可借鉴的方法" if methods else None),
         methods=methods,
         deep_dive_sections=deep_dive_sections,
+        transcript_fingerprint=transcript_fingerprint,
+        key_point_evidence=_safe_key_point_evidence(
+            payload.get("key_point_evidence"),
+            summarize_request,
+            len(key_points),
+            transcript_fingerprint,
+        ),
         search_keywords=content_keywords,
     )
     mindmap_markdown = _safe_text(
@@ -724,6 +779,9 @@ def _repair_common_json_text(json_text: str) -> str:
         "summary_profile",
         "topics",
         "key_points",
+        "key_point_evidence",
+        "point_index",
+        "segment_ids",
         "key_points_title",
         "content_outline",
         "method_title",
@@ -883,6 +941,10 @@ def _build_local_summary(
     snippets = _extract_snippets(transcript)
     text_label = _get_text_source_label(summarize_request)
     content_keywords = _infer_local_content_keywords(summarize_request)
+    transcript_fingerprint = build_transcript_fingerprint(
+        summarize_request.transcript_plain_text,
+        summarize_request.transcript_segments,
+    )
     summary = VideoSummary(
         draft_version=UNIVERSAL_KNOWLEDGE_DRAFT_VERSION,
         content_type=_get_obsidian_content_type_label(summarize_request),
@@ -906,6 +968,8 @@ def _build_local_summary(
         method_title=None,
         methods=[],
         deep_dive_sections=[],
+        transcript_fingerprint=transcript_fingerprint,
+        key_point_evidence=[],
         search_keywords=content_keywords,
     )
     mindmap_meta = _build_local_mindmap_meta(summarize_request)
@@ -1135,6 +1199,74 @@ def _build_deep_dive_markdown(sections: list[SummaryDetailSection]) -> str:
         for section in sections
         if section.title.strip() and section.markdown.strip()
     )
+
+
+def _safe_key_point_evidence(
+    value: Any,
+    summarize_request: SummarizeRequest,
+    point_count: int,
+    transcript_fingerprint: str,
+) -> list[SummaryEvidence]:
+    """只接受当前稿中真实存在的片段 ID，并由后端取回原文。"""
+    if not isinstance(value, list) or point_count <= 0:
+        return []
+
+    segment_catalog = {
+        item.id: item for item in build_evidence_segments(summarize_request.transcript_segments)
+    }
+    if not segment_catalog:
+        return []
+
+    evidence_items: list[SummaryEvidence] = []
+    seen_point_indexes: set[int] = set()
+    for raw_item in value:
+        if not isinstance(raw_item, dict):
+            continue
+        point_index = raw_item.get("point_index")
+        if (
+            not isinstance(point_index, int)
+            or isinstance(point_index, bool)
+            or point_index < 0
+            or point_index >= point_count
+            or point_index in seen_point_indexes
+        ):
+            continue
+        raw_segment_ids = raw_item.get("segment_ids")
+        if not isinstance(raw_segment_ids, list):
+            continue
+        segment_ids = list(
+            dict.fromkeys(
+                segment_id
+                for segment_id in raw_segment_ids
+                if isinstance(segment_id, str) and segment_id in segment_catalog
+            )
+        )[:4]
+        if not segment_ids:
+            continue
+
+        selected_segments = [segment_catalog[segment_id] for segment_id in segment_ids]
+        excerpt = "\n".join(
+            item.segment.text.strip() for item in selected_segments if item.segment.text.strip()
+        )[:6000].strip()
+        if not excerpt:
+            continue
+        speakers = {
+            item.segment.speaker.strip()
+            for item in selected_segments
+            if item.segment.speaker and item.segment.speaker.strip()
+        }
+        evidence_items.append(
+            SummaryEvidence(
+                point_index=point_index,
+                segment_ids=segment_ids,
+                excerpt=excerpt,
+                transcript_fingerprint=transcript_fingerprint,
+                speaker=next(iter(speakers)) if len(speakers) == 1 else None,
+            )
+        )
+        seen_point_indexes.add(point_index)
+
+    return sorted(evidence_items, key=lambda item: item.point_index)
 
 
 def _normalize_content_type(

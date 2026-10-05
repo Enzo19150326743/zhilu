@@ -359,7 +359,7 @@ export function buildManualHighlightFromExcerpt(
     text: excerpt.text,
     start: excerpt.start,
     end: excerpt.end,
-    reason: "用户手动加入摘录草稿",
+    reason: "用户手动加入我的整理",
     tags: [],
     source: "manual",
     source_type: textSourceType ?? "transcript",
@@ -397,8 +397,8 @@ export function getNoteErrorMessage(
   if (error instanceof ApiClientError) {
     if (error.errorCode === "LIBRARY_ITEM_NOT_FOUND") {
       return operation === "save"
-        ? "当前内容尚未写入本地历史，无法保存摘录草稿。"
-        : "当前内容尚未写入本地历史，无法导出知识草稿。";
+        ? "当前内容尚未写入本地档案，无法保存我的整理。"
+        : "当前内容尚未写入本地档案，无法导出知识稿。";
     }
 
     if (error.errorCode === "TIMEOUT") {

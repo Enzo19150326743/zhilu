@@ -24,7 +24,11 @@ class QaServiceTests(unittest.TestCase):
             video_title="AI 产品访谈",
         )
 
-        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
+            clear=False,
+        ):
             response = answer_question(request)
 
         self.assertFalse(response.is_ai_generated)

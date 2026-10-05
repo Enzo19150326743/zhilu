@@ -12,17 +12,12 @@ import { LIBRARY_PROCESSING_TIMEOUT_MS } from "@/lib/library-processing";
 import { getMediaType, getTextSourceType } from "@/lib/media";
 import { parseBatchInput } from "@/lib/batch-input";
 import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
-import {
-  getSummaryMetaFromDetail,
-  isParseResponse,
-  shouldAutoSummarizeDetail
-} from "@/lib/workbench-detail";
+import { getSummaryMetaFromDetail, isParseResponse } from "@/lib/workbench-detail";
 import type {
   AppStatus,
   DemoDetail,
   LibraryItem,
   NoteDraft,
-  ParseTask,
   ParseResponse,
   SummaryDisplayState
 } from "@/lib/types";
@@ -83,7 +78,6 @@ export function useWorkbenchController() {
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<AppStatus>("idle");
   const [activeTab, setActiveTab] = useState<TabKey>("summary");
-  const [parseTasks, setParseTasks] = useState<ParseTask[]>([]);
   const [hiddenTaskIds, setHiddenTaskIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -91,6 +85,8 @@ export function useWorkbenchController() {
   const inputUrlRef = useRef("");
   const isControllerMountedRef = useRef(true);
   const restoredRecoveryVideoIdsRef = useRef<Set<string>>(new Set());
+  const batchTaskSyncKeyRef = useRef("");
+  const singleTaskSyncKeyRef = useRef("");
 
   const activeDetail =
     detail && (status === "parsed" || status === "loading") ? detail : null;
@@ -101,11 +97,11 @@ export function useWorkbenchController() {
   const activeSourceUrl =
     activeDetail && isParseResponse(activeDetail) ? activeDetail.source_url : null;
   const trimmedInputUrl = url.trim();
+  const activeSingleTask = taskWorkspace.activeSingleBatch?.items[0] ?? null;
   const isParsing = Boolean(
-    trimmedInputUrl &&
-      parseTasks.some(
-        (task) => task.sourceUrl === trimmedInputUrl && task.status === "running"
-      )
+    taskWorkspace.isSubmitting ||
+      (activeSingleTask &&
+        !["succeeded", "failed", "cancelled"].includes(activeSingleTask.status))
   );
   useEffect(() => {
     activeSourceUrlRef.current = activeSourceUrl;
@@ -233,20 +229,150 @@ export function useWorkbenchController() {
     pendingAsrEngine,
     pendingTranscribeSettings
   } = transcribeSettingsDialogState;
+  useEffect(() => {
+    if (!activeSingleTask) {
+      return;
+    }
+
+    const syncKey = [
+      activeSingleTask.task_id,
+      activeSingleTask.video_id ?? "",
+      activeSingleTask.stage,
+      activeSingleTask.status,
+      activeSingleTask.updated_at
+    ].join("|");
+    if (singleTaskSyncKeyRef.current === syncKey) {
+      return;
+    }
+    singleTaskSyncKeyRef.current = syncKey;
+
+    if (activeSingleTask.status === "failed") {
+      setErrorMessage(activeSingleTask.error_message ?? "这条内容提炼失败，可以在任务中重试。");
+      setStatus(activeSourceUrlRef.current ? "parsed" : "error");
+      void refreshLibraryItems();
+      return;
+    }
+    if (activeSingleTask.status === "cancelled") {
+      setErrorMessage("这条内容的提炼任务已取消，已完成的结果仍会保留。");
+      setStatus(activeSourceUrlRef.current ? "parsed" : "idle");
+      void refreshLibraryItems();
+      return;
+    }
+    if (!activeSingleTask.video_id) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await apiClient.getLibraryDetail(activeSingleTask.video_id!);
+        if (!isControllerMountedRef.current) {
+          return;
+        }
+        setDetail(response);
+        setUrl(response.source_url);
+        setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
+        setActiveTab("summary");
+        setStatus("parsed");
+        if (activeSingleTask.status === "succeeded") {
+          setErrorMessage(null);
+        }
+        await refreshLibraryItems();
+      } catch (error) {
+        if (activeSingleTask.status === "succeeded") {
+          setErrorMessage(
+            error instanceof Error ? error.message : "任务已完成，但结果暂时无法打开。"
+          );
+        }
+      }
+    })();
+  }, [
+    activeSingleTask?.error_message,
+    activeSingleTask?.stage,
+    activeSingleTask?.status,
+    activeSingleTask?.task_id,
+    activeSingleTask?.updated_at,
+    activeSingleTask?.video_id,
+    refreshLibraryItems,
+    setSummaryGenerationMeta
+  ]);
+  const taskMatchesDetail = (task: typeof activeSingleTask): boolean =>
+    Boolean(
+      task &&
+        activeDetail &&
+        (task.video_id === activeDetail.video.video_id ||
+          (isParseResponse(activeDetail) && task.source_url === activeDetail.source_url))
+    );
+  const activeBatchDetailTask =
+    taskWorkspace.activeBatch?.items.find((task) => taskMatchesDetail(task)) ?? null;
+  const activePersistentDetailTask = taskMatchesDetail(activeSingleTask)
+    ? activeSingleTask
+    : activeBatchDetailTask;
+  useEffect(() => {
+    if (!activeBatchDetailTask?.video_id) return;
+
+    const syncKey = [
+      activeBatchDetailTask.task_id,
+      activeBatchDetailTask.stage,
+      activeBatchDetailTask.status,
+      activeBatchDetailTask.updated_at
+    ].join("|");
+    if (batchTaskSyncKeyRef.current === syncKey) return;
+    batchTaskSyncKeyRef.current = syncKey;
+
+    void (async () => {
+      try {
+        const response = await apiClient.getLibraryDetail(activeBatchDetailTask.video_id!);
+        if (!isControllerMountedRef.current) return;
+        setDetail(response);
+        setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
+        if (activeBatchDetailTask.status === "succeeded") {
+          setErrorMessage(null);
+          await refreshLibraryItems();
+        }
+      } catch (error) {
+        if (activeBatchDetailTask.status === "succeeded") {
+          setErrorMessage(
+            error instanceof Error ? error.message : "任务已完成，但最新结果暂时无法打开。"
+          );
+        }
+      }
+    })();
+  }, [
+    activeBatchDetailTask?.stage,
+    activeBatchDetailTask?.status,
+    activeBatchDetailTask?.task_id,
+    activeBatchDetailTask?.updated_at,
+    activeBatchDetailTask?.video_id,
+    refreshLibraryItems,
+    setSummaryGenerationMeta
+  ]);
+  const isPersistentDetailTaskActive = Boolean(
+    activePersistentDetailTask &&
+      ["queued", "running", "waiting_retry"].includes(activePersistentDetailTask.status)
+  );
   const isCurrentDetailSummarizing = Boolean(
-    activeSummaryTask?.status === "running"
+    activeSummaryTask?.status === "running" ||
+      (isPersistentDetailTaskActive && activePersistentDetailTask?.stage === "summarize")
   );
   const isCurrentDetailTranscribing = Boolean(
-    activeTranscribeTask?.status === "running"
+    activeTranscribeTask?.status === "running" ||
+      (isPersistentDetailTaskActive &&
+        activePersistentDetailTask &&
+        ["download", "recognize", "correct"].includes(activePersistentDetailTask.stage))
   );
   const activeSummaryErrorMessage =
     activeSummaryTask?.status === "error"
       ? (activeSummaryTask.errorMessage ?? null)
-      : summaryErrorMessage;
+      : activePersistentDetailTask?.status === "failed" &&
+          activePersistentDetailTask.stage === "summarize"
+        ? (activePersistentDetailTask.error_message ?? "总结生成失败，可以在任务中重试。")
+        : summaryErrorMessage;
   const activeTranscribeErrorMessage =
     activeTranscribeTask?.status === "error"
       ? (activeTranscribeTask.errorMessage ?? null)
-      : null;
+      : activePersistentDetailTask?.status === "failed"
+        ? (activePersistentDetailTask.error_message ?? null)
+        : null;
   const hasUsableContentText = Boolean(
     activeDetail?.video.has_transcript &&
       activeDetail?.transcript?.plain_text.trim()
@@ -287,101 +413,24 @@ export function useWorkbenchController() {
       return;
     }
 
-    const runningSameUrlTask = parseTasks.some(
-      (task) => task.sourceUrl === trimmedUrl && task.status === "running"
-    );
-    if (runningSameUrlTask) {
+    if (isParsing) {
       return;
     }
 
-    const taskId = `${Date.now()}-parse`;
     setErrorMessage(null);
     setSummaryErrorMessage(null);
     setSummaryGenerationMeta(null);
     setLoadingDemoId(null);
-    setParseTasks((currentTasks) => [
-      {
-        id: taskId,
-        kind: "parse",
-        sourceUrl: trimmedUrl,
-        title: trimmedUrl,
-        status: "running",
-        startedAt: Date.now()
-      },
-      ...currentTasks.filter((task) => task.sourceUrl !== trimmedUrl)
-    ]);
+    setActiveDemoId(null);
+    setStatus(detail ? "parsed" : "loading");
 
     try {
-      const response = await apiClient.parseVideo(trimmedUrl);
-      const shouldAutoSummarize = shouldAutoSummarizeDetail(response);
-      const taskMessage = shouldAutoSummarize
-        ? response.is_from_cache
-          ? "已打开本地历史逐字稿，正在继续生成总结。"
-          : "完整逐字稿已解析，正在继续生成总结。"
-        : response.is_from_cache
-          ? "已从本地历史缓存打开解析结果。"
-          : "媒体元数据已解析并写入最近解析。";
-
-      setParseTasks((currentTasks) =>
-        currentTasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                finishedAt: Date.now(),
-                message: taskMessage,
-                status: "success",
-                title: response.video.title || task.title
-              }
-            : task
-        )
-      );
-
-      setDetail((currentDetail) => {
-        const currentInputUrl = inputUrlRef.current.trim();
-        const shouldOpenResult =
-          currentInputUrl === trimmedUrl ||
-          (currentDetail
-            ? isParseResponse(currentDetail)
-              ? currentDetail.source_url === trimmedUrl
-              : currentDetail.video.url === trimmedUrl
-            : false);
-
-        return shouldOpenResult ? response : currentDetail;
-      });
-      if (
-        inputUrlRef.current.trim() === trimmedUrl ||
-        activeSourceUrlRef.current === trimmedUrl
-      ) {
-        setActiveDemoId(null);
-        setUrl(response.source_url);
-        setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
-        setActiveTab("summary");
-        setStatus("parsed");
-        window.scrollTo({ behavior: "auto", left: 0, top: 0 });
-      }
-      void refreshLibraryItems();
-      if (shouldAutoSummarize) {
-        void runSummaryForDetail(response);
-      }
+      await taskWorkspace.submitSingle(trimmedUrl);
     } catch (error) {
-      const errorText =
-        error instanceof Error ? error.message : "解析失败，请稍后重试。";
-      setParseTasks((currentTasks) =>
-        currentTasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                errorMessage: errorText,
-                finishedAt: Date.now(),
-                status: "error"
-              }
-            : task
-        )
+      setStatus(activeSourceUrlRef.current ? "parsed" : "error");
+      setErrorMessage(
+        error instanceof Error ? error.message : "提炼任务提交失败，请稍后重试。"
       );
-      if (inputUrlRef.current.trim() === trimmedUrl) {
-        setStatus(activeSourceUrlRef.current ? "parsed" : "error");
-        setErrorMessage(errorText);
-      }
     }
   };
 
@@ -537,7 +586,7 @@ export function useWorkbenchController() {
     });
   };
 
-  const visibleTasks = [...parseTasks, ...summaryTasks, ...transcribeTasks]
+  const visibleTasks = [...summaryTasks, ...transcribeTasks]
     .filter((task) => !hiddenTaskIds.has(task.id))
     .sort((leftTask, rightTask) => rightTask.startedAt - leftTask.startedAt);
   const isLibraryActionBusy = Boolean(
@@ -621,6 +670,7 @@ export function useWorkbenchController() {
           onTranscribe: handleTranscribeRequest
         },
         detail: activeDetail,
+        onBack: handleGoHome,
         urlInputProps: {
           errorMessage,
           isParsing,
@@ -666,6 +716,7 @@ export function useWorkbenchController() {
       isOpen: taskWorkspace.isDialogOpen,
       isSubmitting: taskWorkspace.isSubmitting,
       sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,
+      correctionAvailable: asrStatus?.correction_available ?? false,
       onClose: taskWorkspace.closeDialog,
       onSubmit: async (...args: Parameters<typeof taskWorkspace.submitBatch>) => {
         await taskWorkspace.submitBatch(...args);
@@ -679,7 +730,7 @@ export function useWorkbenchController() {
       if (firstBatchId) void taskWorkspace.openBatch(firstBatchId);
       else taskWorkspace.openDialog();
     },
-    isHomeWorkspaceReady: areDemosReady && !isLibraryLoading,
+    isHomeWorkspaceReady: areDemosReady,
     onHomeClick: () => {
       taskWorkspace.closeWorkspace();
       handleGoHome();

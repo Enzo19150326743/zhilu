@@ -131,6 +131,13 @@ export function RecentLibrary({
           最近档案
         </h2>
         <div className="flex items-center gap-2">
+          <IconActionButton
+            disabled={!canUseCollectionActions}
+            icon={RefreshCw}
+            isSpinning={isRefreshing}
+            label="刷新最近档案"
+            onClick={onRefresh}
+          />
           {totalItems > 0 ? (
             <IconActionButton
               disabled={!canUseCollectionActions || isRefreshing}
@@ -140,13 +147,6 @@ export function RecentLibrary({
               onClick={onClearAll}
             />
           ) : null}
-          <IconActionButton
-            disabled={!canUseCollectionActions}
-            icon={RefreshCw}
-            isSpinning={isRefreshing}
-            label="刷新最近档案"
-            onClick={onRefresh}
-          />
         </div>
       </div>
 
@@ -180,7 +180,7 @@ export function RecentLibrary({
           <div className="grid grid-cols-[minmax(0,1fr)_84px] items-center gap-4 border-y-2 border-[var(--line-ink)] py-2.5 sm:grid-cols-[minmax(0,1fr)_104px_92px_86px_84px]">
             {["内容", "来源", "状态", "时间", "操作"].map((label, index) => (
               <span
-                className={`text-xs font-semibold text-[var(--muted)] ${index > 0 && index < 4 ? "hidden sm:block" : ""}`}
+                className={`text-xs font-semibold text-[var(--muted)] ${index > 0 && index < 4 ? "hidden sm:block" : ""} ${[1, 2, 3, 4].includes(index) ? "text-center" : ""}`}
                 key={label}
               >
                 {label}
@@ -216,7 +216,7 @@ export function RecentLibrary({
           <div className="grid grid-cols-[minmax(0,1fr)_84px] items-center gap-4 border-y-2 border-[var(--line-ink)] py-2.5 sm:grid-cols-[minmax(0,1fr)_104px_92px_86px_84px]">
             {["内容", "来源", "状态", "时间", "操作"].map((label, index) => (
               <span
-                className={`text-xs font-semibold text-[var(--muted)] ${index > 0 && index < 4 ? "hidden sm:block" : ""}`}
+                className={`text-xs font-semibold text-[var(--muted)] ${index > 0 && index < 4 ? "hidden sm:block" : ""} ${[1, 2, 3, 4].includes(index) ? "text-center" : ""}`}
                 key={label}
               >
                 {label}
@@ -258,10 +258,10 @@ export function RecentLibrary({
                       </span>
                     </span>
                   </button>
-                  <span className="hidden truncate text-xs text-[var(--muted)] sm:block">
+                  <span className="hidden truncate text-center text-xs text-[var(--muted)] sm:block">
                     {isPodcastMedia(item) ? "小宇宙" : getPlatformLabel(item.platform)}
                   </span>
-                  <span className="hidden truncate text-xs font-medium text-[var(--ink-soft)] sm:block">
+                  <span className="hidden truncate text-center text-xs font-medium text-[var(--ink-soft)] sm:block">
                     {isLoadingItem ? (
                       <Loader2
                         aria-label="正在打开档案"
@@ -274,10 +274,10 @@ export function RecentLibrary({
                       )
                     )}
                   </span>
-                  <span className="hidden truncate text-[11px] text-[var(--muted)] sm:block">
+                  <span className="hidden truncate text-center text-[11px] text-[var(--muted)] sm:block">
                     {formatLibraryUpdatedAt(item.updated_at)}
                   </span>
-                  <div className="flex w-[84px] items-center justify-end gap-2 opacity-75 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <div className="flex w-[84px] items-center justify-center gap-2 opacity-75 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                     <IconActionButton
                       disabled={disabled || isClearing || isDeleting}
                       icon={isCopied ? Check : Copy}

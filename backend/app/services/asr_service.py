@@ -173,7 +173,7 @@ def prepare_transcription_media(
 def recognize_transcription_media(
     prepared: PreparedTranscriptionMedia,
     *,
-    asr_engine: str = "local_whisper",
+    asr_engine: str = "sensevoice_small",
     transcriber: AudioTranscriber | None = None,
 ) -> RecognizedTranscription:
     """只执行本地识别，不进行网络校对。"""
@@ -232,7 +232,7 @@ def finalize_transcription(
     media_type: str | None = None,
     context_settings: TranscribeContextSettings | None = None,
     shownotes_plain_text: str | None = None,
-    asr_engine: str = "local_whisper",
+    asr_engine: str = "sensevoice_small",
 ) -> TranscribeResponse:
     """基于已保存的原始识别结果执行上下文合并和校对。"""
     started_at = monotonic()
@@ -304,7 +304,7 @@ def transcribe_media_audio(
     media_type: str | None = None,
     context_settings: TranscribeContextSettings | None = None,
     shownotes_plain_text: str | None = None,
-    asr_engine: str = "local_whisper",
+    asr_engine: str = "sensevoice_small",
 ) -> TranscribeResponse:
     """
     下载公开视频音频并按用户选择使用本地 Whisper 或 SenseVoice。

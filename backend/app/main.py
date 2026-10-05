@@ -322,9 +322,7 @@ def get_asr_status() -> AsrStatusResponse:
     sensevoice_available, sensevoice_message = get_sensevoice_status()
     correction_available, correction_message = get_transcript_correction_status()
     return AsrStatusResponse(
-        recommended_engine=(
-            "sensevoice_small" if sensevoice_available else "local_whisper"
-        ),
+        recommended_engine="sensevoice_small",
         whisper_model=(
             os.getenv("ASR_WHISPER_MODEL", "").strip() or DEFAULT_ASR_MODEL
         ),
@@ -610,7 +608,7 @@ def update_library_note_draft(
     note_draft_request: NoteDraftUpdateRequest,
 ) -> NoteDraftUpdateResponse:
     """
-    保存当前媒体的摘录草稿到本地历史记录。
+    保存当前媒体的“我的整理”到本地历史记录。
     """
     source_url = normalize_public_video_url(note_draft_request.source_url)
     note_draft = NoteDraft(
@@ -629,7 +627,7 @@ def update_library_note_draft(
             detail={
                 "success": False,
                 "error_code": "NOTE_DRAFT_SAVE_FAILED",
-                "message": "摘录草稿保存失败，请稍后重试。",
+                "message": "我的整理保存失败，请稍后重试。",
             },
         ) from error
 
@@ -639,7 +637,7 @@ def update_library_note_draft(
             detail={
                 "success": False,
                 "error_code": "LIBRARY_ITEM_NOT_FOUND",
-                "message": "没有找到可保存摘录的本地历史记录。",
+                "message": "没有找到可保存整理内容的本地历史记录。",
             },
         )
 

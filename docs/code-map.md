@@ -101,12 +101,13 @@ ai-video-insight-workspace/
 - `frontend/components/RecentLibrary.tsx`：最近解析列表、本地历史打开、删除、清空、加载更多。
 - `frontend/components/VideoPreviewCard.tsx`：媒体预览卡片。
 - `frontend/components/FormatSelector.tsx`：格式列表和下载入口。
-- `frontend/components/AiTabs.tsx`：总结、导图、问答、原文 Tab 容器。
-- `frontend/components/SummaryTab.tsx`：结构化总结展示。
+- `frontend/components/AiTabs.tsx`：总结、导图、问答、原文 Tab 容器；持有共享的“我的整理”状态和稳定导出入口。
+- `frontend/components/SummaryTab.tsx`：结构化总结、观点原文依据预览／固定面板和就地追问入口。
 - `frontend/components/SafeMarkdown.tsx`：结构化分析使用的安全轻量 Markdown 渲染。
 - `frontend/components/MindmapTab.tsx`：markmap 树状导图展示。
 - `frontend/components/QaTab.tsx`：内容问答。
-- `frontend/components/TranscriptTab.tsx`：内容文本、平台字幕、Shownotes、AI 转写稿和导出。
+- `frontend/components/TranscriptTab.tsx`：内容文本、平台字幕、Shownotes、AI 转写稿和“我的整理”。
+- `frontend/components/TranscriptNoteWorkflow.tsx`：我的整理、AI 候选、编辑与保存状态展示。
 - `frontend/components/TranscribeRequiredState.tsx`：总结、导图、问答和内容文本缺少真实转写稿时共用的生成入口。
 - `frontend/components/TranscribeSettingsPanel.tsx`：生成转写稿前的节目结构、内容标签和说话人辅助设置。
 - `frontend/components/TranscribeSettingsDialog.tsx`：所有生成 AI 转写稿入口共用的转写设置确认弹窗。
@@ -116,6 +117,8 @@ ai-video-insight-workspace/
 - `frontend/components/Header.tsx`：顶部导航和品牌区。
 - `frontend/hooks/use-library-processing-workflows.ts`：转写与自动总结期间的统一“处理中”标记、当前标签页刷新恢复和会话清理。
 - `frontend/hooks/use-task-workspace.ts`：批次提交、服务端快照轮询、URL 恢复和单项操作。
+- `frontend/hooks/use-workbench-controller.ts`：首页、详情和任务的主控制器；默认单条提炼提交持久任务并随 `video_id` 打开详情。
+- `frontend/hooks/use-transcript-note-workflow.ts`：我的整理的单一前端状态、自动保存、立即导出一致性和 Markdown 下载。
 
 ## 后端入口
 
@@ -143,6 +146,7 @@ ai-video-insight-workspace/
 - `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；生产 Whisper 目前保持中性解码。
 - `backend/app/services/correction_term_service.py`：本地 AI 校对术语库、文件夹、一次性旧词迁移和使用统计。
 - `backend/app/services/transcript_correction_service.py`：DeepSeek ASR 转写稿自动校对，失败时回退原始稿。
+- `backend/app/services/transcript_identity_service.py`：当前有效转写稿指纹、稳定片段标识和总结证据关联。
 - `backend/app/services/summarize_service.py`：DeepSeek 结构化总结和本地 fallback。
 - `backend/app/services/qa_service.py`：内容文本问答和本地 fallback。
 - `backend/app/services/deepseek_client.py`：DeepSeek OpenAI-compatible 客户端。
