@@ -82,11 +82,11 @@ export function useWorkbenchController() {
     () => new Set()
   );
   const activeSourceUrlRef = useRef<string | null>(null);
-  const inputUrlRef = useRef("");
   const isControllerMountedRef = useRef(true);
   const restoredRecoveryVideoIdsRef = useRef<Set<string>>(new Set());
   const batchTaskSyncKeyRef = useRef("");
   const singleTaskSyncKeyRef = useRef("");
+  const submissionInFlightRef = useRef(false);
 
   const activeDetail =
     detail && (status === "parsed" || status === "loading") ? detail : null;
@@ -96,24 +96,21 @@ export function useWorkbenchController() {
       : null;
   const activeSourceUrl =
     activeDetail && isParseResponse(activeDetail) ? activeDetail.source_url : null;
-  const trimmedInputUrl = url.trim();
   const activeSingleTask = taskWorkspace.activeSingleBatch?.items[0] ?? null;
-  const isParsing = Boolean(
-    taskWorkspace.isSubmitting ||
-      (activeSingleTask &&
-        !["succeeded", "failed", "cancelled"].includes(activeSingleTask.status))
-  );
+  const isSubmitting = taskWorkspace.isSubmitting;
+  const activeVideoIdsKey = taskWorkspace.activeVideoIds.join("|");
+  const observedActiveVideoIdsRef = useRef(activeVideoIdsKey);
+  useEffect(() => {
+    if (observedActiveVideoIdsRef.current === activeVideoIdsKey) return;
+    observedActiveVideoIdsRef.current = activeVideoIdsKey;
+    void refreshLibraryItems();
+  }, [activeVideoIdsKey, refreshLibraryItems]);
   useEffect(() => {
     activeSourceUrlRef.current = activeSourceUrl;
   }, [activeSourceUrl]);
 
-  useEffect(() => {
-    inputUrlRef.current = url;
-  }, [url]);
-
   const isTaskSourceActive = (sourceUrl: string): boolean =>
-    activeSourceUrlRef.current === sourceUrl ||
-    inputUrlRef.current.trim() === sourceUrl;
+    activeSourceUrlRef.current === sourceUrl;
   const {
     activeSummaryTask,
     runSummaryForDetail,
@@ -246,45 +243,50 @@ export function useWorkbenchController() {
     }
     singleTaskSyncKeyRef.current = syncKey;
 
+    void refreshLibraryItems();
+    const isTaskRelevant = () => activeSourceUrlRef.current === activeSingleTask.source_url;
+    if (!isTaskRelevant()) {
+      return;
+    }
+
     if (activeSingleTask.status === "failed") {
       setErrorMessage(activeSingleTask.error_message ?? "这条内容提炼失败，可以在任务中重试。");
-      setStatus(activeSourceUrlRef.current ? "parsed" : "error");
-      void refreshLibraryItems();
       return;
     }
     if (activeSingleTask.status === "cancelled") {
       setErrorMessage("这条内容的提炼任务已取消，已完成的结果仍会保留。");
-      setStatus(activeSourceUrlRef.current ? "parsed" : "idle");
-      void refreshLibraryItems();
       return;
     }
     if (!activeSingleTask.video_id) {
       return;
     }
 
+    let cancelled = false;
     void (async () => {
       try {
         const response = await apiClient.getLibraryDetail(activeSingleTask.video_id!);
-        if (!isControllerMountedRef.current) {
+        if (cancelled || !isControllerMountedRef.current || !isTaskRelevant()) {
           return;
         }
-        setDetail(response);
-        setUrl(response.source_url);
+        // 后台结果只刷新用户正在查看的同一篇内容，不承担页面导航。
+        setDetail((currentDetail) =>
+          currentDetail?.video.video_id === activeSingleTask.video_id ? response : currentDetail
+        );
         setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
-        setActiveTab("summary");
-        setStatus("parsed");
         if (activeSingleTask.status === "succeeded") {
           setErrorMessage(null);
         }
-        await refreshLibraryItems();
       } catch (error) {
-        if (activeSingleTask.status === "succeeded") {
+        if (!cancelled && isTaskRelevant() && activeSingleTask.status === "succeeded") {
           setErrorMessage(
             error instanceof Error ? error.message : "任务已完成，但结果暂时无法打开。"
           );
         }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [
     activeSingleTask?.error_message,
     activeSingleTask?.stage,
@@ -319,24 +321,38 @@ export function useWorkbenchController() {
     if (batchTaskSyncKeyRef.current === syncKey) return;
     batchTaskSyncKeyRef.current = syncKey;
 
+    let cancelled = false;
     void (async () => {
       try {
         const response = await apiClient.getLibraryDetail(activeBatchDetailTask.video_id!);
-        if (!isControllerMountedRef.current) return;
-        setDetail(response);
+        if (
+          cancelled ||
+          !isControllerMountedRef.current ||
+          activeSourceUrlRef.current !== response.source_url
+        ) return;
+        setDetail((currentDetail) =>
+          currentDetail?.video.video_id === activeBatchDetailTask.video_id ? response : currentDetail
+        );
         setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
         if (activeBatchDetailTask.status === "succeeded") {
           setErrorMessage(null);
           await refreshLibraryItems();
         }
       } catch (error) {
-        if (activeBatchDetailTask.status === "succeeded") {
+        if (
+          !cancelled &&
+          activeSourceUrlRef.current === activeBatchDetailTask.source_url &&
+          activeBatchDetailTask.status === "succeeded"
+        ) {
           setErrorMessage(
             error instanceof Error ? error.message : "任务已完成，但最新结果暂时无法打开。"
           );
         }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [
     activeBatchDetailTask?.stage,
     activeBatchDetailTask?.status,
@@ -413,24 +429,23 @@ export function useWorkbenchController() {
       return;
     }
 
-    if (isParsing) {
+    if (isSubmitting || submissionInFlightRef.current) {
       return;
     }
 
+    submissionInFlightRef.current = true;
     setErrorMessage(null);
-    setSummaryErrorMessage(null);
-    setSummaryGenerationMeta(null);
-    setLoadingDemoId(null);
-    setActiveDemoId(null);
-    setStatus(detail ? "parsed" : "loading");
 
     try {
       await taskWorkspace.submitSingle(trimmedUrl);
+      // 只清空本次已提交的内容，保留请求期间用户填写的下一条链接。
+      setUrl((currentUrl) => currentUrl.trim() === trimmedUrl ? "" : currentUrl);
     } catch (error) {
-      setStatus(activeSourceUrlRef.current ? "parsed" : "error");
       setErrorMessage(
         error instanceof Error ? error.message : "提炼任务提交失败，请稍后重试。"
       );
+    } finally {
+      submissionInFlightRef.current = false;
     }
   };
 
@@ -627,7 +642,7 @@ export function useWorkbenchController() {
     heroProps: {
       demos,
       errorMessage,
-      isParsing,
+      isSubmitting,
       loadingDemoId,
       url,
       onAnalyze: handleAnalyze,
@@ -673,7 +688,7 @@ export function useWorkbenchController() {
         onBack: handleGoHome,
         urlInputProps: {
           errorMessage,
-          isParsing,
+          isSubmitting,
           value: url,
           onAnalyze: handleAnalyze,
           onBatchAdd: taskWorkspace.openDialog,

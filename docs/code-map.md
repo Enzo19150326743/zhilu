@@ -117,7 +117,7 @@ ai-video-insight-workspace/
 - `frontend/components/Header.tsx`：顶部导航和品牌区。
 - `frontend/hooks/use-library-processing-workflows.ts`：转写与自动总结期间的统一“处理中”标记、当前标签页刷新恢复和会话清理。
 - `frontend/hooks/use-task-workspace.ts`：批次提交、服务端快照轮询、URL 恢复和单项操作。
-- `frontend/hooks/use-workbench-controller.ts`：首页、详情和任务的主控制器；默认单条提炼提交持久任务并随 `video_id` 打开详情。
+- `frontend/hooks/use-workbench-controller.ts`：首页、详情和任务的主控制器；单条提炼提交持久任务后在后台执行，仅同步用户当前查看的内容，不自动切换详情。
 - `frontend/hooks/use-transcript-note-workflow.ts`：我的整理的单一前端状态、自动保存、立即导出一致性和 Markdown 下载。
 
 ## 后端入口

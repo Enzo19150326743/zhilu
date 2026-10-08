@@ -22,9 +22,12 @@ export function useTaskWorkspace() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(() => new Set());
   const requestIdRef = useRef(createRequestId());
+  const listRequestVersionRef = useRef(0);
 
   const refreshList = useCallback(async () => {
+    const requestVersion = ++listRequestVersionRef.current;
     const response = await apiClient.getTaskBatches();
+    if (requestVersion !== listRequestVersionRef.current) return;
     setRecentBatches(response.batches ?? []);
     setActiveTaskCount(response.active_task_count ?? 0);
     setActiveVideoIds(response.active_video_ids ?? []);
@@ -139,7 +142,7 @@ export function useTaskWorkspace() {
       url.searchParams.set("batch", response.batch_id);
       window.history.replaceState(null, "", url);
       requestIdRef.current = createRequestId();
-      await refreshList().catch(() => undefined);
+      void refreshList().catch(() => undefined);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "批次提交失败，请稍后重试。");
       throw error;
@@ -164,7 +167,7 @@ export function useTaskWorkspace() {
       });
       setActiveSingleBatch(response);
       setIsWorkspaceOpen(false);
-      await refreshList().catch(() => undefined);
+      void refreshList().catch(() => undefined);
       return response;
     } catch (error) {
       setErrorMessage(

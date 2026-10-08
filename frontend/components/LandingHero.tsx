@@ -5,7 +5,7 @@ import type { DemoItem } from "@/lib/types";
 interface LandingHeroProps {
   demos: DemoItem[];
   errorMessage: string | null;
-  isParsing: boolean;
+  isSubmitting: boolean;
   loadingDemoId: string | null;
   url: string;
   onAnalyze: () => void;
@@ -94,7 +94,7 @@ function RecommendationDeck({
 export function LandingHero({
   demos,
   errorMessage,
-  isParsing,
+  isSubmitting,
   loadingDemoId,
   url,
   onAnalyze,
@@ -138,16 +138,16 @@ export function LandingHero({
               </div>
               <button
                 className="inline-flex min-h-[54px] shrink-0 cursor-pointer items-center justify-center gap-2 border-l border-[var(--line)] bg-[var(--accent)] px-5 text-sm font-bold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
-                disabled={isParsing || !url.trim()}
+                disabled={isSubmitting || !url.trim()}
                 type="button"
                 onClick={onAnalyze}
               >
-                {isParsing ? (
+                {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
                   <Search className="h-4 w-4" aria-hidden="true" />
                 )}
-                {isParsing ? "提炼中" : "提炼内容"}
+                {isSubmitting ? "提交中" : "提炼内容"}
               </button>
             </div>
 

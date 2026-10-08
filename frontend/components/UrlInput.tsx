@@ -1,7 +1,7 @@
 import { Link2, Loader2 } from "lucide-react";
 
 interface UrlInputProps {
-  isParsing: boolean;
+  isSubmitting: boolean;
   value: string;
   errorMessage: string | null;
   onAnalyze: () => void;
@@ -10,7 +10,7 @@ interface UrlInputProps {
 }
 
 export function UrlInput({
-  isParsing,
+  isSubmitting,
   value,
   errorMessage,
   onAnalyze,
@@ -45,13 +45,13 @@ export function UrlInput({
 
           <button
             className="inline-flex min-h-12 shrink-0 cursor-pointer items-center justify-center gap-2 border-l border-[var(--line)] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] active:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
-            disabled={isParsing || !value.trim()}
+            disabled={isSubmitting || !value.trim()}
             type="submit"
           >
-            {isParsing ? (
+            {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : null}
-            {isParsing ? "提炼中" : "提炼内容"}
+            {isSubmitting ? "提交中" : "提炼内容"}
           </button>
         </form>
 

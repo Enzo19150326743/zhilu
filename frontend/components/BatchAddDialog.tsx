@@ -80,13 +80,17 @@ export function BatchAddDialog({
         视频链接
       </label>
       <textarea
+        aria-describedby="batch-input-help"
         className="mt-2 min-h-52 w-full resize-y border-2 border-[var(--line-ink)] bg-[var(--paper)] p-3 text-sm leading-6 outline-none focus:border-[var(--accent)]"
         data-dialog-initial-focus
         id="batch-input"
-        placeholder="每行一条，或直接粘贴多行分享文案"
+        placeholder="多条链接用换行、空格或分号分隔，也可直接粘贴分享文案"
         value={value}
         onChange={(event) => setValue(event.target.value)}
       />
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]" id="batch-input-help">
+        不必每条换行；用换行、空格或分号隔开，系统会自动提取链接并去重。
+      </p>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--muted)]">
         <span>有效 {result.urls.length} 条</span>
         {result.duplicateCount ? <span>重复 {result.duplicateCount} 条（已折叠）</span> : null}
