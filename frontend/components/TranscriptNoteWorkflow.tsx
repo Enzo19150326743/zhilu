@@ -80,8 +80,8 @@ export function TranscriptNoteWorkflow({
   };
 
   return (
-    <aside className="min-w-0 rounded-lg border border-[var(--line)] bg-[var(--paper-raised)] shadow-[0_12px_30px_rgba(54,45,32,0.08)] lg:sticky lg:top-[9rem] lg:flex lg:max-h-[calc(100dvh-10rem)] lg:flex-col lg:overflow-hidden">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--line)] p-4">
+    <aside className="min-w-0 rounded-[2px] border border-[var(--line-strong)] border-t-2 border-t-[var(--line-ink)] bg-[var(--paper-raised)] lg:sticky lg:top-[9rem] lg:flex lg:max-h-[calc(100dvh-10rem)] lg:flex-col lg:overflow-hidden">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--line-strong)] bg-[var(--paper)] p-4">
         <div>
           <h3 className="text-base font-semibold text-[var(--ink)]">
             我的整理

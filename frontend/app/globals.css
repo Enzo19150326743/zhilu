@@ -19,10 +19,10 @@
   --line: #e2daca;
   --line-strong: #cfc5b0;
   --line-ink: #211d17;
-  --shadow-hard-sm: 0 6px 18px rgba(54, 45, 32, 0.08);
-  --shadow-hard-md: 0 10px 28px rgba(54, 45, 32, 0.1);
-  --shadow-hard-lg: 0 16px 42px rgba(54, 45, 32, 0.1);
-  --shadow-hard-accent: 0 8px 24px rgba(209, 75, 49, 0.14);
+  --shadow-hard-sm: 2px 2px 0 var(--ink);
+  --shadow-hard-md: 4px 4px 0 var(--ink);
+  --shadow-hard-lg: 6px 6px 0 var(--ink);
+  --shadow-hard-accent: 3px 3px 0 var(--accent);
   --font-ui:
     "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC",
     "Noto Sans CJK SC", sans-serif;
@@ -128,7 +128,7 @@ input.focus-subtle:focus-visible {
   box-shadow: var(--shadow-hard-accent);
 }
 
-/* 兼容旧组件名：统一为轻量按压反馈。 */
+/* 主操作以硬边与短距离按压反馈建立层级。 */
 .ink-block {
   border: 2px solid var(--line-ink);
   box-shadow: var(--shadow-hard-sm);
@@ -138,21 +138,20 @@ input.focus-subtle:focus-visible {
     background-color 120ms ease;
 }
 
-.ink-block:hover {
-  box-shadow: 0 4px 12px rgba(54, 45, 32, 0.12);
-  transform: translateY(-1px);
+.ink-block:hover:not(:disabled) {
+  box-shadow: 1px 1px 0 var(--ink);
+  transform: translate(1px, 1px);
 }
 
-.ink-block:active {
+.ink-block:active:not(:disabled) {
   box-shadow: none;
-  transform: translateY(0);
+  transform: translate(2px, 2px);
 }
 
 .editorial-enter {
   opacity: 0;
-  filter: blur(4px);
   transform: translateY(12px);
-  animation: editorial-enter 520ms cubic-bezier(0.2, 0, 0, 1) forwards;
+  animation: editorial-enter 240ms cubic-bezier(0.2, 0, 0, 1) forwards;
 }
 
 .editorial-enter-delay-1 {
@@ -180,7 +179,6 @@ input.focus-subtle:focus-visible {
 @keyframes editorial-enter {
   to {
     opacity: 1;
-    filter: blur(0);
     transform: translateY(0);
   }
 }

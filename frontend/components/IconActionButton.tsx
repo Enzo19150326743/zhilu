@@ -39,7 +39,7 @@ export function IconActionButton({
       <button
         aria-label={ariaLabel ?? label}
         aria-pressed={pressed || undefined}
-        className={`inline-flex h-9 w-9 items-center justify-center rounded-[2px] border-2 border-[var(--line-ink)] shadow-[2px_2px_0_0_var(--ink)] transition-[box-shadow,transform,background-color,color] duration-150 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_0_var(--ink)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[2px_2px_0_0_var(--ink)] ${toneClass}`}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-[2px] border border-[var(--line-strong)] transition-[border-color,background-color,color] duration-150 hover:border-[var(--line-ink)] disabled:cursor-not-allowed disabled:opacity-45 ${toneClass}`}
         disabled={disabled}
         type="button"
         onClick={onClick}

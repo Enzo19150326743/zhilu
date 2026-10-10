@@ -111,11 +111,11 @@ export function AiTabs({
   };
 
   return (
-    <section className="min-w-0 rounded-[10px] border border-[var(--line)] bg-[var(--paper-raised)] p-4 shadow-[0_14px_40px_rgba(54,45,32,0.07)] sm:p-7">
-      <div className="sticky top-[4.75rem] z-20 -mx-4 -mt-4 flex items-end gap-3 border-b border-[var(--line)] bg-[var(--paper-raised)] px-4 pb-3 pt-4 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pt-5">
+    <section className="min-w-0 rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] p-4 sm:p-7">
+      <div className="sticky top-[4.75rem] z-20 -mx-4 -mt-4 flex items-end gap-3 border-b-2 border-[var(--line-ink)] bg-[var(--paper)] px-4 pb-3 pt-4 sm:-mx-7 sm:-mt-7 sm:px-7 sm:pt-5">
         <div
           aria-label="知识稿内容视图"
-          className="flex min-w-0 flex-1 gap-5 overflow-x-auto"
+          className="grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex sm:gap-2 sm:overflow-x-auto"
           role="tablist"
         >
         {tabs.map((tab, tabIndex) => {
@@ -125,10 +125,10 @@ export function AiTabs({
           return (
             <button
               aria-selected={isActive}
-              className={`group inline-flex shrink-0 flex-col gap-1.5 pb-1 text-sm transition-colors duration-150 ${
+              className={`group inline-flex min-h-10 shrink-0 items-center justify-center border-2 px-2 py-2 text-sm transition-colors duration-150 sm:justify-start sm:px-3 ${
                 isActive
-                  ? "font-semibold text-[var(--ink)]"
-                  : "font-normal text-[var(--muted)] hover:text-[var(--ink)]"
+                  ? "border-[var(--ink)] bg-[var(--ink)] font-bold text-[var(--paper-raised)]"
+                  : "border-transparent font-medium text-[var(--muted-strong)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]"
               }`}
               key={tab.key}
               role="tab"
@@ -151,23 +151,16 @@ export function AiTabs({
               }}
             >
               <span className="inline-flex items-center gap-2">
-                <Icon className="h-4 w-4" aria-hidden="true" />
+                <Icon className="hidden h-4 w-4 sm:block" aria-hidden="true" />
                 {tab.label}
               </span>
-              <span
-                aria-hidden="true"
-                className={`h-[3px] w-full ${
-                  isActive
-                    ? "bg-[var(--accent)]"
-                    : "bg-transparent group-hover:bg-[var(--line-strong)]"
-                }`}
-              />
             </button>
           );
         })}
         </div>
         <button
-          className="inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-[var(--accent-deep)] active:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
+          className="ink-block inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[2px] bg-[var(--accent)] px-3 text-xs font-bold text-white hover:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
+          aria-label={noteWorkflow.isExportingNote ? "导出中" : "导出知识稿"}
           disabled={!sourceUrl || noteWorkflow.isExportingNote}
           type="button"
           onClick={() => void noteWorkflow.handleExportObsidianNote()}

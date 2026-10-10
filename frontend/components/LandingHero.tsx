@@ -1,6 +1,9 @@
-import { ArrowUpRight, FileText, Link2, Loader2, Search } from "lucide-react";
+import { ArrowUpRight, FileText, Loader2 } from "lucide-react";
 import { getDisplayThumbnailUrl } from "@/lib/media-image";
 import type { DemoItem } from "@/lib/types";
+
+import { MediaUrlForm } from "./MediaUrlForm";
+import styles from "./LandingHero.module.css";
 
 interface LandingHeroProps {
   demos: DemoItem[];
@@ -27,26 +30,26 @@ function RecommendationDeck({
 }: RecommendationDeckProps) {
   return (
     <aside className="editorial-enter editorial-enter-delay-2 min-w-0 lg:pt-2">
-      <div className="mb-3 flex items-end justify-between gap-4">
-        <h2 className="font-editorial text-xl font-bold text-[var(--ink)]">
+      <div className="flex items-end justify-between gap-4 border-2 border-b-0 border-[var(--line-ink)] bg-[var(--ink)] px-4 py-3">
+        <h2 className="font-editorial text-lg font-bold text-[var(--paper-raised)]">
           快速体验
         </h2>
       </div>
 
-      <div className="divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] bg-[var(--paper-raised)] shadow-[0_10px_28px_rgba(54,45,32,0.06)]">
+      <div className="divide-y divide-[var(--line-strong)] rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] shadow-hard-md">
         {items.slice(0, 3).map((item) => {
           const isLoading = loadingItemId === item.demo_id;
           const thumbnailUrl = getDisplayThumbnailUrl(item.thumbnail);
 
           return (
             <button
-              className="group grid min-h-[82px] w-full grid-cols-[78px_minmax(0,1fr)_24px] items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-55"
+              className="group grid min-h-[88px] w-full grid-cols-[78px_minmax(0,1fr)_24px] items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-55"
               disabled={isLoading}
               key={item.demo_id}
               type="button"
               onClick={() => onOpenItem(item.demo_id)}
             >
-              <span className="aspect-video overflow-hidden rounded-md bg-[var(--ink)]">
+              <span className="aspect-video overflow-hidden rounded-[2px] bg-[var(--ink)]">
                 {thumbnailUrl ? (
                   <img
                     alt=""
@@ -65,7 +68,7 @@ function RecommendationDeck({
                 )}
               </span>
               <span className="min-w-0">
-                <span className="font-editorial line-clamp-1 text-sm font-semibold leading-6 text-[var(--ink)] transition-colors group-hover:text-[var(--accent)]">
+                <span className="font-editorial line-clamp-2 text-sm font-semibold leading-6 text-[var(--ink)] transition-colors group-hover:text-[var(--accent)]">
                   {item.title}
                 </span>
                 <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">
@@ -103,53 +106,25 @@ export function LandingHero({
   onLoadDemo
 }: LandingHeroProps) {
   return (
-    <section className="border-b border-[var(--line)] bg-[var(--paper)]">
-      <div className="mx-auto grid max-w-[82rem] gap-8 px-4 pb-8 pt-7 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:items-start lg:gap-10 lg:px-10 lg:pb-9 lg:pt-8">
+    <section className="border-b-2 border-[var(--line-ink)] bg-[var(--paper)]">
+      <div className="mx-auto grid max-w-[90rem] gap-10 px-4 py-9 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] lg:items-start lg:gap-16 lg:px-10">
         <div className="min-w-0">
-          <h1 className="text-balance text-[clamp(2.25rem,4.2vw,3.9rem)] font-bold leading-[1.12] tracking-[-0.04em] text-[var(--ink)]">
-            把公开内容提炼成
-            <span className="text-[var(--accent)]">可编辑的知识稿</span>
+          <h1 className={styles.title}>
+            <span className={styles.lead}>把公开内容提炼成</span>
+            <span className={styles.highlight}>可编辑的知识稿</span>
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)] sm:text-base">
-            一次提交会按需提取全文、本地转写并生成总结；AI 未配置时会明确显示可用的基础结果。
+          <p className="mt-6 max-w-2xl text-sm leading-7 text-[var(--ink-soft)] sm:text-base">
+            粘贴公开链接，提取全文、生成总结，再整理成自己的知识稿。
           </p>
 
-          <div className="mt-5 max-w-[760px]">
-            <div className="flex min-h-[54px] min-w-0 items-stretch overflow-hidden rounded-lg border border-[var(--line-strong)] bg-[var(--paper-raised)] shadow-[0_10px_28px_rgba(54,45,32,0.07)] focus-within:border-[var(--accent)]">
-              <div className="relative min-w-0 flex-1">
-                <Link2
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--muted)]"
-                />
-                <input
-                  aria-label="公开媒体链接"
-                  className="min-h-[54px] w-full border-0 bg-transparent pl-11 pr-3 text-base text-[var(--ink)] outline-none placeholder:text-[#9b927f] focus-visible:outline-none disabled:cursor-not-allowed"
-                  inputMode="url"
-                  placeholder="粘贴 B 站、小红书、小宇宙或抖音公开链接"
-                  type="text"
-                  value={url}
-                  onChange={(event) => onChangeUrl(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      onAnalyze();
-                    }
-                  }}
-                />
-              </div>
-              <button
-                className="inline-flex min-h-[54px] shrink-0 cursor-pointer items-center justify-center gap-2 border-l border-[var(--line)] bg-[var(--accent)] px-5 text-sm font-bold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
-                disabled={isSubmitting || !url.trim()}
-                type="button"
-                onClick={onAnalyze}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Search className="h-4 w-4" aria-hidden="true" />
-                )}
-                {isSubmitting ? "提交中" : "提炼内容"}
-              </button>
-            </div>
+          <div className="mt-6">
+            <MediaUrlForm
+              isSubmitting={isSubmitting}
+              value={url}
+              size="large"
+              onAnalyze={onAnalyze}
+              onChange={onChangeUrl}
+            />
 
             <button
               className="mt-3 text-sm font-semibold text-[var(--muted)] underline decoration-2 underline-offset-4 hover:text-[var(--accent)]"

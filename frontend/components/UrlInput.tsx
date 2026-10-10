@@ -1,4 +1,4 @@
-import { Link2, Loader2 } from "lucide-react";
+import { MediaUrlForm } from "./MediaUrlForm";
 
 interface UrlInputProps {
   isSubmitting: boolean;
@@ -20,40 +20,12 @@ export function UrlInput({
   return (
     <section className="bg-[var(--paper)]">
       <div className="mx-auto max-w-[90rem] px-4 py-5 sm:px-6 lg:px-10">
-        <form
-          className="flex min-h-12 min-w-0 items-stretch overflow-hidden rounded-lg border border-[var(--line-strong)] bg-[var(--paper-raised)] shadow-[0_8px_24px_rgba(54,45,32,0.06)] focus-within:border-[var(--accent)]"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onAnalyze();
-          }}
-        >
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">公开媒体链接</span>
-            <Link2
-              className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--muted)]"
-              aria-hidden="true"
-            />
-            <input
-              className="focus-subtle h-full min-h-12 w-full border-0 bg-transparent pl-11 pr-4 text-sm text-[var(--ink)] outline-none placeholder:text-[#8f8675] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
-              inputMode="url"
-              type="text"
-              value={value}
-              placeholder="粘贴公开媒体链接，例如 B 站 / 小红书 / 小宇宙 / 抖音…"
-              onChange={(event) => onChange(event.target.value)}
-            />
-          </label>
-
-          <button
-            className="inline-flex min-h-12 shrink-0 cursor-pointer items-center justify-center gap-2 border-l border-[var(--line)] bg-[var(--accent)] px-5 text-sm font-semibold text-[var(--paper-raised)] transition-colors hover:bg-[var(--accent-deep)] active:bg-[var(--accent-deep)] disabled:cursor-not-allowed disabled:bg-[var(--paper-deep)] disabled:text-[var(--muted)]"
-            disabled={isSubmitting || !value.trim()}
-            type="submit"
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : null}
-            {isSubmitting ? "提交中" : "提炼内容"}
-          </button>
-        </form>
+        <MediaUrlForm
+          isSubmitting={isSubmitting}
+          value={value}
+          onAnalyze={onAnalyze}
+          onChange={onChange}
+        />
 
         {onBatchAdd ? (
           <button

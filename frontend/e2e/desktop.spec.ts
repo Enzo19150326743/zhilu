@@ -1251,7 +1251,7 @@ test("工作台链接输入框提交单条持久提炼任务", async ({ page }) 
   ).toHaveCount(0);
   const urlInput = page.getByRole("textbox", { name: "公开媒体链接" });
   const inputFrame = urlInput.locator("xpath=ancestor::form[1]");
-  await expect(inputFrame).toHaveCSS("border-top-width", "1px");
+  await expect(inputFrame).toHaveCSS("border-top-width", "2px");
   const inputFrameColor = await inputFrame.evaluate(
     (element) => getComputedStyle(element).borderTopColor
   );
@@ -1409,5 +1409,32 @@ test("工作台来源条使用紧凑缩略图并完整缩放", async ({ page }) 
   await expect(coverImage).toHaveCSS("opacity", "1");
   await expect(coverImage).toHaveCSS("filter", "none");
   await expect(page.getByText("原始标题", { exact: true })).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
+test("窄屏首页不溢出且工作台四个内容标签都可直接操作", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.setViewportSize({ width: 320, height: 812 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await page.getByRole("button", { name: "已总结演示", exact: true }).click();
+
+  for (const width of [320, 375]) {
+    await page.setViewportSize({ width, height: 812 });
+    for (const label of ["总结", "思维导图", "内容问答", "内容文本"]) {
+      const tab = page.getByRole("tab", { name: label, exact: true });
+      await expect(tab).toBeInViewport();
+      const box = await tab.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    await expect(page.getByRole("button", { name: "导出知识稿", exact: true })).toBeInViewport();
+  }
   expect(browserErrors).toEqual([]);
 });
