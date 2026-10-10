@@ -30,65 +30,67 @@ function RecommendationDeck({
 }: RecommendationDeckProps) {
   return (
     <aside className="editorial-enter editorial-enter-delay-2 min-w-0 lg:pt-2">
-      <div className="flex items-end justify-between gap-4 border-2 border-b-0 border-[var(--line-ink)] bg-[var(--ink)] px-4 py-3">
-        <h2 className="font-editorial text-lg font-bold text-[var(--paper-raised)]">
-          快速体验
-        </h2>
-      </div>
+      <div className="overflow-hidden rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] shadow-hard-md">
+        <div className="flex items-end justify-between gap-4 bg-[var(--ink)] px-4 py-3">
+          <h2 className="font-editorial text-lg font-bold text-[var(--paper-raised)]">
+            快速体验
+          </h2>
+        </div>
 
-      <div className="divide-y divide-[var(--line-strong)] rounded-[2px] border-2 border-[var(--line-ink)] bg-[var(--paper-raised)] shadow-hard-md">
-        {items.slice(0, 3).map((item) => {
-          const isLoading = loadingItemId === item.demo_id;
-          const thumbnailUrl = getDisplayThumbnailUrl(item.thumbnail);
+        <div className="divide-y divide-[var(--line-strong)]">
+          {items.slice(0, 3).map((item) => {
+            const isLoading = loadingItemId === item.demo_id;
+            const thumbnailUrl = getDisplayThumbnailUrl(item.thumbnail);
 
-          return (
-            <button
-              className="group grid min-h-[88px] w-full grid-cols-[78px_minmax(0,1fr)_24px] items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-55"
-              disabled={isLoading}
-              key={item.demo_id}
-              type="button"
-              onClick={() => onOpenItem(item.demo_id)}
-            >
-              <span className="aspect-video overflow-hidden rounded-[2px] bg-[var(--ink)]">
-                {thumbnailUrl ? (
-                  <img
-                    alt=""
+            return (
+              <button
+                className="group grid min-h-[88px] w-full grid-cols-[78px_minmax(0,1fr)_24px] items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-55"
+                disabled={isLoading}
+                key={item.demo_id}
+                type="button"
+                onClick={() => onOpenItem(item.demo_id)}
+              >
+                <span className="aspect-video overflow-hidden rounded-[2px] bg-[var(--ink)]">
+                  {thumbnailUrl ? (
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                      src={thumbnailUrl}
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-[var(--paper-raised)]">
+                      <FileText aria-hidden="true" className="h-5 w-5" />
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="font-editorial line-clamp-2 text-sm font-semibold leading-6 text-[var(--ink)] transition-colors group-hover:text-[var(--accent)]">
+                    {item.title}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">
+                    {item.description}
+                  </span>
+                </span>
+                {isLoading ? (
+                  <Loader2
                     aria-hidden="true"
-                    className="h-full w-full object-cover"
-                    referrerPolicy="no-referrer"
-                    src={thumbnailUrl}
-                    onError={(event) => {
-                      event.currentTarget.style.display = "none";
-                    }}
+                    className="h-4 w-4 animate-spin text-[var(--accent)]"
                   />
                 ) : (
-                  <span className="flex h-full w-full items-center justify-center text-[var(--paper-raised)]">
-                    <FileText aria-hidden="true" className="h-5 w-5" />
-                  </span>
+                  <ArrowUpRight
+                    aria-hidden="true"
+                    className="h-4 w-4 text-[var(--muted)] transition-[color,transform] group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--accent)]"
+                  />
                 )}
-              </span>
-              <span className="min-w-0">
-                <span className="font-editorial line-clamp-2 text-sm font-semibold leading-6 text-[var(--ink)] transition-colors group-hover:text-[var(--accent)]">
-                  {item.title}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">
-                  {item.description}
-                </span>
-              </span>
-              {isLoading ? (
-                <Loader2
-                  aria-hidden="true"
-                  className="h-4 w-4 animate-spin text-[var(--accent)]"
-                />
-              ) : (
-                <ArrowUpRight
-                  aria-hidden="true"
-                  className="h-4 w-4 text-[var(--muted)] transition-[color,transform] group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--accent)]"
-                />
-              )}
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );
