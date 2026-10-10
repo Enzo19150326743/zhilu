@@ -335,6 +335,12 @@ test("批量添加默认使用 SenseVoice 并沿用品牌选中色", async ({ pa
   await page.getByRole("button", { name: "处理设置或批量添加", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "批量添加" });
   const analyzeRadio = dialog.getByRole("radio", { name: /提炼内容/ });
+  const batchInput = dialog.getByLabel("视频链接");
+  await batchInput.focus();
+  await expect(batchInput).toHaveCSS("border-top-color", "rgb(209, 75, 49)");
+  await expect(batchInput).toHaveCSS("outline-style", "none");
+  await batchInput.blur();
+  await expect(batchInput).toHaveCSS("border-top-color", "rgb(33, 29, 23)");
 
   await expect(dialog.getByLabel("缺少逐字稿时使用")).toHaveValue("sensevoice_small");
   await expect(analyzeRadio).toBeChecked();
@@ -1257,7 +1263,7 @@ test("工作台链接输入框提交单条持久提炼任务", async ({ page }) 
   );
   await urlInput.focus();
   await expect(urlInput).toHaveCSS("outline-style", "none");
-  await expect(inputFrame).not.toHaveCSS("border-top-color", inputFrameColor);
+  await expect(inputFrame).toHaveCSS("border-top-color", inputFrameColor);
   const inputSection = urlInput.locator("xpath=ancestor::section[1]");
   await expect(inputSection).toHaveCSS("border-bottom-width", "0px");
 

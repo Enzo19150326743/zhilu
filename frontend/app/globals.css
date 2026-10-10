@@ -71,7 +71,8 @@ a:focus-visible {
   outline-offset: 3px;
 }
 
-input.focus-subtle:focus-visible {
+input.focus-subtle:focus-visible,
+textarea.focus-subtle:focus-visible {
   outline: none;
   outline-offset: 0;
 }

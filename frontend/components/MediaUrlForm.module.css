@@ -6,16 +6,11 @@
   border-radius: 2px;
   background: var(--paper-raised);
   box-shadow: var(--shadow-hard-sm);
-  transition: border-color 120ms ease;
 }
 
 .form[data-size="large"] {
   min-height: 62px;
   box-shadow: var(--shadow-hard-md);
-}
-
-.form:focus-within {
-  border-color: var(--accent);
 }
 
 .field {

@@ -81,7 +81,7 @@ export function BatchAddDialog({
       </label>
       <textarea
         aria-describedby="batch-input-help"
-        className="mt-2 min-h-52 w-full resize-y border-2 border-[var(--line-ink)] bg-[var(--paper)] p-3 text-sm leading-6 outline-none focus:border-[var(--accent)]"
+        className="focus-subtle mt-2 min-h-52 w-full resize-y border-2 border-[var(--line-ink)] bg-[var(--paper)] p-3 text-sm leading-6 focus:border-[var(--accent)]"
         data-dialog-initial-focus
         id="batch-input"
         placeholder="多条链接用换行、空格或分号分隔，也可直接粘贴分享文案"
