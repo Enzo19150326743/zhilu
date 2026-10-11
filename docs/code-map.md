@@ -127,6 +127,7 @@ ai-video-insight-workspace/
 - `backend/app/schemas.py`：Pydantic 请求 / 响应模型。
 - `backend/app/demo_data.py`：Demo 数据读取。
 - `backend/requirements.txt`：Python 依赖。
+- `backend/requirements-dev.txt`：开发与 CI 依赖，包含运行依赖及接口测试客户端。
 - `backend/tests/`：后端单测。
 - `scripts/prepare-local-asr.ps1`：一次安装本地转写依赖并预下载 SenseVoiceSmall 和 FSMN-VAD。
 - `scripts/prefetch-asr-models.py`：固定模型目标和预下载实现，可用 `--plan-only` 只查看清单。

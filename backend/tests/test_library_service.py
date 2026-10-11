@@ -110,13 +110,17 @@ class LibraryServiceTests(unittest.TestCase):
             )
             converting = threading.Event()
             release_conversion = threading.Event()
-            simplify = library_service.simplify_text_payload
+            # 先完成真实转换，再用事件控制转换阶段；锁回归不以机器的 OpenCC 吞吐量判定。
+            converted_payload = library_service.simplify_text_payload(
+                transcript.model_dump(mode="json")
+            )
 
             def slow_conversion(payload):
                 converting.set()
                 if not release_conversion.wait(2):
                     raise RuntimeError("测试未及时释放文本转换")
-                return simplify(payload)
+                self.assertEqual(payload, transcript.model_dump(mode="json"))
+                return converted_payload
 
             with (
                 ThreadPoolExecutor(max_workers=2) as executor,

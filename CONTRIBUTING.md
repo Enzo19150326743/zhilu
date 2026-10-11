@@ -26,7 +26,7 @@ Copy-Item backend/.env.example backend/.env
 ```powershell
 cd backend
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
@@ -37,6 +37,8 @@ npm run dev
 ```
 
 ## 提交前检查
+
+后端测试需要 `requirements-dev.txt` 中的接口测试客户端。运行依赖固定了已验证的 FastAPI 与 Starlette 配对；升级它们时应同时验证接口测试依赖与干净环境安装。
 
 ```powershell
 cd backend

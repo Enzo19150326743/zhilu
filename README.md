@@ -192,7 +192,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-public-r
 # 后端
 cd backend
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 # 前端（另开终端）
