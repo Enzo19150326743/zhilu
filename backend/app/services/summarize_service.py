@@ -603,7 +603,7 @@ def _is_asr_transcript_source(summarize_request: SummarizeRequest) -> bool:
 def _build_text_source_boundary(summarize_request: SummarizeRequest) -> str:
     if _is_asr_transcript_source(summarize_request):
         return (
-            "文本边界：当前文本是本地 Whisper 生成的 AI 转写稿，可能存在识别误差。"
+            "文本边界：当前文本是本地 SenseVoice 生成的 AI 转写稿，可能存在识别误差。"
             "请只依据当前文本总结，对专有名词或不确定表述保持谨慎。"
         )
 

@@ -196,12 +196,12 @@ async function installApiMocks(page: Page, libraryDelayMs = 0) {
       return json(route, {
         correction_available: true,
         correction_message: null,
-        recommended_engine: "sensevoice_small",
+
         sensevoice_available: true,
         sensevoice_message: null,
         sensevoice_model: "iic/SenseVoiceSmall",
         success: true,
-        whisper_model: "large-v3-turbo"
+
       });
     }
     if (path === "/api/library/recent") {
@@ -269,6 +269,31 @@ async function getRenderedTextCenter(locator: Locator) {
   });
 }
 
+test("快速体验保留接口返回的推荐摘要与导图，不误报未生成总结", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  await page.route("http://127.0.0.1:8000/api/demo", (route) => json(route, {
+    success: true,
+    demos: [{ demo_id: "public-demo", title: "公开推荐内容", description: "推荐内容", thumbnail: "" }]
+  }));
+  await page.route("http://127.0.0.1:8000/api/demo/public-demo", (route) =>
+    json(route, { ...summarizedDetail, library_summary_status: "local_fallback" })
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "公开推荐内容 推荐内容", exact: true }).click();
+  await expect(page.getByText("推荐摘要", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "一句话结论" })).toContainText(summarizedDetail.summary.tldr);
+  await expect(page.getByRole("heading", { name: "未生成总结" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "思维导图", exact: true }).click();
+  await expect(page.getByRole("button", { name: "重置导图视图", exact: true })).toBeEnabled({ timeout: 15_000 });
+  await expect(page.getByText("第一分支", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "返回首页", exact: true }).click();
+  await page.getByRole("button", { name: "需转写演示", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "未生成总结" })).toBeVisible();
+  await expect(page.getByText("推荐摘要", { exact: true })).toHaveCount(0);
+  expect(browserErrors).toEqual([]);
+});
+
 test("最近档案先显示加载态，并保持已总结与需转写互斥", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await installApiMocks(page, 450);
@@ -327,14 +352,27 @@ test("最近档案的辅助列与操作列表头和内容共用中心线", async
   expect(browserErrors).toEqual([]);
 });
 
-test("批量添加默认使用 SenseVoice 并沿用品牌选中色", async ({ page }) => {
+test("批量添加首屏只提供链接和处理设置", async ({ page }, testInfo) => {
   const browserErrors = watchBrowserErrors(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await installApiMocks(page);
   await page.goto("/");
 
   await page.getByRole("button", { name: "处理设置或批量添加", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "批量添加" });
-  const analyzeRadio = dialog.getByRole("radio", { name: /提炼内容/ });
+  await expect(dialog.getByRole("radio")).toHaveCount(0);
+  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  await expect(dialog.getByText("处理设置（可选）", { exact: true })).toBeVisible();
+  const layout = await dialog.evaluate((element) => {
+    const body = element.querySelector<HTMLElement>(":scope > div:nth-last-child(2)")!;
+    const box = element.getBoundingClientRect();
+    return { bodyHeight: body.clientHeight, bodyScrollHeight: body.scrollHeight, width: box.width, top: box.top, bottom: box.bottom };
+  });
+  expect(layout.width).toBeLessThanOrEqual(672);
+  expect(layout.top).toBeGreaterThanOrEqual(24);
+  expect(layout.bottom).toBeLessThanOrEqual(696);
+  expect(layout.bodyScrollHeight).toBeLessThanOrEqual(layout.bodyHeight + 1);
+  await dialog.screenshot({ path: testInfo.outputPath("batch-dialog.png") });
   const batchInput = dialog.getByLabel("视频链接");
   await batchInput.focus();
   await expect(batchInput).toHaveCSS("border-top-color", "rgb(209, 75, 49)");
@@ -342,13 +380,26 @@ test("批量添加默认使用 SenseVoice 并沿用品牌选中色", async ({ pa
   await batchInput.blur();
   await expect(batchInput).toHaveCSS("border-top-color", "rgb(33, 29, 23)");
 
-  await expect(dialog.getByLabel("缺少逐字稿时使用")).toHaveValue("sensevoice_small");
-  await expect(analyzeRadio).toBeChecked();
-  await expect(analyzeRadio).toHaveCSS("accent-color", "rgb(209, 75, 49)");
   await expect(dialog.getByText("不必每条换行；用换行、空格或分号隔开，系统会自动提取链接并去重。", { exact: true })).toBeVisible();
   await dialog.getByLabel("视频链接").fill("分享 https://example.com/a https://example.com/b;https://example.com/a");
   await expect(dialog.getByText("有效 2 条", { exact: true })).toBeVisible();
   await expect(dialog.getByText("重复 1 条（已折叠）", { exact: true })).toBeVisible();
+  await dialog.getByText("处理设置（可选）", { exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "自动判断", exact: true }).first()).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "开始处理 2 条" })).toBeVisible();
+  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  await dialog.getByText("处理设置（可选）", { exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 700 });
+  const narrowLayout = await dialog.evaluate((element) => {
+    const body = element.querySelector<HTMLElement>(":scope > div:nth-last-child(2)")!;
+    const box = element.getBoundingClientRect();
+    return { bodyHeight: body.clientHeight, bodyScrollHeight: body.scrollHeight, left: box.left, right: box.right, bottom: box.bottom };
+  });
+  expect(narrowLayout.left).toBeGreaterThanOrEqual(16);
+  expect(narrowLayout.right).toBeLessThanOrEqual(374);
+  expect(narrowLayout.bottom).toBeLessThanOrEqual(676);
+  expect(narrowLayout.bodyScrollHeight).toBeLessThanOrEqual(narrowLayout.bodyHeight + 1);
+  await dialog.screenshot({ path: testInfo.outputPath("batch-dialog-narrow.png") });
   expect(browserErrors).toEqual([]);
 });
 
@@ -374,8 +425,7 @@ test("从批量任务打开转写中的详情时只显示转写状态", async ({
       }
     ],
     stats: { active: 1, cancelled: 0, failed: 0, succeeded: 0, total: 1 },
-    success: true,
-    target: "analyze"
+    success: true
   };
 
   await installApiMocks(page);
@@ -389,8 +439,7 @@ test("从批量任务打开转写中的详情时只显示转写状态", async ({
           {
             batch_id: batchId,
             created_at: batchSnapshot.created_at,
-            stats: batchSnapshot.stats,
-            target: batchSnapshot.target
+            stats: batchSnapshot.stats
           }
         ],
         success: true
@@ -597,7 +646,7 @@ test("最近档案操作提示只在对应图标上悬停时显示", async ({ pa
   expect(browserErrors).toEqual([]);
 });
 
-test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({ page }) => {
+test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({ page }, testInfo) => {
   const browserErrors = watchBrowserErrors(page);
   let nativeDialogOpened = false;
   page.on("dialog", async (dialog) => {
@@ -624,48 +673,14 @@ test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({
   await expect(transcribeDialog.getByText("需转写演示", { exact: true })).toHaveCount(0);
   await expect(transcribeDialog.getByText("推荐", { exact: true })).toHaveCount(0);
   await expect(transcribeDialog.getByText("iic/SenseVoiceSmall", { exact: true })).toHaveCount(0);
-  await expect(transcribeDialog.getByText("large-v3-turbo", { exact: true })).toHaveCount(0);
   await expect(
     transcribeDialog.getByRole("button", { name: "云端快速识别", exact: true })
   ).toHaveCount(0);
   await expect(transcribeDialog.getByText(/用于改善标点、断句/)).toHaveCount(0);
   await expect(transcribeDialog.getByText("本期术语", { exact: true })).toBeVisible();
   await expect(transcribeDialog.getByText("已选 0/120", { exact: true })).toHaveCount(0);
-  const senseVoiceOption = transcribeDialog.getByRole("button", {
-    name: "SenseVoice（推荐）",
-    exact: true
-  });
-  const whisperOption = transcribeDialog.getByRole("button", {
-    name: "Whisper",
-    exact: true
-  });
-  await expect(senseVoiceOption).toContainText("中文长内容 · 较快");
-  await expect(whisperOption).toContainText("多语言识别 · 较慢");
-  await expect(senseVoiceOption).not.toContainText("本地");
-  await expect(whisperOption).not.toContainText("本地");
-  const selectedEngineBackground = await senseVoiceOption.evaluate(
-    (element) => getComputedStyle(element).backgroundColor
-  );
-  const senseVoiceDescription = senseVoiceOption.getByText(
-    "中文长内容 · 较快",
-    { exact: true }
-  );
-  const selectedDescriptionColor = await senseVoiceDescription.evaluate(
-    (element) => getComputedStyle(element).color
-  );
-  const selectedTitleColor = await senseVoiceOption
-    .locator("span")
-    .first()
-    .evaluate((element) => getComputedStyle(element).color);
-  expect(selectedDescriptionColor).not.toBe(selectedTitleColor);
-  await whisperOption.click();
-  await expect(whisperOption).toHaveCSS(
-    "background-color",
-    selectedEngineBackground
-  );
-  await expect(
-    whisperOption.getByText("多语言识别 · 较慢", { exact: true })
-  ).toHaveCSS("color", selectedDescriptionColor);
+  await expect(transcribeDialog.getByText("识别方式", { exact: true })).toHaveCount(0);
+  await expect(transcribeDialog.getByRole("combobox")).toHaveCount(0);
   await expect(
     transcribeDialog.getByRole("button", { name: "取消", exact: true })
   ).toHaveCount(0);
@@ -682,6 +697,7 @@ test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({
   await expect(
     transcribeDialog.getByRole("button", { name: "AI / 科技", exact: true })
   ).toBeHidden();
+  await transcribeDialog.screenshot({ path: testInfo.outputPath("transcribe-settings.png") });
 
   await transcribeDialog
     .getByRole("button", { name: "双人访谈", exact: true })
@@ -719,11 +735,35 @@ test("转写弹窗明确引导可选说话人并只保留术语记忆", async ({
   await expect(page.getByRole("button", { name: "管理术语库" })).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(1);
   expect(nativeDialogOpened).toBe(false);
+  await transcribeDialog.screenshot({ path: testInfo.outputPath("transcribe-speakers.png") });
 
   await page.getByRole("button", { name: "关闭转写设置" }).press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(transcribeButton).toBeFocused();
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("");
+  expect(browserErrors).toEqual([]);
+});
+
+test("转写入口只根据 SenseVoice 可用状态启用，且不展示模型选择", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page);
+  await installApiMocks(page);
+  let available = true;
+  await page.route("**/api/asr/status", async (route) => {
+    await route.fulfill({ json: {
+      success: true, sensevoice_available: available,
+      sensevoice_model: "iic/SenseVoiceSmall", correction_available: true
+    } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "需转写演示", exact: true }).click();
+  await page.getByRole("button", { name: "生成转写稿", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "转写设置" });
+  await expect(dialog.getByRole("button", { name: "开始转写", exact: true })).toBeEnabled();
+  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  await page.getByRole("button", { name: "关闭转写设置" }).click();
+  available = false;
+  await page.getByRole("button", { name: "生成转写稿", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "开始转写", exact: true })).toBeDisabled();
   expect(browserErrors).toEqual([]);
 });
 
@@ -984,7 +1024,7 @@ test("后台单条任务就绪时不替换正在阅读的其他文章", async ({
       video_id: withVideo ? needsTranscriptItem.video_id : null
     }],
     stats: { active: completed ? 0 : 1, cancelled: 0, failed: 0, succeeded: completed ? 1 : 0, total: 1 },
-    success: true, target: "analyze"
+    success: true
   });
   await installApiMocks(page);
   await page.route("http://127.0.0.1:8000/api/task-batches**", async (route) => {
@@ -1041,8 +1081,7 @@ test("首页可逐条提交并保留后台任务解析期间的新输入", async
       video_id: withVideo ? "first-podcast" : null
     }],
     stats: { active: 1, cancelled: 0, failed: 0, succeeded: 0, total: 1 },
-    success: true,
-    target: "analyze"
+    success: true
   });
 
   await installApiMocks(page);
@@ -1059,8 +1098,7 @@ test("首页可逐条提交并保留后台任务解析期间的新输入", async
         batches: submitted.map((_body, index) => ({
           batch_id: `continuous-batch-${index + 1}`,
           created_at: "2026-10-08T08:00:00Z",
-          stats: snapshot(index + 1).stats,
-          target: "analyze"
+          stats: snapshot(index + 1).stats
         })),
         success: true
       });
@@ -1125,7 +1163,7 @@ test("工作台可逐条提交且旧任务响应不会覆盖下一条草稿或�
       video_id: index === 1 ? needsTranscriptItem.video_id : "second-video"
     }],
     stats: { active: 1, cancelled: 0, failed: 0, succeeded: 0, total: 1 },
-    success: true, target: "analyze"
+    success: true
   });
 
   await installApiMocks(page);
@@ -1236,8 +1274,7 @@ test("工作台链接输入框提交单条持久提炼任务", async ({ page }) 
         }
       ],
       stats: { active: 0, cancelled: 0, failed: 0, succeeded: 1, total: 1 },
-      success: true,
-      target: "analyze"
+      success: true
     });
   });
   await page.goto("/");
@@ -1295,11 +1332,11 @@ test("工作台链接输入框提交单条持久提炼任务", async ({ page }) 
   await extractButton.click();
   await expect.poll(() => taskBody).not.toBeNull();
   expect(taskBody).toMatchObject({
-    asr_engine: "sensevoice_small",
     context_settings: null,
-    target: "analyze",
     urls: [shareText]
   });
+  expect(taskBody).not.toHaveProperty("asr_engine");
+  expect(taskBody).not.toHaveProperty("target");
   await expect(page.getByRole("heading", { name: summarizedItem.title })).toBeVisible();
   expect(browserErrors).toEqual([]);
 });

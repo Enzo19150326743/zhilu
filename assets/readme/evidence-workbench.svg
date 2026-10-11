@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
   <title id="title">一份内容，可以继续总结、提问、画导图和摘录</title>
-  <desc id="desc">同一份内容可以继续生成结构化总结、AI 内容问答、思维导图，以及 AI 金句和手动摘录。</desc>
+  <desc id="desc">同一份内容可以继续生成结构化总结、AI 内容问答、思维导图，以及 AI 候选、手动摘录和我的整理。</desc>
   <rect x="2" y="2" width="1196" height="356" fill="#f4efe6" stroke="#181713" stroke-width="4"/>
   <text x="44" y="64" font-family="Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" font-size="36" font-weight="900" fill="#181713">不只总结，也能继续整理</text>
 
@@ -18,7 +18,7 @@
     </g>
     <g transform="translate(694)">
       <rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#f4c95d" stroke="#181713" stroke-width="3"/><text x="28" y="53" font-size="30">结构化总结</text>
-      <g transform="translate(0 106)"><rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#d84a2d" stroke="#181713" stroke-width="3"/><text x="20" y="53" fill="#fff" font-size="27">AI 金句 · 手动摘录</text></g>
+      <g transform="translate(0 106)"><rect x="7" y="7" width="290" height="82" fill="#181713"/><rect width="290" height="82" fill="#d84a2d" stroke="#181713" stroke-width="3"/><text x="20" y="53" fill="#fff" font-size="27">摘录 · 我的整理</text></g>
     </g>
   </g>
 </svg>

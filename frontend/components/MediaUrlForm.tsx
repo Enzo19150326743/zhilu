@@ -1,4 +1,4 @@
-import { Link2, Loader2 } from "lucide-react";
+import { Link, Loader2 } from "lucide-react";
 import styles from "./MediaUrlForm.module.css";
 
 interface MediaUrlFormProps {
@@ -27,7 +27,7 @@ export function MediaUrlForm({
     >
       <label className={styles.field}>
         <span className="sr-only">公开媒体链接</span>
-        <Link2 aria-hidden="true" className={styles.icon} />
+        <Link aria-hidden="true" className={styles.icon} />
         <input
           className={styles.input}
           inputMode="url"

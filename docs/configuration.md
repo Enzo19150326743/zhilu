@@ -68,21 +68,9 @@ XIAOYUZHOU_RSSHUB_BASE_URL=https://rsshub.app
 
 只支持公开单集页面。系统优先读取公开 RSS，失败时回退公开网页结构化数据，不处理付费或私密节目。
 
-## 本地 ASR
+## 本地 SenseVoiceSmall
 
-```dotenv
-ASR_WHISPER_MODEL=large-v3-turbo
-ASR_FALLBACK_WHISPER_MODEL=base
-ASR_DEVICE=auto
-ASR_COMPUTE_TYPE=int8
-ASR_LANGUAGE=zh
-ASR_BEAM_SIZE=5
-ASR_AUTO_FALLBACK=1
-```
-
-更大的模型通常更慢、更占内存。`ASR_DEVICE=auto` 会优先尝试可用 GPU，失败后按配置回退 CPU。
-
-## 本地 SenseVoiceSmall（可选实验）
+本地识别只使用 SenseVoiceSmall，前端不提供引擎选择。默认提炼任务自动补齐转写稿并生成总结；依赖未安装时会明确提示，不会切换到其他语音模型。
 
 在 `backend/` 目录运行：
 
@@ -108,22 +96,7 @@ SENSEVOICE_SEGMENT_SILENCE_GAP_SECONDS=2
 RTX 3050 Laptop 等 4GB 级显卡默认使用更保守的 60 秒 GPU 批量；CPU 默认保持
 300 秒。需要 NVIDIA GPU 时，请先运行项目根目录的
 `scripts/install-sensevoice-cuda.ps1` 安装官方 CUDA 版 PyTorch，然后重启后端。
-同一媒体使用不同引擎重转写时，各版本独立保存在本地历史中；新任务失败不会覆盖旧稿。
-自动转写和转写弹窗默认使用 SenseVoice；未安装本地依赖时会提示不可用，不会自动改用
-Whisper。需要时可在转写设置中手动选择 Whisper。短于4秒的 SenseVoice 句段会在
-校对前继续合并，优先形成4–8秒的校对单元，原始句段仍完整保存。
-
-Whisper 默认在识别完成后、DeepSeek 校对前合并过碎的相邻片段：
-
-```env
-ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED=1
-ASR_WHISPER_SEGMENT_MAX_SECONDS=8
-ASR_WHISPER_SEGMENT_MAX_CHARACTERS=120
-ASR_WHISPER_SEGMENT_SILENCE_GAP_SECONDS=2
-```
-
-该处理不会重新切割音频，也不会删除原始时间戳。模型原始片段继续保存到
-`raw_segments`，校对和默认阅读使用整理后的句段。设为 `0` 可恢复旧行为。
+新任务失败不会覆盖旧稿。短于 4 秒的 SenseVoice 句段会在校对前继续合并，优先形成 4–8 秒的校对单元；该处理不会重新切割音频或删除原始时间戳。模型原始片段保存在 `raw_segments`，校对和默认阅读使用整理后的句段。`SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED=0` 可关闭句段合并。
 
 ## AI 转写校对
 
@@ -137,7 +110,7 @@ ASR_CORRECTION_TIMEOUT_SECONDS=120
 
 `ASR_CORRECTION_CHUNK_CHARS=3500` 是单次校对请求的大致批量，不是全文读取上限；
 系统会依次处理完整转写的所有批次。节目结构、内容标签、说话人信息和本期选择的 AI 校对术语用于
-AI 校对，不会直接注入本地 Whisper 声学解码。未配置 AI Key 或校对失败时，系统保留原始稿。
+AI 校对，不会直接注入本地 SenseVoice 声学识别。未配置 AI Key 或校对失败时，系统保留原始稿。
 
 ## Obsidian
 

@@ -40,8 +40,6 @@ interface AiTabsProps {
   summaryGenerationMeta: SummaryGenerationMeta | null;
   transcribeErrorMessage: string | null;
   transcript: TranscriptPayload | null;
-  transcriptVariants: Record<string, TranscriptPayload>;
-  activeTranscriptVariant?: string | null;
   textSourceType?: string | null;
   sourceUrl?: string | null;
   videoAuthor?: string | null;
@@ -81,8 +79,6 @@ export function AiTabs({
   summaryGenerationMeta,
   transcribeErrorMessage,
   transcript,
-  transcriptVariants,
-  activeTranscriptVariant,
   textSourceType,
   sourceUrl,
   videoAuthor,
@@ -255,8 +251,6 @@ export function AiTabs({
             transcribeErrorMessage={transcribeErrorMessage}
             textSourceType={textSourceType}
             transcript={transcript}
-            transcriptVariants={transcriptVariants}
-            activeTranscriptVariant={activeTranscriptVariant}
             videoTitle={videoTitle}
             onTranscribe={onTranscribe}
           />

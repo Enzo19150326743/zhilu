@@ -28,7 +28,6 @@ class PrefetchAsrModelsTests(unittest.TestCase):
         self.assertEqual(
             [target.model_id for target in targets],
             [
-                "large-v3-turbo",
                 "iic/SenseVoiceSmall",
                 "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
             ],
@@ -36,17 +35,13 @@ class PrefetchAsrModelsTests(unittest.TestCase):
 
     def test_prefetch_uses_injected_downloaders_without_network(self) -> None:
         module = _load_prefetch_module()
-        whisper_calls: list[str] = []
         modelscope_calls: list[str] = []
 
         downloaded = module.prefetch_models(
-            whisper_downloader=lambda model_id: whisper_calls.append(model_id)
-            or f"whisper/{model_id}",
             modelscope_downloader=lambda model_id: modelscope_calls.append(model_id)
             or f"modelscope/{model_id}",
         )
 
-        self.assertEqual(whisper_calls, ["large-v3-turbo"])
         self.assertEqual(
             modelscope_calls,
             [

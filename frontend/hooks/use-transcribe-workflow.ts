@@ -9,12 +9,10 @@ import {
 } from "@/lib/transcribe-settings";
 import {
   buildTranscribedDetail,
-  getRecommendedLocalAsrEngine,
   isParseResponse,
   isRecoverableTranscribeError
 } from "@/lib/workbench-detail";
 import type {
-  AsrEngine,
   AsrStatusResponse,
   DemoDetail,
   ParseResponse,
@@ -64,8 +62,6 @@ export function useTranscribeWorkflow({
   const [transcribeTasks, setTranscribeTasks] = useState<TranscribeTask[]>([]);
   const [isTranscribeSettingsOpen, setIsTranscribeSettingsOpen] = useState(false);
   const [asrStatus, setAsrStatus] = useState<AsrStatusResponse | null>(null);
-  const [pendingAsrEngine, setPendingAsrEngine] =
-    useState<AsrEngine>("sensevoice_small");
   const [pendingTranscribeSettings, setPendingTranscribeSettings] =
     useState<TranscribeContextSettings>(() => getDefaultTranscribeSettings(null));
 
@@ -74,7 +70,6 @@ export function useTranscribeWorkflow({
       .getAsrStatus()
       .then((response) => {
         setAsrStatus(response);
-        setPendingAsrEngine(getRecommendedLocalAsrEngine(response));
       })
       .catch(() => setAsrStatus(null));
   }, []);
@@ -86,14 +81,13 @@ export function useTranscribeWorkflow({
   const waitForRecoveredTranscribeDetail = async (
     videoId: string,
     sourceUrl: string,
-    transcriptVariantKey: AsrEngine,
     previousVariantJson: string | null
   ): Promise<ParseResponse | null> =>
     pollForRecoveredValue({
       fetchValue: () => apiClient.getLibraryDetail(videoId),
       intervalMs: TRANSCRIBE_RECOVERY_INTERVAL_MS,
       isRecovered: (detail) => {
-        const recoveredVariant = detail.transcript_variants?.[transcriptVariantKey];
+        const recoveredVariant = detail.transcript;
         return Boolean(
           detail.source_url === sourceUrl &&
             getTextSourceType(detail.video) === "asr_transcript" &&
@@ -169,13 +163,12 @@ export function useTranscribeWorkflow({
     }
 
     setPendingTranscribeSettings(getDefaultTranscribeSettings(activeDetail.video));
-    setPendingAsrEngine(getRecommendedLocalAsrEngine(asrStatus));
+    void apiClient.getAsrStatus().then(setAsrStatus).catch(() => setAsrStatus(null));
     setIsTranscribeSettingsOpen(true);
   };
 
   const startTranscribe = async (
-    settings?: TranscribeContextSettings,
-    asrEngine: AsrEngine = "sensevoice_small"
+    settings?: TranscribeContextSettings
   ) => {
     if (!activeDetail || !isParseResponse(activeDetail)) {
       setErrorMessage("当前记录无法生成转写稿，请先解析公开视频链接。");
@@ -185,7 +178,7 @@ export function useTranscribeWorkflow({
     const taskSourceUrl = activeDetail.source_url;
     const taskVideoId = activeDetail.video.video_id;
     const taskTitle = activeDetail.video.title || "未命名内容";
-    const previousVariant = activeDetail.transcript_variants?.[asrEngine] ?? null;
+    const previousVariant = activeDetail.transcript ?? null;
     const previousVariantJson = previousVariant
       ? JSON.stringify(previousVariant)
       : null;
@@ -212,7 +205,6 @@ export function useTranscribeWorkflow({
         title: taskTitle,
         status: "running",
         startedAt: Date.now(),
-        asrEngine,
         contextSettings: settings
       },
       ...currentTasks.filter((task) => task.sourceUrl !== taskSourceUrl)
@@ -221,7 +213,6 @@ export function useTranscribeWorkflow({
 
     try {
       const response = await apiClient.transcribeVideo({
-        asr_engine: asrEngine,
         context_settings: settings ?? null,
         url: taskSourceUrl,
         video_id: taskVideoId
@@ -256,7 +247,6 @@ export function useTranscribeWorkflow({
         const recoveredDetail = await waitForRecoveredTranscribeDetail(
           taskVideoId,
           taskSourceUrl,
-          asrEngine,
           previousVariantJson
         );
         if (recoveredDetail) {
@@ -291,7 +281,7 @@ export function useTranscribeWorkflow({
 
   const handleConfirmTranscribeSettings = () => {
     setIsTranscribeSettingsOpen(false);
-    void startTranscribe(pendingTranscribeSettings, pendingAsrEngine);
+    void startTranscribe(pendingTranscribeSettings);
   };
 
   return {
@@ -299,12 +289,10 @@ export function useTranscribeWorkflow({
     handleConfirmTranscribeSettings,
     handleTranscribeRequest,
     setIsTranscribeSettingsOpen,
-    setPendingAsrEngine,
     setPendingTranscribeSettings,
     transcribeSettingsDialogState: {
       asrStatus,
       isOpen: isTranscribeSettingsOpen,
-      pendingAsrEngine,
       pendingTranscribeSettings
     },
     transcribeTasks

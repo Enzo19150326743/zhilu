@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api";
-import type { AsrEngine, BatchTarget, TaskBatchResponse, TaskBatchSummary, TranscribeContextSettings } from "@/lib/types";
+import type { TaskBatchResponse, TaskBatchSummary, TranscribeContextSettings } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -121,8 +121,6 @@ export function useTaskWorkspace() {
 
   const submitBatch = async (
     urls: string[],
-    target: BatchTarget,
-    asrEngine: AsrEngine,
     contextSettings: TranscribeContextSettings | null = null
   ) => {
     setIsSubmitting(true);
@@ -131,8 +129,6 @@ export function useTaskWorkspace() {
       const response = await apiClient.createTaskBatch({
         client_request_id: requestIdRef.current,
         urls,
-        target,
-        asr_engine: asrEngine,
         context_settings: contextSettings
       });
       setActiveBatch(response);
@@ -152,8 +148,7 @@ export function useTaskWorkspace() {
   };
 
   const submitSingle = async (
-    sourceUrl: string,
-    asrEngine: AsrEngine = "sensevoice_small"
+    sourceUrl: string
   ): Promise<TaskBatchResponse> => {
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -161,8 +156,6 @@ export function useTaskWorkspace() {
       const response = await apiClient.createTaskBatch({
         client_request_id: createRequestId(),
         urls: [sourceUrl],
-        target: "analyze",
-        asr_engine: asrEngine,
         context_settings: null
       });
       setActiveSingleBatch(response);

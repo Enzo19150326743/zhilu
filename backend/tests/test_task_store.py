@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from app.services.task_store import TaskStore, TaskStoreError
@@ -17,9 +18,62 @@ class TaskStoreTests(unittest.TestCase):
         return self.store.create_batch(
             client_request_id=key,
             urls=[f"https://example.com/video/{index}" for index in range(count)],
-            target="analyze",
-            settings={"asr_engine": "local_whisper", "context_settings": None},
+            settings={"context_settings": None},
         )
+
+    def test_legacy_migration_preserves_history_checkpoints_and_idempotency(self) -> None:
+        batch_id = self.create_batch(2)
+        task_id = self.store.get_batch(batch_id)["items"][0]["task_id"]
+        legacy_settings = json.dumps({
+            "asr_engine": "removed-engine", "context_settings": None, "client_key": "local",
+        })
+        checkpoint = json.dumps({"recognition": {"raw_text": "已有原始稿"}, "audio_download_seconds": 8})
+        with self.store.connect(immediate=True) as connection:
+            connection.execute("ALTER TABLE processing_batches ADD COLUMN target TEXT NOT NULL DEFAULT 'parse_only'")
+            connection.execute("ALTER TABLE processing_tasks ADD COLUMN target TEXT NOT NULL DEFAULT 'parse_only'")
+            connection.execute("DROP INDEX idx_processing_tasks_identity")
+            connection.execute("CREATE INDEX idx_processing_tasks_identity ON processing_tasks(normalized_url, target, settings_hash)")
+            connection.execute("UPDATE processing_batches SET settings_json=?, request_hash='old-request-hash'", (legacy_settings,))
+            connection.execute("UPDATE processing_tasks SET settings_json=?, settings_hash='old-settings-hash'", (legacy_settings,))
+            connection.execute("UPDATE processing_tasks SET checkpoint_json=?, status='failed', stage='correct', video_id='existing-video' WHERE id=?", (checkpoint, task_id))
+            connection.execute("CREATE TABLE saved_content (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
+            connection.execute("INSERT INTO saved_content VALUES ('article', '保留用户内容')")
+
+        migrated = TaskStore(self.store.database_path)
+        self.assertEqual(migrated.create_batch(
+            client_request_id="request-key-0001",
+            urls=[f"https://example.com/video/{index}" for index in range(2)],
+            settings={"context_settings": None},
+        ), batch_id)
+        self.assertNotIn("target", migrated.get_batch(batch_id))
+        with migrated.connect() as connection:
+            for table in ("processing_batches", "processing_tasks"):
+                self.assertNotIn("target", {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")})
+            row = connection.execute("SELECT * FROM processing_tasks WHERE id=?", (task_id,)).fetchone()
+            self.assertEqual(row["checkpoint_json"], checkpoint)
+            self.assertEqual(row["video_id"], "existing-video")
+            self.assertEqual(row["status"], "failed")
+            self.assertEqual(json.loads(row["settings_json"]), {"context_settings": None, "client_key": "local"})
+            self.assertEqual(connection.execute("SELECT body FROM saved_content").fetchone()[0], "保留用户内容")
+            self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+        migrated.retry(task_id, batch_id)
+        self.assertEqual(migrated.get_task(task_id)["status"], "queued")
+        restarted = TaskStore(migrated.database_path)
+        self.assertEqual(restarted.get_batch(batch_id), migrated.get_batch(batch_id))
+
+    def test_failed_migration_rolls_back_schema_and_keeps_task_data(self) -> None:
+        batch_id = self.create_batch(1)
+        with self.store.connect(immediate=True) as connection:
+            connection.execute("ALTER TABLE processing_batches ADD COLUMN target TEXT NOT NULL DEFAULT 'analyze'")
+            connection.execute("ALTER TABLE processing_tasks ADD COLUMN target TEXT NOT NULL DEFAULT 'analyze'")
+            connection.execute("UPDATE processing_tasks SET settings_json='invalid-json'")
+        with self.assertRaises(json.JSONDecodeError):
+            TaskStore(self.store.database_path)
+        with self.store.connect() as connection:
+            self.assertIn("target", {row["name"] for row in connection.execute("PRAGMA table_info(processing_tasks)")})
+            self.assertEqual(connection.execute("SELECT settings_json FROM processing_tasks").fetchone()[0], "invalid-json")
+            self.assertEqual(connection.execute("SELECT id FROM processing_batches").fetchone()[0], batch_id)
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM processing_batch_items").fetchone()[0], 1)
 
     def test_creates_49_atomically_and_rejects_capacity_overflow(self) -> None:
         batch_id = self.create_batch(49)
@@ -28,8 +82,7 @@ class TaskStoreTests(unittest.TestCase):
             self.store.create_batch(
                 client_request_id="request-key-0002",
                 urls=["https://example.com/extra"],
-                target="analyze",
-                settings={"asr_engine": "local_whisper"},
+                settings={"context_settings": None},
             )
         self.assertEqual(context.exception.error_code, "ACTIVE_TASK_CAPACITY_EXCEEDED")
         self.assertEqual(len(self.store.list_batches()["batches"]), 1)
@@ -41,8 +94,7 @@ class TaskStoreTests(unittest.TestCase):
             self.store.create_batch(
                 client_request_id="request-key-0001",
                 urls=["https://example.com/different"],
-                target="analyze",
-                settings={"asr_engine": "local_whisper", "context_settings": None},
+                settings={"context_settings": None},
             )
         self.assertEqual(context.exception.status_code, 409)
 

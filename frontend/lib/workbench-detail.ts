@@ -1,8 +1,6 @@
 import { ApiClientError } from "./api";
 import { getTextSourceType } from "./media";
 import type {
-  AsrEngine,
-  AsrStatusResponse,
   DemoDetail,
   ParseResponse,
   SummarizeResponse,
@@ -84,19 +82,15 @@ function buildAsrSummaryPlaceholder(
   return {
     content_type: contentType,
     topics: ["选题"],
-    tldr: "逐字稿已更新，可先对比版本，再生成结构化总结。",
+    tldr: "逐字稿已生成，正在继续提炼内容。",
     key_points: [
       `《${videoTitle}》的逐字稿已准备好。`,
-      "总结与导图已重置，避免继续展示与当前逐字稿不一致的内容。",
-      "确认逐字稿后，可手动生成新的摘录、导图和知识稿。"
+      "结构化总结和导图正在生成，完成后自动更新。"
     ],
     timeline: [],
-    structured_analysis_markdown: `## ${videoTitle}\n### 当前状态\n逐字稿已更新，可以先检查内容是否准确。\n### 下一步\n确认转写效果后重新生成总结和导图。`,
-    takeaways: [
-      "确认逐字稿后，可以继续生成摘录、导图和问答。",
-      "专有名词、人名和断句仍建议结合原媒体复核。"
-    ],
-    to_confirm: ["逐字稿中的关键摘录需要结合原媒体复核。"]
+    structured_analysis_markdown: `## ${videoTitle}\n### 当前状态\n逐字稿已生成，正在基于完整内容生成总结和导图。`,
+    takeaways: [],
+    to_confirm: []
   };
 }
 
@@ -122,10 +116,7 @@ export function buildTranscribedDetail(
     baseDetail.video.text_source_type === "asr_transcript" &&
     baseDetail.transcript.asr_meta
   ) {
-    const existingEngine = baseDetail.transcript.asr_meta.engine.toLowerCase();
-    const existingKey = existingEngine.includes("sensevoice")
-      ? "sensevoice_small"
-      : "local_whisper";
+    const existingKey = baseDetail.active_transcript_variant ?? baseDetail.transcript.asr_meta.engine;
     existingVariants[existingKey] = baseDetail.transcript;
   }
   existingVariants[transcriptVariantKey] = transcript;
@@ -149,12 +140,6 @@ export function isRecoverableTranscribeError(error: unknown): boolean {
     error instanceof ApiClientError &&
     (error.errorCode === "REQUEST_INTERRUPTED" || error.errorCode === "TIMEOUT")
   );
-}
-
-export function getRecommendedLocalAsrEngine(
-  status: AsrStatusResponse | null
-): AsrEngine {
-  return status?.recommended_engine ?? "sensevoice_small";
 }
 
 export function getSummaryTaskMessage(response: SummarizeResponse): string {

@@ -38,6 +38,13 @@ def _hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _processing_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    result = {"context_settings": settings.get("context_settings")}
+    if "client_key" in settings:
+        result["client_key"] = settings["client_key"]
+    return result
+
+
 class TaskStore:
     def __init__(self, database_path: Path = DATABASE_PATH):
         self.database_path = Path(database_path)
@@ -62,13 +69,11 @@ class TaskStore:
 
     def initialize(self) -> None:
         with self.connect(immediate=True) as connection:
-            connection.executescript(
-                """
+            schema = """
                 CREATE TABLE IF NOT EXISTS processing_batches (
                     id TEXT PRIMARY KEY,
                     client_request_id TEXT NOT NULL UNIQUE,
                     request_hash TEXT NOT NULL,
-                    target TEXT NOT NULL,
                     settings_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -78,7 +83,6 @@ class TaskStore:
                     source_url TEXT NOT NULL,
                     normalized_url TEXT NOT NULL,
                     content_key TEXT,
-                    target TEXT NOT NULL,
                     settings_json TEXT NOT NULL,
                     settings_hash TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -101,7 +105,7 @@ class TaskStore:
                 CREATE INDEX IF NOT EXISTS idx_processing_tasks_active
                     ON processing_tasks(status, updated_at);
                 CREATE INDEX IF NOT EXISTS idx_processing_tasks_identity
-                    ON processing_tasks(normalized_url, target, settings_hash);
+                    ON processing_tasks(normalized_url, settings_hash);
                 CREATE TABLE IF NOT EXISTS processing_batch_items (
                     batch_id TEXT NOT NULL REFERENCES processing_batches(id) ON DELETE CASCADE,
                     task_id TEXT NOT NULL REFERENCES processing_tasks(id),
@@ -112,23 +116,63 @@ class TaskStore:
                     UNIQUE (batch_id, input_index)
                 );
                 """
+            for statement in schema.split(";"):
+                if statement.strip():
+                    connection.execute(statement)
+            self._migrate_task_settings(connection)
+
+    @staticmethod
+    def _migrate_task_settings(connection: sqlite3.Connection) -> None:
+        """移除旧选项，保留任务、检查点、批次关联和请求幂等标识。"""
+        legacy_tables = [
+            table
+            for table in ("processing_batches", "processing_tasks")
+            if any(row["name"] == "target" for row in connection.execute(f"PRAGMA table_info({table})"))
+        ]
+        if not legacy_tables:
+            return
+        connection.execute("DROP INDEX IF EXISTS idx_processing_tasks_identity")
+        for row in connection.execute("SELECT id, settings_json FROM processing_tasks").fetchall():
+            settings = _processing_settings(json.loads(row["settings_json"]))
+            identity = {key: value for key, value in settings.items() if key != "client_key"}
+            connection.execute(
+                "UPDATE processing_tasks SET settings_json=?, settings_hash=? WHERE id=?",
+                (_stable_json(settings), _hash(_stable_json(identity)), row["id"]),
             )
+        for row in connection.execute("SELECT id, settings_json FROM processing_batches").fetchall():
+            settings = _processing_settings(json.loads(row["settings_json"]))
+            identity = {key: value for key, value in settings.items() if key != "client_key"}
+            urls = [item[0] for item in connection.execute(
+                """SELECT t.normalized_url FROM processing_batch_items i
+                   JOIN processing_tasks t ON t.id=i.task_id WHERE i.batch_id=? ORDER BY i.input_index""",
+                (row["id"],),
+            )]
+            request_hash = _hash(_stable_json({"urls": urls, "settings": identity}))
+            connection.execute(
+                "UPDATE processing_batches SET settings_json=?, request_hash=? WHERE id=?",
+                (_stable_json(settings), request_hash, row["id"]),
+            )
+        for table in legacy_tables:
+            connection.execute(f"ALTER TABLE {table} DROP COLUMN target")
+        connection.execute(
+            "CREATE INDEX idx_processing_tasks_identity ON processing_tasks(normalized_url, settings_hash)"
+        )
 
     def create_batch(
         self,
         *,
         client_request_id: str,
         urls: list[str],
-        target: str,
         settings: dict[str, Any],
     ) -> str:
         unique_urls = list(dict.fromkeys(urls))
         if not unique_urls or len(unique_urls) > MAX_ACTIVE_TASKS:
             raise TaskStoreError("BATCH_SIZE_INVALID", "每批需要 1～49 条有效链接。", 422)
+        settings = _processing_settings(settings)
         settings_json = _stable_json(settings)
         identity_settings = {key: value for key, value in settings.items() if key != "client_key"}
         settings_hash = _hash(_stable_json(identity_settings))
-        request_hash = _hash(_stable_json({"urls": unique_urls, "target": target, "settings": identity_settings}))
+        request_hash = _hash(_stable_json({"urls": unique_urls, "settings": identity_settings}))
         timestamp = _now()
         with self.connect(immediate=True) as connection:
             existing = connection.execute(
@@ -149,11 +193,11 @@ class TaskStore:
                 row = connection.execute(
                     """
                     SELECT * FROM processing_tasks
-                    WHERE normalized_url = ? AND target = ? AND settings_hash = ?
+                    WHERE normalized_url = ? AND settings_hash = ?
                       AND status IN ('queued', 'running', 'waiting_retry')
                     ORDER BY created_at LIMIT 1
                     """,
-                    (url, target, settings_hash),
+                    (url, settings_hash),
                 ).fetchone()
                 if row:
                     reusable[url] = row
@@ -172,8 +216,8 @@ class TaskStore:
 
             batch_id = uuid.uuid4().hex
             connection.execute(
-                "INSERT INTO processing_batches VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (batch_id, client_request_id, request_hash, target, settings_json, timestamp, timestamp),
+                "INSERT INTO processing_batches VALUES (?, ?, ?, ?, ?, ?)",
+                (batch_id, client_request_id, request_hash, settings_json, timestamp, timestamp),
             )
             for index, url in enumerate(unique_urls):
                 task_id = str(reusable[url]["id"]) if url in reusable else uuid.uuid4().hex
@@ -181,11 +225,11 @@ class TaskStore:
                     connection.execute(
                         """
                         INSERT INTO processing_tasks (
-                            id, source_url, normalized_url, target, settings_json,
+                            id, source_url, normalized_url, settings_json,
                             settings_hash, status, stage, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, 'queued', 'parse', ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, 'queued', 'parse', ?, ?)
                         """,
-                        (task_id, url, url, target, settings_json, settings_hash, timestamp, timestamp),
+                        (task_id, url, url, settings_json, settings_hash, timestamp, timestamp),
                     )
                 connection.execute(
                     "INSERT INTO processing_batch_items VALUES (?, ?, ?, NULL, ?)",
@@ -394,7 +438,7 @@ class TaskStore:
                 ).fetchall()
                 snapshot = self._batch_snapshot(batch, items)
                 summaries.append({
-                    "batch_id": snapshot["batch_id"], "target": snapshot["target"],
+                    "batch_id": snapshot["batch_id"],
                     "created_at": snapshot["created_at"], "stats": snapshot["stats"],
                 })
             active = int(connection.execute(
@@ -427,7 +471,7 @@ class TaskStore:
             ).fetchone()
             if row is None:
                 raise TaskStoreError("TASK_NOT_FOUND", "没有找到这条任务。", 404)
-            fake_batch = {"id": "", "client_request_id": "", "target": row["target"], "created_at": row["created_at"]}
+            fake_batch = {"id": "", "client_request_id": "", "created_at": row["created_at"]}
             return self._batch_snapshot(fake_batch, [row])["items"][0]
 
     def has_active_tasks(self, *, video_id: str | None = None) -> bool:
@@ -466,6 +510,6 @@ class TaskStore:
             })
         return {
             "batch_id": batch["id"], "client_request_id": batch["client_request_id"],
-            "target": batch["target"], "created_at": batch["created_at"],
+            "created_at": batch["created_at"],
             "stats": {"total": len(items), **counts}, "items": items,
         }

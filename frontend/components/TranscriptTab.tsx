@@ -6,15 +6,13 @@ import {
   ClipboardCheck,
   FileAudio,
   FileDown,
-  GitCompareArrows,
   Loader2,
   Plus,
   Search
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { TranscriptNoteWorkflowState } from "@/hooks/use-transcript-note-workflow";
 import type { TranscriptPayload } from "@/lib/types";
-import { TranscriptComparisonColumn } from "./TranscriptComparisonColumn";
 import { IconActionButton } from "./IconActionButton";
 import { TranscriptNoteWorkflow } from "./TranscriptNoteWorkflow";
 import { TranscribeRequiredState } from "./TranscribeRequiredState";
@@ -24,8 +22,6 @@ import {
   getTextSourceHint,
   getTextSourceSlug,
   getTranscriptSourceLabel,
-  getTranscriptVariantLabel,
-  inferTranscriptVariantKey,
   sanitizeFilename
 } from "@/lib/transcript-workbench";
 
@@ -39,8 +35,6 @@ interface TranscriptTabProps {
   textSourceType?: string | null;
   transcribeErrorMessage: string | null;
   transcript: TranscriptPayload | null;
-  transcriptVariants: Record<string, TranscriptPayload>;
-  activeTranscriptVariant?: string | null;
   videoTitle?: string | null;
   onTranscribe: () => void;
 }
@@ -54,16 +48,11 @@ export function TranscriptTab({
   textSourceType,
   transcribeErrorMessage,
   transcript,
-  transcriptVariants,
-  activeTranscriptVariant,
   videoTitle,
   onTranscribe
 }: TranscriptTabProps) {
   const [hasCopied, setHasCopied] = useState(false);
   const [hasExported, setHasExported] = useState(false);
-  const [selectedTranscriptVariant, setSelectedTranscriptVariant] =
-    useState<string>(activeTranscriptVariant ?? "");
-  const [isComparingTranscripts, setIsComparingTranscripts] = useState(false);
   const [transcriptQuery, setTranscriptQuery] = useState("");
   const {
     candidateHighlights,
@@ -87,41 +76,12 @@ export function TranscriptTab({
   } = noteWorkflow;
   const isShownotes = textSourceType === "shownotes";
   const isPodcast = mediaType === "podcast";
-  const normalizedTranscriptVariants = useMemo(() => {
-    const variants = { ...transcriptVariants };
-    if (transcript?.asr_meta && Object.keys(variants).length === 0) {
-      variants[inferTranscriptVariantKey(transcript)] = transcript;
-    }
-    return variants;
-  }, [transcript, transcriptVariants]);
-  const transcriptVariantKeys = useMemo(
-    () => Object.keys(normalizedTranscriptVariants),
-    [normalizedTranscriptVariants]
-  );
-  const transcriptVariantSignature = transcriptVariantKeys.join("|");
-  const selectedTranscript =
-    normalizedTranscriptVariants[selectedTranscriptVariant] ?? transcript;
-  const sourceLabel = getTranscriptSourceLabel(textSourceType, selectedTranscript);
-  const sourceHint = getTextSourceHint(textSourceType, selectedTranscript);
-  const activeTranscript = selectedTranscript ?? transcript;
+  const sourceLabel = getTranscriptSourceLabel(textSourceType, transcript);
+  const sourceHint = getTextSourceHint(textSourceType, transcript);
+  const activeTranscript = transcript;
   useEffect(() => {
     setTranscriptQuery("");
   }, [sourceUrl, transcript]);
-
-  useEffect(() => {
-    const nextVariant =
-      activeTranscriptVariant && normalizedTranscriptVariants[activeTranscriptVariant]
-        ? activeTranscriptVariant
-        : transcriptVariantKeys[0] ?? "";
-    setSelectedTranscriptVariant(nextVariant);
-    setIsComparingTranscripts(false);
-  }, [
-    activeTranscriptVariant,
-    normalizedTranscriptVariants,
-    sourceUrl,
-    transcriptVariantKeys,
-    transcriptVariantSignature
-  ]);
 
   const handleCopy = async () => {
     if (!activeTranscript) {
@@ -241,14 +201,6 @@ export function TranscriptTab({
     );
   }
 
-  const preferredComparisonKeys = ["local_whisper", "sensevoice_small"].filter(
-    (variantKey) => Boolean(normalizedTranscriptVariants[variantKey])
-  );
-  const comparisonVariantKeys =
-    preferredComparisonKeys.length === 2
-      ? preferredComparisonKeys
-      : transcriptVariantKeys.slice(0, 2);
-  const canCompareTranscripts = comparisonVariantKeys.length === 2;
   const shownotesParagraphs = activeTranscript.plain_text
     .split(/\n+/)
     .map((paragraph) => paragraph.trim())
@@ -346,117 +298,78 @@ export function TranscriptTab({
       {renderSelectionToolbar()}
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.48fr)] lg:items-start">
         <div className="min-w-0">
-          {isComparingTranscripts && canCompareTranscripts ? (
-            <div className="grid gap-4 2xl:grid-cols-2">
-              {comparisonVariantKeys.map((variantKey) => (
-                <TranscriptComparisonColumn
-                  key={variantKey}
-                  transcript={normalizedTranscriptVariants[variantKey]}
-                  variantKey={variantKey}
-                  viewMode="final"
-                />
-              ))}
+          <div className="mb-3 flex items-end justify-between gap-4 select-none">
+            <div>
+              <h3 className="font-editorial text-xl font-bold leading-7 text-[var(--ink)]">
+                原文
+              </h3>
+              <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+                选中文本，加入我的整理。
+              </p>
+              {sourceHint ? (
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  {sourceHint}
+                </p>
+              ) : null}
             </div>
-          ) : (
-            <>
-              <div className="mb-3 flex items-end justify-between gap-4 select-none">
-                <div>
-                  <h3 className="font-editorial text-xl font-bold leading-7 text-[var(--ink)]">
-                    原文
-                  </h3>
-                  <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
-                    选中文本，加入我的整理。
-                  </p>
-                  {sourceHint ? (
-                    <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                      {sourceHint}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap justify-end gap-2">
-                  {transcriptVariantKeys.length > 1 && !isComparingTranscripts ? (
-                    <select
-                      aria-label="选择转写稿版本"
-                      className="h-10 rounded-[2px] border border-[var(--line-strong)] bg-[var(--paper-raised)] px-3 text-sm font-medium text-[var(--ink-soft)] outline-none transition focus:border-[var(--accent)]"
-                      value={selectedTranscriptVariant}
-                      onChange={(event) => {
-                        setSelectedTranscriptVariant(event.target.value);
-                      }}
-                    >
-                      {transcriptVariantKeys.map((variantKey) => (
-                        <option key={variantKey} value={variantKey}>
-                          {getTranscriptVariantLabel(variantKey)}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-                  {canCompareTranscripts ? (
-                    <IconActionButton
-                      icon={GitCompareArrows}
-                      label={isComparingTranscripts ? "退出并排对比" : "并排对比转写稿"}
-                      pressed={isComparingTranscripts}
-                      onClick={() => setIsComparingTranscripts((current) => !current)}
-                    />
-                  ) : null}
-                  {renderTopActions("transcript")}
-                </div>
-              </div>
-              <label className="relative mb-3 block select-none">
-                <span className="sr-only">搜索并定位原文</span>
-                <Search
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
-                />
-                <input
-                  className="h-10 w-full border border-[var(--line-strong)] bg-[var(--paper)] pl-9 pr-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
-                  placeholder="输入关键词，定位原文"
-                  type="search"
-                  value={transcriptQuery}
-                  onChange={(event) => setTranscriptQuery(event.target.value)}
-                />
-              </label>
-              <div
-                className="rounded-[2px] border border-[var(--line-strong)]"
-                onPointerDown={handleExcerptPointerDown}
-                onPointerUp={handleExcerptPointerUp}
-                ref={(element) => {
-                  transcriptTextRootRef.current = element;
-                }}
-              >
-                {visibleSegments.length > 0 ? (
-                  visibleSegments.map((segment) => (
-                    <div
-                      className="grid gap-3 border-b border-[var(--line-strong)] bg-[var(--paper-raised)] px-4 py-3 last:border-b-0 sm:grid-cols-[86px_minmax(0,1fr)]"
-                      key={`${segment.start}-${segment.end}-${segment.speaker ?? ""}-${segment.text}`}
-                    >
-                      <div className="select-none space-y-1">
-                        <div className="mono text-xs text-[var(--muted)]">
-                          {formatTimestamp(segment.start)}
-                        </div>
-                        {segment.speaker ? (
-                          <span className="inline-flex max-w-[76px] truncate rounded-[2px] bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-                            {segment.speaker}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p
-                        className="transcript-excerpt-text text-sm leading-6 text-[var(--ink-soft)]"
-                        data-excerpt-end={segment.end}
-                        data-excerpt-start={segment.start}
-                        data-transcript-excerpt="true"
-                      >
-                        {segment.text}
-                      </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              {renderTopActions("transcript")}
+            </div>
+          </div>
+          <label className="relative mb-3 block select-none">
+            <span className="sr-only">搜索并定位原文</span>
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
+            />
+            <input
+              className="h-10 w-full border border-[var(--line-strong)] bg-[var(--paper)] pl-9 pr-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+              placeholder="输入关键词，定位原文"
+              type="search"
+              value={transcriptQuery}
+              onChange={(event) => setTranscriptQuery(event.target.value)}
+            />
+          </label>
+          <div
+            className="rounded-[2px] border border-[var(--line-strong)]"
+            onPointerDown={handleExcerptPointerDown}
+            onPointerUp={handleExcerptPointerUp}
+            ref={(element) => {
+              transcriptTextRootRef.current = element;
+            }}
+          >
+            {visibleSegments.length > 0 ? (
+              visibleSegments.map((segment) => (
+                <div
+                  className="grid gap-3 border-b border-[var(--line-strong)] bg-[var(--paper-raised)] px-4 py-3 last:border-b-0 sm:grid-cols-[86px_minmax(0,1fr)]"
+                  key={`${segment.start}-${segment.end}-${segment.speaker ?? ""}-${segment.text}`}
+                >
+                  <div className="select-none space-y-1">
+                    <div className="mono text-xs text-[var(--muted)]">
+                      {formatTimestamp(segment.start)}
                     </div>
-                  ))
-                ) : (
-                  <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-                    没有找到包含“{transcriptQuery.trim()}”的片段。
+                    {segment.speaker ? (
+                      <span className="inline-flex max-w-[76px] truncate rounded-[2px] bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                        {segment.speaker}
+                      </span>
+                    ) : null}
                   </div>
-                )}
+                  <p
+                    className="transcript-excerpt-text text-sm leading-6 text-[var(--ink-soft)]"
+                    data-excerpt-end={segment.end}
+                    data-excerpt-start={segment.start}
+                    data-transcript-excerpt="true"
+                  >
+                    {segment.text}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+                没有找到包含“{transcriptQuery.trim()}”的片段。
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
         {renderNoteWorkflow()}
       </div>

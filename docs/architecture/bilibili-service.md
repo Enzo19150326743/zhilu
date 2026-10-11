@@ -5,7 +5,7 @@
 
 ## 一、模块概览
 
-- 功能目标：在通用 yt-dlp 被 B 站播放流接口拒绝时，补一条 B 站专用取流链路，优先拿到公开视频 DASH audio，供本地 Whisper 转写使用。
+- 功能目标：在通用 yt-dlp 被 B 站播放流接口拒绝时，补一条 B 站专用取流链路，优先拿到公开视频 DASH audio，供本地 SenseVoice 转写使用。
 - 当前定位：不是万能下载器，不处理 DRM、付费、私密、会员专属或无授权内容。
 - 核心入口：计划新增 `backend/app/services/bilibili_service.py`，并通过 `media_source_service.py` 的专用 Adapter 接入 `/api/parse`。
 
@@ -14,7 +14,7 @@
 - `backend/app/services/bilibili_service.py`：新增 B 站专用元数据、签名、播放流和格式整理逻辑。
 - `backend/app/services/media_source_service.py`：新增 `BilibiliVideoSourceAdapter`，顺序放在 `YtdlpVideoSourceAdapter` 之前。
 - `backend/app/services/ytdlp_service.py`：继续保留通用 yt-dlp 兜底和公开元数据降级，不承载完整 B 站专用链路。
-- `backend/app/services/asr_service.py`：继续负责下载音频和 Whisper 转写；后续应能接收 B 站专用链路提供的音频 URL 与请求头。
+- `backend/app/services/asr_service.py`：负责下载音频和 SenseVoice 转写，接收 B 站专用链路提供的音频 URL 与请求头。
 - `backend/app/main.py`：`/api/transcribe` 当前通过 `_resolve_transcription_source_url()` 解析转写源；后续需要让 B 站结果能稳定传入 ASR。
 - `frontend/components/FormatSelector.tsx`：继续展示格式列表和平台拒绝提示，不承担取流逻辑。
 
@@ -47,7 +47,7 @@ URL
 → x/player/wbi/playurl 请求 DASH 流
 → 选择可用 audio stream
 → 返回 ParseResponse + transcription_source_url 或 B 站音频候选
-→ /api/transcribe 下载该音频并交给 Whisper
+→ /api/transcribe 下载该音频并交给 SenseVoice
 ```
 
 完整 DownKyi 式路线可分阶段补齐：

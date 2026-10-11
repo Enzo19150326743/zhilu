@@ -58,7 +58,7 @@ AI 转写稿生成：
 → POST /api/transcribe
 → main._resolve_transcription_source_url() 对抖音先解析 transcription_source_url
 → asr_service 下载公开直链音频 / 视频输入
-→ faster-whisper 生成 TranscriptPayload
+→ SenseVoiceSmall 生成 TranscriptPayload
 → library_service 仍按原始抖音 source_url 写回历史
 ```
 
@@ -68,8 +68,8 @@ AI 转写稿生成：
 - 抖音分享口令不是标准 URL 输入，后端必须先从整段文案里提取公开 URL。
 - `transcription_source_url` 只作为 ASR 输入，不应替代原始抖音链接成为历史主键。
 - 下载时需要重新解析公开视频直链，避免直链过期。
-- 当前没有平台字幕；页面显示“无可用内容文本”是正常状态，用户可手动触发 ASR 生成 AI 转写稿。ASR 依赖后端本机 ffmpeg 与 faster-whisper 模型，`.env` 变更后必须重启后端。
-- 抖音直链有时是可由 yt-dlp 识别的 mp4 视频输入，不一定是纯音频；`asr_service` 负责下载临时媒体并交给 Whisper 读取音轨。
+- 当前没有平台字幕；普通解析页面显示“无可用内容文本”是正常状态，默认提炼任务会使用 SenseVoiceSmall 自动补齐 AI 转写稿并继续总结。ASR 依赖后端本机 ffmpeg 和 SenseVoice 环境，`.env` 变更后必须重启后端。
+- 抖音直链有时是可由 yt-dlp 识别的 mp4 视频输入，不一定是纯音频；`asr_service` 负责下载临时媒体，再由 ffmpeg 提取音轨交给 SenseVoice。
 - WAF challenge、公开接口和分享页结构随平台变化可能失效；失败时要返回明确错误，不要用文案掩盖解析失败。
 - 不为抖音加入自动登录、自动拿 Cookie、破解风控或批量抓取能力。
 

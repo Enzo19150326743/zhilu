@@ -27,13 +27,13 @@ AI 服务不可用不会阻止基础解析；系统会保留本地降级结果�
 
 ## 没有字幕或内容文本
 
-平台可能没有公开字幕。打开“内容文本”，按需生成本地 AI 转写稿。第一次使用 Whisper 时可能下载模型。
+平台可能没有公开字幕。默认“提炼内容”任务会自动使用 SenseVoiceSmall 补齐转写稿并继续总结。第一次使用时可能下载模型；建议先运行“准备完整本地转写环境”。
 
-## Whisper 模型不可用或转写很慢
+## 本地转写模型不可用或转写很慢
 
-- 检查 `ASR_WHISPER_MODEL` 是否是有效模型名或本地目录。
-- 先使用 `base + cpu + int8` 验证链路。
-- GPU 显存不足时允许自动回退 CPU。
+- 检查 SenseVoice 依赖是否安装，以及 `SENSEVOICE_MODEL` 是否是有效模型名或本地目录。
+- 先设置 `SENSEVOICE_DEVICE=cpu` 验证同一模型的识别链路。
+- 使用 NVIDIA 加速时运行 `scripts/install-sensevoice-cuda.ps1`，确认安装的 PyTorch 支持 CUDA；4GB 级显卡可保持默认的 60 秒 GPU 批量。
 - 长媒体会显著增加转写时间，第一次先测试短内容。
 
 ## 小宇宙解析失败

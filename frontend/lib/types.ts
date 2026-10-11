@@ -4,14 +4,8 @@ export interface HealthResponse {
   version: string;
 }
 
-export type AsrEngine =
-  | "local_whisper"
-  | "sensevoice_small";
-
 export interface AsrStatusResponse {
   success: true;
-  recommended_engine: "local_whisper" | "sensevoice_small";
-  whisper_model: string;
   sensevoice_available: boolean;
   sensevoice_model: string;
   sensevoice_message?: string | null;
@@ -351,7 +345,6 @@ export interface TranscribeRequest {
   url: string;
   video_id?: string | null;
   context_settings?: TranscribeContextSettings | null;
-  asr_engine?: AsrEngine;
 }
 
 export interface TranscribeResponse {
@@ -359,7 +352,7 @@ export interface TranscribeResponse {
   source_url: string;
   video_id?: string | null;
   transcript: TranscriptPayload;
-  transcript_variant_key: AsrEngine | string;
+  transcript_variant_key: string;
   message: string;
 }
 
@@ -387,7 +380,6 @@ export interface TranscribeTask {
   finishedAt?: number;
   message?: string;
   errorMessage?: string;
-  asrEngine?: AsrEngine;
   contextSettings?: TranscribeContextSettings;
 }
 
@@ -442,8 +434,6 @@ export type LibraryFilter = "all" | "ready" | "summarized" | "noTranscript";
 
 export type AppStatus = "idle" | "loading" | "parsed" | "error";
 
-export type BatchTarget = "parse_only" | "analyze";
-
 export interface ProcessingTaskItem {
   task_id: string;
   input_index: number;
@@ -475,7 +465,6 @@ export interface TaskBatchResponse {
   success: true;
   batch_id: string;
   client_request_id: string;
-  target: BatchTarget;
   created_at: string;
   stats: TaskBatchStats;
   items: ProcessingTaskItem[];
@@ -483,7 +472,6 @@ export interface TaskBatchResponse {
 
 export interface TaskBatchSummary {
   batch_id: string;
-  target: BatchTarget;
   created_at: string;
   stats: TaskBatchStats;
 }
@@ -498,8 +486,6 @@ export interface TaskBatchListResponse {
 export interface TaskBatchCreateRequest {
   client_request_id: string;
   urls: string[];
-  target: BatchTarget;
-  asr_engine: AsrEngine;
   context_settings?: TranscribeContextSettings | null;
 }
 

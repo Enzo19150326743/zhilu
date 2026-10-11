@@ -75,9 +75,10 @@ rg "关键词" ai-video-insight-workspace/backend `
 ai-video-insight-workspace/
 ├── frontend/   Next.js + React + TypeScript + Tailwind 前端
 ├── backend/    FastAPI + Pydantic 后端
-├── docs/       项目上下文、架构、计划、交接文档
+├── docs/       使用指南、架构、示例与历史存档（导航见 docs/README.md）
+├── assets/     README 插图与当前版本截图
 ├── .github/    GitHub Actions、Issue 与 PR 模板
-├── scripts/    Windows 本地启动脚本
+├── scripts/    Windows 启动、配置、模型准备与发布检查
 └── 启动网站.bat
 ```
 
@@ -92,7 +93,7 @@ ai-video-insight-workspace/
 - `frontend/lib/platform-display.ts`：平台稳定键到面向用户名称的统一转换，最近档案和详情卡片共用。
 - `frontend/lib/media-image.ts`：媒体源封面地址规范化与后端图片代理地址生成。
 - `frontend/lib/transcribe-settings.ts`：转写设置选项、平台默认值和说话人模板。
-- `frontend/lib/mock-data.ts`：前端兜底推荐内容数据。
+- `backend/data/demo_seed.json`：首页快速体验使用的公开推荐内容，前端通过 Demo API 读取。
 
 ## 前端组件地图
 
@@ -112,7 +113,7 @@ ai-video-insight-workspace/
 - `frontend/components/TranscribeSettingsPanel.tsx`：生成转写稿前的节目结构、内容标签和说话人辅助设置。
 - `frontend/components/TranscribeSettingsDialog.tsx`：所有生成 AI 转写稿入口共用的转写设置确认弹窗。
 - `frontend/components/TranscribeTaskToasts.tsx`：解析、总结、转写后台任务提示。
-- `frontend/components/BatchAddDialog.tsx`：多链接提取、去重、目标和转写引擎设置。
+- `frontend/components/BatchAddDialog.tsx`：多链接提取、去重和可展开的处理设置，统一提交内容提炼任务。
 - `frontend/components/BatchWorkspace.tsx`：批次统计、最近批次、任务筛选、单项取消/重试与结果回看。
 - `frontend/components/Header.tsx`：顶部导航和品牌区。
 - `frontend/hooks/use-library-processing-workflows.ts`：转写与自动总结期间的统一“处理中”标记、当前标签页刷新恢复和会话清理。
@@ -127,7 +128,7 @@ ai-video-insight-workspace/
 - `backend/app/demo_data.py`：Demo 数据读取。
 - `backend/requirements.txt`：Python 依赖。
 - `backend/tests/`：后端单测。
-- `scripts/prepare-local-asr.ps1`：一次安装本地转写依赖并预下载 Whisper、SenseVoiceSmall 和 FSMN-VAD。
+- `scripts/prepare-local-asr.ps1`：一次安装本地转写依赖并预下载 SenseVoiceSmall 和 FSMN-VAD。
 - `scripts/prefetch-asr-models.py`：固定模型目标和预下载实现，可用 `--plan-only` 只查看清单。
 
 ## 后端服务地图
@@ -140,10 +141,10 @@ ai-video-insight-workspace/
 - `backend/app/services/demo_cover_service.py`：推荐内容封面解析；稳定封面直接复用，临时签名封面按需刷新。
 - `backend/app/services/xiaoyuzhou_service.py`：小宇宙公开单集 RSS / 网页解析。
 - `backend/app/services/transcript_service.py`：平台字幕和 VTT/SRT 字幕解析。
-- `backend/app/services/asr_service.py`：本地 Whisper 与 SenseVoiceSmall 分流、模型 fallback、耗时元数据和双稿串联。
+- `backend/app/services/asr_service.py`：本地 SenseVoiceSmall 识别编排、耗时元数据和原始稿／校对稿串联。
 - `backend/app/services/sensevoice_service.py`：本地 SenseVoiceSmall、ffmpeg 规范化、FSMN-VAD 长音频识别和时间戳映射。
-- `backend/app/services/transcript_segment_service.py`：按停顿、标点、时长和字符数规范化 ASR 相邻碎片；当前用于 Whisper 校对前整理。
-- `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；生产 Whisper 目前保持中性解码。
+- `backend/app/services/transcript_segment_service.py`：按停顿、标点、时长和字符数规范化 SenseVoice 相邻碎片，整理校对输入并保留原始句段。
+- `backend/app/services/transcribe_context_service.py`：转写上下文规范化与 DeepSeek 校对上下文生成；不把人物或术语注入原始语音识别。
 - `backend/app/services/correction_term_service.py`：本地 AI 校对术语库、文件夹、一次性旧词迁移和使用统计。
 - `backend/app/services/transcript_correction_service.py`：DeepSeek ASR 转写稿自动校对，失败时回退原始稿。
 - `backend/app/services/transcript_identity_service.py`：当前有效转写稿指纹、稳定片段标识和总结证据关联。
@@ -168,14 +169,14 @@ ai-video-insight-workspace/
 - 改 B 站：先读 `docs/architecture/bilibili-service.md`，再读 `backend/app/services/bilibili_service.py`、`backend/app/services/transcript_service.py`。
 - 改抖音：先读 `docs/architecture/v0-4-douyin-adapter.md`，再读 `backend/app/services/douyin_service.py`。
 - 改小红书：先读 `docs/architecture/xiaohongshu-public-video.md`，再读 `backend/app/services/xiaohongshu_service.py`、`backend/app/services/media_source_service.py`、`frontend/components/TranscribeRequiredState.tsx` 和 `frontend/lib/platform-display.ts`。
-- 改小宇宙：先读 `docs/plans/2026-05-10-xiaoyuzhou-podcast-source.md`，再读 `backend/app/services/xiaoyuzhou_service.py`。
+- 改小宇宙：先读 `backend/app/services/xiaoyuzhou_service.py` 和 `backend/tests/test_xiaoyuzhou_service.py`；本地计划仅作补充。
 - 改总结 / 导图：先读 `frontend/components/SummaryTab.tsx`、`frontend/components/MindmapTab.tsx`、`backend/app/services/summarize_service.py`。
 - 改 QA：先读 `frontend/components/QaTab.tsx`、`backend/app/services/qa_service.py`。
 - 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/sensevoice_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
 - 改 AI 校对术语：先读 `frontend/components/CorrectionTermSelector.tsx` 和 `backend/app/services/correction_term_service.py`；`docs/asr-glossary.md` 只负责首次初始化种子。
 - 改本地历史：先读 `frontend/components/RecentLibrary.tsx`、`backend/app/services/library_service.py`。
 - 改批量处理：先读 `docs/architecture/batch-processing.md`，再读 `backend/app/services/task_store.py`、`task_runner.py`、`frontend/hooks/use-task-workspace.ts` 和 `frontend/components/BatchWorkspace.tsx`。
-- 改 Obsidian 导出：先读 `docs/plans/2026-06-12-obsidian-note-workflow-prd.md`、`backend/app/services/obsidian_export_service.py`。
+- 改 Obsidian 导出：先读 `docs/architecture/obsidian-note-workflow.md`、`backend/app/services/obsidian_export_service.py`。
 - 改启动器：先读 `启动网站.bat`、`scripts/launch-site.ps1`、`scripts/wait-for-url.ps1`。
 - 改公开安装说明：先读 `README.md`、`docs/installation.md`、`docs/configuration.md`、`docs/troubleshooting.md`。
 - 改 Obsidian 兼容说明：先读 `docs/obsidian-export.md`、`backend/app/services/obsidian_export_service.py`。

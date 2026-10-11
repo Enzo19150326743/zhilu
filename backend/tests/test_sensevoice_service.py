@@ -140,7 +140,7 @@ class SenseVoiceServiceTests(unittest.TestCase):
         self.assertEqual([segment.start for segment in segments], [0.0, 0.4])
         self.assertEqual([segment.end for segment in segments], [0.32, 0.72])
 
-    def test_asr_service_returns_sensevoice_metadata_without_whisper_fallback(
+    def test_asr_service_returns_sensevoice_metadata(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -159,21 +159,17 @@ class SenseVoiceServiceTests(unittest.TestCase):
                 "app.services.asr_service.transcribe_audio_with_sensevoice",
                 return_value=sensevoice_result,
             ):
-                with patch(
-                    "app.services.asr_service._transcribe_audio_with_whisper"
-                ) as whisper:
-                    with patch.dict(
-                        os.environ,
-                        {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
-                        clear=False,
-                    ):
-                        response = asr_service.transcribe_media_audio(
-                            "https://example.com/video",
-                            audio_downloader=lambda _: audio_path,
-                            asr_engine="sensevoice_small",
-                        )
+                with patch.dict(
+                    os.environ,
+                    {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
+                    clear=False,
+                ):
+                    response = asr_service.transcribe_media_audio(
+                        "https://example.com/video",
+                        audio_downloader=lambda _: audio_path,
+                    )
 
-        whisper.assert_not_called()
+
         self.assertEqual(response.transcript_variant_key, "sensevoice_small")
         self.assertEqual(response.transcript.asr_meta.engine, "sensevoice-small")
         self.assertEqual(response.transcript.asr_meta.device, "cpu")
@@ -217,7 +213,6 @@ class SenseVoiceServiceTests(unittest.TestCase):
                     response = asr_service.transcribe_media_audio(
                         "https://example.com/video",
                         audio_downloader=lambda _: audio_path,
-                        asr_engine="sensevoice_small",
                     )
 
         self.assertEqual(len(response.transcript.segments), 2)
@@ -245,28 +240,21 @@ class SenseVoiceServiceTests(unittest.TestCase):
 
         self.assertEqual(len(normalized), 2)
 
-    def test_sensevoice_failure_does_not_call_whisper(self) -> None:
+    def test_sensevoice_failure_surfaces_original_error_without_another_attempt(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             audio_path = Path(temporary_directory) / "source.mp4"
             audio_path.write_bytes(b"audio")
             with patch(
                 "app.services.asr_service.transcribe_audio_with_sensevoice",
-                side_effect=SenseVoiceError(
-                    "SENSEVOICE_MODEL_FAILED",
-                    "SenseVoice 失败。",
-                ),
-            ):
-                with patch(
-                    "app.services.asr_service._transcribe_audio_with_whisper"
-                ) as whisper:
-                    with self.assertRaises(HTTPException):
-                        asr_service.transcribe_media_audio(
-                            "https://example.com/video",
-                            audio_downloader=lambda _: audio_path,
-                            asr_engine="sensevoice_small",
-                        )
-
-        whisper.assert_not_called()
+                side_effect=SenseVoiceError("SENSEVOICE_MODEL_FAILED", "SenseVoice 失败。"),
+            ) as recognize:
+                with self.assertRaises(HTTPException) as raised:
+                    asr_service.transcribe_media_audio(
+                        "https://example.com/video", audio_downloader=lambda _: audio_path
+                    )
+            recognize.assert_called_once()
+            self.assertEqual(raised.exception.detail["error_code"], "SENSEVOICE_MODEL_FAILED")
+            self.assertFalse(audio_path.exists())
 
 
 if __name__ == "__main__":

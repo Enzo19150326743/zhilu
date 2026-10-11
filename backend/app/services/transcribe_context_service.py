@@ -128,26 +128,6 @@ def normalize_transcribe_context_settings(
     )
 
 
-def build_whisper_context_lines(settings: TranscribeContextSettings) -> list[str]:
-    """生成给 Whisper initial_prompt 的短上下文，避免 prompt 过长。"""
-    lines = [
-        f"节目结构：{PROGRAM_STRUCTURE_LABELS.get(settings.program_structure, '自动判断')}"
-    ]
-    tag_labels = _get_content_tag_labels(settings.content_tags)
-    if tag_labels:
-        lines.append(f"内容标签：{'、'.join(tag_labels)}")
-
-    speaker_terms = [
-        _format_speaker_compact(speaker)
-        for speaker in settings.speakers[:MAX_SPEAKERS]
-        if _has_speaker_content(speaker)
-    ]
-    if speaker_terms:
-        lines.append(f"说话人参考：{'；'.join(speaker_terms)}")
-
-    return lines
-
-
 def build_correction_context_lines(settings: TranscribeContextSettings) -> list[str]:
     """生成给 DeepSeek 校对的详细上下文和边界说明。"""
     lines = [
@@ -173,22 +153,6 @@ def build_correction_context_lines(settings: TranscribeContextSettings) -> list[
         ]
     )
     return lines
-
-
-def build_speaker_hotwords(settings: TranscribeContextSettings) -> list[str]:
-    """把用户提供的说话人名称和身份加入 Whisper hotwords。"""
-    hotwords: list[str] = []
-    seen_values: set[str] = set()
-    for speaker in settings.speakers[:MAX_SPEAKERS]:
-        for value in (speaker.name, speaker.role):
-            text = _normalize_text(value)
-            if not text or text.casefold() in seen_values:
-                continue
-
-            seen_values.add(text.casefold())
-            hotwords.append(text)
-
-    return hotwords
 
 
 def get_allowed_speaker_labels(settings: TranscribeContextSettings) -> set[str]:

@@ -53,7 +53,7 @@ from app.schemas import (
     TranscribeRequest,
     TranscribeResponse,
 )
-from app.services.asr_service import DEFAULT_ASR_MODEL, transcribe_media_audio
+from app.services.asr_service import transcribe_media_audio
 from app.services import http_fetch_service
 from app.services.bilibili_service import (
     download_bilibili_video_format,
@@ -322,10 +322,6 @@ def get_asr_status() -> AsrStatusResponse:
     sensevoice_available, sensevoice_message = get_sensevoice_status()
     correction_available, correction_message = get_transcript_correction_status()
     return AsrStatusResponse(
-        recommended_engine="sensevoice_small",
-        whisper_model=(
-            os.getenv("ASR_WHISPER_MODEL", "").strip() or DEFAULT_ASR_MODEL
-        ),
         sensevoice_available=sensevoice_available,
         sensevoice_model=(
             os.getenv("SENSEVOICE_MODEL", "").strip()
@@ -989,7 +985,6 @@ def transcribe_video(
             media_type=transcribe_context.get("media_type"),
             context_settings=transcribe_request.context_settings,
             shownotes_plain_text=transcribe_context.get("shownotes_plain_text"),
-            asr_engine=transcribe_request.asr_engine,
         )
     try:
         saved = update_transcript_for_source_url(
@@ -1040,7 +1035,7 @@ def transcribe_video(
 
 def _get_transcribe_prompt_context(source_url: str) -> dict[str, object]:
     """
-    从本地历史读取媒体上下文，用于 ASR hotwords / prompt；读取失败不阻断转写。
+    从本地历史读取媒体上下文，用于校对上下文；读取失败不阻断转写。
     """
     try:
         detail = get_library_detail_by_source_url(source_url)

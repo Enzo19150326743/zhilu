@@ -10,7 +10,6 @@ from app.schemas import (
 )
 from app.services.transcribe_context_service import (
     build_correction_context_lines,
-    build_whisper_context_lines,
     merge_shownotes_context,
     normalize_transcribe_context_settings,
 )
@@ -180,22 +179,6 @@ class TranscribeContextServiceTests(unittest.TestCase):
 
         self.assertEqual([speaker.name for speaker in settings.speakers], ["主持人", "嘉宾"])
 
-    def test_whisper_context_contains_program_tags_and_speaker_names(self) -> None:
-        settings = normalize_transcribe_context_settings(
-            TranscribeContextSettings(
-                program_structure="interview",
-                content_tags=["ai_tech"],
-                speakers=[TranscribeSpeakerProfile(name="老王", role="嘉宾")],
-            ),
-            platform="bilibili",
-            media_type="video",
-        )
-
-        prompt_text = "\n".join(build_whisper_context_lines(settings))
-
-        self.assertIn("双人访谈", prompt_text)
-        self.assertIn("AI / 科技", prompt_text)
-        self.assertIn("老王", prompt_text)
 
 
 if __name__ == "__main__":

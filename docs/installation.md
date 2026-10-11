@@ -1,6 +1,6 @@
 # 安装与启动
 
-知录当前以 Windows 本地使用为第一优先级。第一次启动需要联网安装 Python、npm 依赖；如果没有提前准备完整本地转写环境，第一次生成 AI 转写稿时还可能下载所选模型。
+知录当前以 Windows 本地使用为第一优先级。第一次启动需要联网安装 Python、npm 依赖；如果没有提前准备完整本地转写环境，第一次生成 AI 转写稿时还可能下载 SenseVoiceSmall 和 FSMN-VAD。
 
 ## 环境要求
 
@@ -42,19 +42,18 @@ cd zhilu
 
 ## 推荐：一次准备全部本地转写依赖与模型
 
-为了避免第一次使用 Whisper、SenseVoiceSmall 时再次等待，在项目根目录运行：
+为了避免第一次使用 SenseVoiceSmall 时再次等待，在项目根目录运行：
 
 ```powershell
 .\准备完整本地转写环境.bat
 ```
 
-脚本会在下载前展示计划并等待确认。自动模式会检测 Windows NVIDIA 显卡；有 NVIDIA 显卡时安装项目内 CUDA 依赖和 CUDA 版 PyTorch，否则使用 CPU 环境。随后提前缓存：
+脚本会在下载前展示计划并等待确认。自动模式会检测 Windows NVIDIA 显卡；有 NVIDIA 显卡时安装官方 CUDA 版 PyTorch，否则使用 CPU 环境。随后提前缓存：
 
-- Whisper `large-v3-turbo`，约 1.62 GB；
 - SenseVoiceSmall，约 0.94 GB；
 - SenseVoice 使用的 FSMN-VAD 辅助模型。
 
-完整 CPU 环境预计下载约 3～5 GB、建议预留 6～10 GB；完整 NVIDIA 环境预计下载约 6～8 GB、建议预留 12～15 GB。上游包版本和已有缓存会影响实际体积。
+依赖与模型的下载规划范围：CPU 约 1.5～3.5 GB、建议预留 4～7 GB；NVIDIA 约 3～6 GB、建议预留 8～12 GB。这是按模型与 PyTorch 等依赖估算的范围，并非一次安装的实测总量；不包含前端 npm 依赖、媒体下载或用户历史数据。上游包版本、安装时的缓存和临时解压会影响实际体积。
 
 只查看计划、不执行安装：
 
@@ -85,15 +84,7 @@ npm run dev -- --hostname 127.0.0.1 --port 3000
 
 ## 可选：Windows NVIDIA GPU 加速
 
-CPU 模式始终可用。完整环境准备脚本会自动完成以下步骤；需要手动维护时，Windows + NVIDIA 用户也可以把 CUDA 运行库只安装到项目虚拟环境：
-
-```powershell
-backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-gpu-windows.txt
-```
-
-项目只修改当前 Python 进程的 DLL 搜索目录，不写入 Windows 全局 `PATH`。GPU 加载、推理或显存不足时，会按配置回退到 CPU。
-
-如需启用推荐的本地 SenseVoiceSmall 中文长内容识别，再运行：
+完整环境准备脚本会自动安装 SenseVoiceSmall 依赖。需要手动维护 CPU 环境时，在项目根目录运行：
 
 ```powershell
 backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-sensevoice-windows.txt
@@ -108,7 +99,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install-sensevoice-cuda.ps1
 
 脚本只修改项目的 `backend/.venv`，从 PyTorch 官方 CUDA wheel 源安装依赖，不修改
 Windows 全局 Python 或系统 `PATH`。CUDA wheel 体积较大，脚本已启用断点续传重试；
-安装结束会打印 `cuda_available` 和实际显卡名称。
+安装结束会打印 `cuda_available` 和实际显卡名称。Windows CUDA 版 PyTorch 自带所需运行库，无需另外安装独立的 NVIDIA 运行库包。设备配置为 `auto` 时优先使用可用 GPU，也可使用同一 SenseVoice 模型的 CPU 设备；不会切换到另一种语音模型。
 
 ## 构建生产前端
 

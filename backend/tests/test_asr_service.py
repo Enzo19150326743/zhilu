@@ -1,9 +1,7 @@
 import tempfile
 import unittest
 import os
-import sys
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import HTTPException
@@ -15,58 +13,39 @@ from app.schemas import (
     TranscriptSegment,
 )
 from app.services import asr_service
+from app.services.sensevoice_service import SenseVoiceTranscriptionResult
 from app.services.asr_service import transcribe_media_audio
 
 
 class AsrServiceTests(unittest.TestCase):
-    def test_whisper_activates_project_cuda_runtime_before_model_loading(self) -> None:
-        """项目内 NVIDIA DLL 必须在 Whisper 模型构造前加入当前进程搜索路径。"""
-        events: list[str] = []
+    def setUp(self) -> None:
+        settings_patch = patch.dict(os.environ, {
+            "ASR_CORRECTION_ENABLED": "0", "AI_API_KEY": "", "DEEPSEEK_API_KEY": "",
+            "SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED": "0",
+        }, clear=False)
+        settings_patch.start()
+        self.addCleanup(settings_patch.stop)
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            audio_path = Path(temporary_directory) / "sample.m4a"
-            audio_path.write_text("fake audio", encoding="utf-8")
-
-            class FakeSegment:
-                start = 0
-                end = 1
-                text = "测试转写"
-
-            class FakeWhisperModel:
-                def __init__(
-                    self,
-                    _: str,
-                    *,
-                    device: str,
-                    compute_type: str,
-                ) -> None:
-                    events.append(f"model:{device}:{compute_type}")
-
-                def transcribe(
-                    self,
-                    _: str,
-                    **__: object,
-                ) -> tuple[list[FakeSegment], object]:
-                    return [FakeSegment()], object()
-
-            fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
-            env = {
-                "ASR_WHISPER_MODEL": "base",
-                "ASR_FALLBACK_WHISPER_MODEL": "base",
-                "ASR_DEVICE": "cpu",
-                "ASR_COMPUTE_TYPE": "int8",
-                "ASR_AUTO_FALLBACK": "0",
-            }
-
-            with patch.dict(sys.modules, {"faster_whisper": fake_module}):
-                with patch.dict(os.environ, env, clear=False):
-                    with patch(
-                        "app.services.cuda_runtime.activate_cuda_dll_directories",
-                        side_effect=lambda: events.append("activate"),
-                    ):
-                        asr_service._transcribe_audio_with_whisper(audio_path)
-
-        self.assertEqual(events, ["activate", "model:cpu:int8"])
+    def test_saved_recognition_checkpoint_keeps_its_original_metadata(self) -> None:
+        transcript = TranscriptPayload(
+            segments=[TranscriptSegment(start=0, end=1, text="历史识别稿")],
+            plain_text="历史识别稿",
+        )
+        recognized = asr_service.RecognizedTranscription(
+            result=asr_service.AsrTranscriptionResult(
+                transcript=transcript, model="archived-model", device="cpu",
+                compute_type="int8", language="zh", engine="archived-engine",
+            ),
+            transcription_seconds=3,
+        )
+        response = asr_service.finalize_transcription(
+            recognized,
+            asr_service.PreparedTranscriptionMedia(path=Path("saved-checkpoint"), audio_download_seconds=2),
+            source_url="https://example.com/archived",
+        )
+        self.assertEqual(response.transcript_variant_key, "archived_asr")
+        self.assertEqual(response.transcript.asr_meta.engine, "archived-engine")
+        self.assertEqual(response.transcript.raw_plain_text, "历史识别稿")
 
     def test_transcribe_media_audio_builds_payload_from_segments(self) -> None:
         """
@@ -88,6 +67,15 @@ class AsrServiceTests(unittest.TestCase):
                     plain_text="第一句内容。 第二句内容。",
                 )
 
+            sensevoice_patch = patch(
+                "app.services.asr_service.transcribe_audio_with_sensevoice",
+                side_effect=lambda path, **_: SenseVoiceTranscriptionResult(
+                    transcript=fake_transcribe(path), model="iic/SenseVoiceSmall", device="cpu"
+                ),
+            )
+            sensevoice_patch.start()
+            self.addCleanup(sensevoice_patch.stop)
+
             # NOTE: 全量测试可能由其他模块加载本机 .env；这里显式清空密钥，
             # 保证该用例只验证 ASR 载荷组装，不意外调用真实校对服务。
             with patch.dict(
@@ -98,8 +86,6 @@ class AsrServiceTests(unittest.TestCase):
                 response = transcribe_media_audio(
                     "https://example.com/video",
                     audio_downloader=fake_download,
-                    asr_engine="local_whisper",
-                    transcriber=fake_transcribe,
                 )
 
         self.assertEqual(response.transcript.plain_text, "第一句内容。 第二句内容。")
@@ -121,6 +107,15 @@ class AsrServiceTests(unittest.TestCase):
                     plain_text="敏感正文",
                 )
 
+            sensevoice_patch = patch(
+                "app.services.asr_service.transcribe_audio_with_sensevoice",
+                side_effect=lambda path, **_: SenseVoiceTranscriptionResult(
+                    transcript=fake_transcribe(path), model="iic/SenseVoiceSmall", device="cpu"
+                ),
+            )
+            sensevoice_patch.start()
+            self.addCleanup(sensevoice_patch.stop)
+
             with patch.dict(
                 os.environ,
                 {"AI_API_KEY": "", "DEEPSEEK_API_KEY": ""},
@@ -133,13 +128,11 @@ class AsrServiceTests(unittest.TestCase):
                     transcribe_media_audio(
                         "https://example.com/private-video",
                         audio_downloader=fake_download,
-                        asr_engine="local_whisper",
-                        transcriber=fake_transcribe,
                     )
 
         log_output = "\n".join(captured_logs.output)
         self.assertIn("stage=audio_download", log_output)
-        self.assertIn("stage=whisper", log_output)
+        self.assertIn("stage=sensevoice", log_output)
         self.assertIn("stage=correction", log_output)
         self.assertIn("stage=total", log_output)
         self.assertNotIn("https://example.com/private-video", log_output)
@@ -159,204 +152,23 @@ class AsrServiceTests(unittest.TestCase):
             def fake_transcribe(_: Path) -> TranscriptPayload:
                 return TranscriptPayload(segments=[], plain_text="文本")
 
+            sensevoice_patch = patch(
+                "app.services.asr_service.transcribe_audio_with_sensevoice",
+                side_effect=lambda path, **_: SenseVoiceTranscriptionResult(
+                    transcript=fake_transcribe(path), model="iic/SenseVoiceSmall", device="cpu"
+                ),
+            )
+            sensevoice_patch.start()
+            self.addCleanup(sensevoice_patch.stop)
+
             with patch("app.services.asr_service._remove_file") as remove_file:
                 transcribe_media_audio(
                     "https://example.com/video",
                     audio_downloader=fake_download,
-                    asr_engine="local_whisper",
-                    transcriber=fake_transcribe,
                 )
 
         remove_file.assert_called_once_with(audio_path)
 
-    def test_auto_device_falls_back_without_injecting_semantic_whisper_prompt(
-        self,
-    ) -> None:
-        """
-        ASR_DEVICE=auto 时先试 CUDA；失败后继续使用 CPU，但不向声学解码注入长语义上下文。
-        """
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            audio_path = Path(temporary_directory) / "sample.m4a"
-            audio_path.write_text("fake audio", encoding="utf-8")
-
-            class FakeSegment:
-                start = 0
-                end = 1.5
-                text = " Deep seek 和 codex "
-
-            class FakeWhisperModel:
-                init_calls: list[tuple[str, str, str]] = []
-                transcribe_kwargs: dict[str, object] = {}
-
-                def __init__(
-                    self,
-                    model: str,
-                    *,
-                    device: str,
-                    compute_type: str,
-                ) -> None:
-                    self.model = model
-                    self.device = device
-                    self.compute_type = compute_type
-                    self.init_calls.append((model, device, compute_type))
-                    if device == "cuda":
-                        raise RuntimeError("cuda unavailable")
-
-                def transcribe(
-                    self,
-                    _: str,
-                    **kwargs: object,
-                ) -> tuple[list[FakeSegment], object]:
-                    self.transcribe_kwargs = kwargs
-                    FakeWhisperModel.transcribe_kwargs = kwargs
-                    return [FakeSegment()], object()
-
-            fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
-            env = {
-                "ASR_WHISPER_MODEL": "large-v3-turbo",
-                "ASR_FALLBACK_WHISPER_MODEL": "base",
-                "ASR_DEVICE": "auto",
-                "ASR_COMPUTE_TYPE": "int8",
-                "ASR_LANGUAGE": "zh",
-                "ASR_BEAM_SIZE": "5",
-                "ASR_AUTO_FALLBACK": "1",
-            }
-
-            with patch.dict(sys.modules, {"faster_whisper": fake_module}):
-                with patch.dict(os.environ, env, clear=False):
-                    result = asr_service._transcribe_audio_with_whisper(
-                        audio_path,
-                    )
-
-        self.assertEqual(
-            FakeWhisperModel.init_calls,
-            [
-                ("large-v3-turbo", "cuda", "int8"),
-                ("base", "cpu", "int8"),
-            ],
-        )
-        self.assertEqual(result.model, "base")
-        self.assertEqual(result.device, "cpu")
-        self.assertEqual(FakeWhisperModel.transcribe_kwargs["language"], "zh")
-        self.assertEqual(FakeWhisperModel.transcribe_kwargs["beam_size"], 5)
-        self.assertIsNone(FakeWhisperModel.transcribe_kwargs["initial_prompt"])
-        self.assertIsNone(FakeWhisperModel.transcribe_kwargs["hotwords"])
-        self.assertTrue(FakeWhisperModel.transcribe_kwargs["condition_on_previous_text"])
-
-    def test_whisper_decode_excludes_semantic_context_to_prevent_repetition(self) -> None:
-        """
-        标题、术语和说话人仍供 DeepSeek 校对使用，但不能污染 Whisper 声学解码。
-        """
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            audio_path = Path(temporary_directory) / "sample.m4a"
-            audio_path.write_text("fake audio", encoding="utf-8")
-
-            class FakeSegment:
-                start = 0
-                end = 1.5
-                text = " 老王 说到了 deep seek "
-
-            class FakeWhisperModel:
-                transcribe_kwargs: dict[str, object] = {}
-
-                def __init__(
-                    self,
-                    model: str,
-                    *,
-                    device: str,
-                    compute_type: str,
-                ) -> None:
-                    self.model = model
-                    self.device = device
-                    self.compute_type = compute_type
-
-                def transcribe(
-                    self,
-                    _: str,
-                    **kwargs: object,
-                ) -> tuple[list[FakeSegment], object]:
-                    FakeWhisperModel.transcribe_kwargs = kwargs
-                    return [FakeSegment()], object()
-
-            fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
-            with patch.dict(sys.modules, {"faster_whisper": fake_module}):
-                result = asr_service._transcribe_audio_with_whisper(
-                    audio_path,
-                    asr_config=asr_service.AsrConfig(
-                        model="base",
-                        fallback_model="base",
-                        device="cpu",
-                        compute_type="int8",
-                        language="zh",
-                        beam_size=5,
-                        auto_fallback=False,
-                    ),
-                )
-
-        self.assertEqual(result.model, "base")
-        self.assertIsNone(FakeWhisperModel.transcribe_kwargs["initial_prompt"])
-        self.assertIsNone(FakeWhisperModel.transcribe_kwargs["hotwords"])
-        self.assertTrue(FakeWhisperModel.transcribe_kwargs["condition_on_previous_text"])
-
-    def test_whisper_normalizes_correction_segments_and_preserves_raw_segments(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            audio_path = Path(temporary_directory) / "sample.m4a"
-            audio_path.write_text("fake audio", encoding="utf-8")
-
-            class FakeWhisperModel:
-                def __init__(self, *_: object, **__: object) -> None:
-                    pass
-
-                def transcribe(
-                    self,
-                    _: str,
-                    **__: object,
-                ) -> tuple[list[SimpleNamespace], object]:
-                    return (
-                        [
-                            SimpleNamespace(start=0, end=1.5, text="第一段"),
-                            SimpleNamespace(start=1.5, end=3, text="第二段"),
-                            SimpleNamespace(start=3, end=4.5, text="第三段"),
-                            SimpleNamespace(start=4.5, end=6, text="第四段"),
-                        ],
-                        object(),
-                    )
-
-            fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
-            env = {
-                "ASR_DEVICE": "cpu",
-                "ASR_AUTO_FALLBACK": "0",
-                "ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED": "1",
-                "ASR_WHISPER_SEGMENT_MAX_SECONDS": "4",
-                "ASR_WHISPER_SEGMENT_MAX_CHARACTERS": "120",
-                "ASR_WHISPER_SEGMENT_SILENCE_GAP_SECONDS": "2",
-            }
-            with patch.dict(sys.modules, {"faster_whisper": fake_module}):
-                with patch.dict(os.environ, env, clear=False):
-                    result = asr_service._transcribe_audio_with_whisper(audio_path)
-
-        self.assertEqual(len(result.transcript.segments), 2)
-        self.assertEqual(result.transcript.segments[0].text, "第一段 第二段 第三段")
-        self.assertIsNotNone(result.raw_transcript)
-        self.assertEqual(len(result.raw_transcript.segments), 4)
-        self.assertEqual(result.timestamp_source, "whisper-segment-normalized")
-
-    def test_whisper_segment_normalization_can_be_disabled(self) -> None:
-        raw_segments = [
-            TranscriptSegment(start=0, end=1, text="第一段"),
-            TranscriptSegment(start=1, end=2, text="第二段"),
-        ]
-        with patch.dict(
-            os.environ,
-            {"ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED": "0"},
-            clear=False,
-        ):
-            normalized = asr_service._normalize_whisper_segments(raw_segments)
-
-        self.assertEqual(len(normalized), 2)
-        self.assertEqual([item.text for item in normalized], ["第一段", "第二段"])
 
     def test_transcribe_media_audio_persists_context_settings_in_asr_meta(self) -> None:
         """
@@ -375,6 +187,15 @@ class AsrServiceTests(unittest.TestCase):
                     plain_text="访谈内容。",
                 )
 
+            sensevoice_patch = patch(
+                "app.services.asr_service.transcribe_audio_with_sensevoice",
+                side_effect=lambda path, **_: SenseVoiceTranscriptionResult(
+                    transcript=fake_transcribe(path), model="iic/SenseVoiceSmall", device="cpu"
+                ),
+            )
+            sensevoice_patch.start()
+            self.addCleanup(sensevoice_patch.stop)
+
             response = transcribe_media_audio(
                 "https://example.com/video",
                 audio_downloader=fake_download,
@@ -389,8 +210,6 @@ class AsrServiceTests(unittest.TestCase):
                 ),
                 media_platform="bilibili",
                 media_type="video",
-                asr_engine="local_whisper",
-                transcriber=fake_transcribe,
             )
 
         self.assertIsNotNone(response.transcript.asr_meta)
@@ -421,6 +240,15 @@ class AsrServiceTests(unittest.TestCase):
                     plain_text="转写仍然完成。",
                 )
 
+            sensevoice_patch = patch(
+                "app.services.asr_service.transcribe_audio_with_sensevoice",
+                side_effect=lambda path, **_: SenseVoiceTranscriptionResult(
+                    transcript=fake_transcribe(path), model="iic/SenseVoiceSmall", device="cpu"
+                ),
+            )
+            sensevoice_patch.start()
+            self.addCleanup(sensevoice_patch.stop)
+
             with patch(
                 "app.services.asr_service.extract_shownotes_context",
                 side_effect=ValueError("invalid JSON"),
@@ -437,8 +265,7 @@ class AsrServiceTests(unittest.TestCase):
                     response = transcribe_media_audio(
                         "https://example.com/podcast",
                         audio_downloader=fake_download,
-                        asr_engine="local_whisper",
-                        transcriber=fake_transcribe,
+
                         shownotes_plain_text="主持人和嘉宾信息",
                     )
 
@@ -459,7 +286,7 @@ class AsrServiceTests(unittest.TestCase):
             raised.exception.detail["error_code"],
             "ASR_AUDIO_PLATFORM_REJECTED",
         )
-        self.assertIn("没有拿到可交给 Whisper 的音频文件", raised.exception.detail["message"])
+        self.assertIn("没有拿到可用于本地转写 的音频文件", raised.exception.detail["message"])
 
 
 if __name__ == "__main__":

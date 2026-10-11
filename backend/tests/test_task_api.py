@@ -31,8 +31,6 @@ class TaskApiTests(unittest.TestCase):
             json={
                 "client_request_id": "api-request-0001",
                 "urls": ["https://www.bilibili.com/video/BV123?p=2&spm_id_from=tracker"],
-                "target": "analyze",
-                "asr_engine": "local_whisper",
             },
         )
         self.assertEqual(response.status_code, 202)
@@ -59,19 +57,19 @@ class TaskApiTests(unittest.TestCase):
             json={
                 "client_request_id": "api-request-0050",
                 "urls": [f"https://example.com/{index}" for index in range(50)],
-                "target": "parse_only",
             },
         )
         self.assertEqual(response.status_code, 422)
         self.assertEqual(self.store.list_batches()["batches"], [])
 
-    def test_omitted_engine_persists_sensevoice_for_auto_transcription(self) -> None:
+    def test_legacy_options_are_ignored_and_not_persisted(self) -> None:
         response = self.client.post(
             "/api/task-batches",
             json={
                 "client_request_id": "default-asr-engine",
                 "urls": ["https://example.com/video"],
-                "target": "analyze",
+                "target": "parse_only",
+                "asr_engine": "removed-engine",
             },
         )
 
@@ -82,7 +80,8 @@ class TaskApiTests(unittest.TestCase):
                 "SELECT settings_json FROM processing_tasks WHERE id=?", (task_id,)
             ).fetchone()
         self.assertIsNotNone(row)
-        self.assertEqual(json.loads(row["settings_json"])["asr_engine"], "sensevoice_small")
+        self.assertEqual(set(json.loads(row["settings_json"])), {"context_settings", "client_key"})
+        self.assertNotIn("target", response.json())
 
 
 if __name__ == "__main__":

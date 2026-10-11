@@ -6,7 +6,6 @@ import type {
   TranscriptPayload
 } from "./types";
 
-export type TranscriptViewMode = "final" | "raw";
 export type DraftEditStatus = "saving" | "saved" | "error";
 
 export interface SelectedExcerpt {
@@ -28,69 +27,6 @@ export function formatTimestamp(seconds: number): string {
   return `${minutes.toString().padStart(2, "0")}:${remainSeconds
     .toString()
     .padStart(2, "0")}`;
-}
-
-export function formatElapsedSeconds(
-  seconds: number | null | undefined
-): string {
-  if (typeof seconds !== "number" || !Number.isFinite(seconds)) {
-    return "未记录";
-  }
-  return seconds < 60
-    ? `${seconds.toFixed(1)} 秒`
-    : `${(seconds / 60).toFixed(1)} 分钟`;
-}
-
-export function getTranscriptVariantLabel(variantKey: string): string {
-  if (variantKey === "local_whisper") {
-    return "Whisper";
-  }
-  if (variantKey === "sensevoice_small") {
-    return "SenseVoiceSmall";
-  }
-  return variantKey;
-}
-
-export function inferTranscriptVariantKey(
-  transcript: TranscriptPayload
-): string {
-  const engine = transcript.asr_meta?.engine?.toLowerCase() ?? "";
-  if (engine.includes("sensevoice")) {
-    return "sensevoice_small";
-  }
-  return "local_whisper";
-}
-
-export function canShowRawVersion(
-  transcript: TranscriptPayload | null
-): boolean {
-  return Boolean(
-    transcript &&
-      ((transcript.raw_segments?.length ?? 0) > 0 ||
-        transcript.raw_plain_text?.trim())
-  );
-}
-
-export function getTranscriptForViewMode(
-  transcript: TranscriptPayload,
-  viewMode: TranscriptViewMode
-): TranscriptPayload {
-  if (viewMode !== "raw" || !canShowRawVersion(transcript)) {
-    return transcript;
-  }
-
-  const rawPlainText = transcript.raw_plain_text?.trim() ?? "";
-  const rawSegments = transcript.raw_segments ?? [];
-  return {
-    ...transcript,
-    plain_text: rawPlainText || transcript.plain_text,
-    segments:
-      rawSegments.length > 0
-        ? rawSegments
-        : rawPlainText
-          ? [{ end: 0, start: 0, text: rawPlainText }]
-          : transcript.segments
-  };
 }
 
 function getTextSourceLabel(
@@ -146,10 +82,7 @@ export function getTextSourceHint(
       return null;
     }
     if (transcript?.asr_meta?.correction_status === "failed") {
-      const engineLabel = getTranscriptVariantLabel(
-        inferTranscriptVariantKey(transcript)
-      );
-      return `自动校对未成功，当前已回退展示 ${engineLabel} 原始识别稿。`;
+      return "自动校对未成功，当前展示原始识别稿。";
     }
     return null;
   }

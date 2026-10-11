@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-WHISPER_MODEL = "large-v3-turbo"
 SENSEVOICE_MODEL = "iic/SenseVoiceSmall"
 SENSEVOICE_VAD_MODEL = "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
 
@@ -23,12 +22,6 @@ class ModelTarget:
 
 def get_model_targets() -> tuple[ModelTarget, ...]:
     return (
-        ModelTarget(
-            name="Whisper large-v3-turbo",
-            model_id=WHISPER_MODEL,
-            approximate_size="约 1.62 GB",
-            source="Hugging Face",
-        ),
         ModelTarget(
             name="SenseVoiceSmall",
             model_id=SENSEVOICE_MODEL,
@@ -46,15 +39,9 @@ def get_model_targets() -> tuple[ModelTarget, ...]:
 
 def prefetch_models(
     *,
-    whisper_downloader: Callable[[str], str] | None = None,
     modelscope_downloader: Callable[[str], str] | None = None,
 ) -> dict[str, str]:
-    """下载三个固定目标；测试可注入假下载器，避免访问网络。"""
-
-    if whisper_downloader is None:
-        from faster_whisper.utils import download_model
-
-        whisper_downloader = download_model
+    """下载识别和 VAD 两个固定目标；测试可注入假下载器，避免访问网络。"""
 
     if modelscope_downloader is None:
         from modelscope import snapshot_download
@@ -62,7 +49,6 @@ def prefetch_models(
         modelscope_downloader = snapshot_download
 
     downloaded_paths = {
-        WHISPER_MODEL: str(whisper_downloader(WHISPER_MODEL)),
         SENSEVOICE_MODEL: str(modelscope_downloader(SENSEVOICE_MODEL)),
         SENSEVOICE_VAD_MODEL: str(modelscope_downloader(SENSEVOICE_VAD_MODEL)),
     }

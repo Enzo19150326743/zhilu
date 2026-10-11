@@ -132,7 +132,6 @@ export function useWorkbenchController() {
     handleConfirmTranscribeSettings,
     handleTranscribeRequest,
     setIsTranscribeSettingsOpen,
-    setPendingAsrEngine,
     setPendingTranscribeSettings,
     transcribeSettingsDialogState,
     transcribeTasks
@@ -223,7 +222,6 @@ export function useWorkbenchController() {
   const {
     asrStatus,
     isOpen: isTranscribeSettingsOpen,
-    pendingAsrEngine,
     pendingTranscribeSettings
   } = transcribeSettingsDialogState;
   useEffect(() => {
@@ -409,11 +407,13 @@ export function useWorkbenchController() {
   );
   const summaryDisplayState: SummaryDisplayState = !activeDetail
     ? "empty"
-    : isParseResponse(activeDetail)
-      ? summaryGenerationMeta && hasFullTranscript
-        ? "generated"
-        : "empty"
-      : "demo";
+    : activeDemoId !== null
+      ? "demo"
+      : isParseResponse(activeDetail)
+        ? summaryGenerationMeta && hasFullTranscript
+          ? "generated"
+          : "empty"
+        : "demo";
 
   const handleAnalyze = async () => {
     const trimmedUrl = url.trim();
@@ -456,11 +456,11 @@ export function useWorkbenchController() {
     setSummaryGenerationMeta(null);
     setLoadingDemoId(demoId);
     setLoadingLibraryVideoId(null);
-    setActiveDemoId(demoId);
 
     try {
       const response = await apiClient.getDemoDetail(demoId);
       setDetail(response);
+      setActiveDemoId(demoId);
     } catch (error) {
       setStatus(detail ? "parsed" : "error");
       setErrorMessage(
@@ -525,6 +525,7 @@ export function useWorkbenchController() {
     try {
       const response = await apiClient.getLibraryDetail(videoId);
       setDetail(response);
+      setActiveDemoId(null);
       setUrl(response.source_url);
       setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
       setActiveTab("summary");
@@ -656,7 +657,6 @@ export function useWorkbenchController() {
     ? {
         aiTabsProps: {
           activeTab,
-          activeTranscriptVariant: activeDetail.active_transcript_variant ?? null,
           canSummarize,
           canTranscribe,
           hasTranscript: hasUsableContentText,
@@ -676,7 +676,6 @@ export function useWorkbenchController() {
           textSourceType: getTextSourceType(activeDetail.video),
           transcribeErrorMessage: activeTranscribeErrorMessage,
           transcript: activeDetail.transcript ?? null,
-          transcriptVariants: activeDetail.transcript_variants ?? {},
           videoAuthor: activeDetail.video.author ?? null,
           videoTitle: activeDetail.video.title ?? null,
           onChangeTab: setActiveTab,
@@ -730,7 +729,6 @@ export function useWorkbenchController() {
       initialValue: url,
       isOpen: taskWorkspace.isDialogOpen,
       isSubmitting: taskWorkspace.isSubmitting,
-      sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,
       correctionAvailable: asrStatus?.correction_available ?? false,
       onClose: taskWorkspace.closeDialog,
       onSubmit: async (...args: Parameters<typeof taskWorkspace.submitBatch>) => {
@@ -751,14 +749,12 @@ export function useWorkbenchController() {
       handleGoHome();
     },
     transcribeSettingsDialogProps: {
-      asrEngine: pendingAsrEngine,
-      sensevoiceAvailable: asrStatus?.sensevoice_available ?? false,
+      asrAvailable: asrStatus?.sensevoice_available ?? false,
       correctionAvailable: asrStatus?.correction_available ?? false,
       isOpen: isTranscribeSettingsOpen,
       isTranscribing: isCurrentDetailTranscribing,
       settings: pendingTranscribeSettings,
       onChange: setPendingTranscribeSettings,
-      onChangeAsrEngine: setPendingAsrEngine,
       onClose: () => setIsTranscribeSettingsOpen(false),
       onConfirm: handleConfirmTranscribeSettings
     },

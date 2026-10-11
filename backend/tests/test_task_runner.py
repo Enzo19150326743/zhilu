@@ -19,7 +19,7 @@ from app.services import library_service
 from app.services.asr_service import (
     PreparedTranscriptionMedia,
     RecognizedTranscription,
-    WhisperTranscriptionResult,
+    AsrTranscriptionResult,
 )
 from app.services.task_runner import TaskRunner
 from app.services.task_store import TaskStore
@@ -63,6 +63,39 @@ def build_detail(source_url: str, *, transcript: bool = False) -> ParseResponse:
 
 
 class TaskRunnerTests(unittest.TestCase):
+    def test_retrying_legacy_extraction_task_continues_to_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = TaskStore(Path(directory) / "tasks.sqlite3")
+            batch_id = store.create_batch(
+                client_request_id="legacy-extraction-request",
+                urls=["https://example.com/legacy"],
+                settings={"context_settings": None},
+            )
+            original = store.claim_next()
+            store.finish(original["id"], original["execution_token"])
+            with store.connect(immediate=True) as connection:
+                connection.execute("ALTER TABLE processing_batches ADD COLUMN target TEXT NOT NULL DEFAULT 'parse_only'")
+                connection.execute("ALTER TABLE processing_tasks ADD COLUMN target TEXT NOT NULL DEFAULT 'parse_only'")
+            store = TaskStore(store.database_path)
+            store.retry(original["id"], batch_id)
+            task = store.claim_next()
+            # 即便内存里的旧快照带有旧选项，也必须完成内容提炼。
+            task["target"] = "parse_only"
+            task["settings"]["asr_engine"] = "removed-engine"
+            detail = build_detail("https://example.com/legacy", transcript=True)
+            runner = TaskRunner(store, task_root=Path(directory) / "task-media")
+            with (
+                patch("app.services.task_runner.get_library_detail_by_source_url", return_value=detail),
+                patch("app.services.task_runner.parse_and_persist", return_value=detail),
+                patch("app.services.task_runner.get_library_detail", return_value=detail),
+                patch("app.services.task_runner.check_and_increment_rate_limit", return_value=SimpleNamespace(allowed=True)),
+                patch("app.services.task_runner.summarize_and_persist", return_value=(detail, SimpleNamespace(is_ai_generated=True))) as summarize,
+            ):
+                runner._execute(task)
+            runner.stop()
+            summarize.assert_called_once_with(detail)
+            self.assertEqual(store.get_batch(batch_id)["stats"]["succeeded"], 1)
+
     def test_single_long_transcript_persists_and_summarizes_with_live_scheduler(self) -> None:
         """单条长音频复用真实内容库与调度器；只有外部识别和 AI 调用被替代。"""
         with tempfile.TemporaryDirectory() as directory:
@@ -74,8 +107,7 @@ class TaskRunnerTests(unittest.TestCase):
                 batch_id = store.create_batch(
                     client_request_id="single-long-podcast",
                     urls=[detail.source_url],
-                    target="analyze",
-                    settings={"asr_engine": "sensevoice_small"},
+                    settings={"context_settings": None},
                 )
                 segments = [
                     TranscriptSegment(
@@ -99,7 +131,7 @@ class TaskRunnerTests(unittest.TestCase):
                     ),
                 )
                 recognized = RecognizedTranscription(
-                    result=WhisperTranscriptionResult(
+                    result=AsrTranscriptionResult(
                         transcript=transcript,
                         model="test-model",
                         device="cpu",
@@ -175,14 +207,13 @@ class TaskRunnerTests(unittest.TestCase):
             batch_id = store.create_batch(
                 client_request_id="runner-failure-request",
                 urls=[f"https://example.com/{index}" for index in range(5)],
-                target="parse_only",
-                settings={"asr_engine": "local_whisper", "context_settings": None},
+                settings={"context_settings": None},
             )
 
             def parse(url: str):
                 if url.endswith("/2"):
                     raise RuntimeError("synthetic failure")
-                return build_detail(url)
+                return build_detail(url, transcript=True)
 
             runner = TaskRunner(
                 store,
@@ -194,6 +225,8 @@ class TaskRunnerTests(unittest.TestCase):
             with (
                 patch("app.services.task_runner.get_library_detail_by_source_url", return_value=None),
                 patch("app.services.task_runner.parse_and_persist", side_effect=parse),
+                patch("app.services.task_runner.get_library_detail", return_value=None),
+                patch("app.services.task_runner.summarize_and_persist", side_effect=lambda detail: (detail, SimpleNamespace(is_ai_generated=True))),
                 patch("app.services.task_runner.check_and_increment_rate_limit", return_value=SimpleNamespace(allowed=True)),
             ):
                 runner.start()
@@ -215,8 +248,7 @@ class TaskRunnerTests(unittest.TestCase):
             batch_id = store.create_batch(
                 client_request_id="runner-overlap-request",
                 urls=[f"https://example.com/{index}" for index in range(8)],
-                target="analyze",
-                settings={"asr_engine": "local_whisper", "context_settings": None},
+                settings={"context_settings": None},
             )
             lock = threading.Lock()
             active = {"download": 0, "recognize": 0}
@@ -246,7 +278,7 @@ class TaskRunnerTests(unittest.TestCase):
 
             def recognized(prepared_media, **_kwargs):
                 return RecognizedTranscription(
-                    result=WhisperTranscriptionResult(
+                    result=AsrTranscriptionResult(
                         transcript=TranscriptPayload(segments=[], plain_text="原始稿"),
                         model="fake",
                         device="cpu",

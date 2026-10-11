@@ -326,7 +326,7 @@ def _is_asr_transcript_source(qa_request: QaRequest) -> bool:
 def _build_text_source_boundary(qa_request: QaRequest) -> str:
     if _is_asr_transcript_source(qa_request):
         return (
-            "文本边界：当前文本是本地 Whisper 生成的 AI 转写稿，可能存在识别误差。"
+            "文本边界：当前文本是本地 SenseVoice 生成的 AI 转写稿，可能存在识别误差。"
             "如果问题依赖精确人名、术语或原句，请基于当前文本谨慎回答。"
         )
 

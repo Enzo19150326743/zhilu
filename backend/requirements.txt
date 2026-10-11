@@ -3,6 +3,5 @@ uvicorn[standard]>=0.32.0,<1.0.0
 pydantic>=2.10.0,<3.0.0
 python-dotenv>=1.0.1,<2.0.0
 yt-dlp>=2026.6.9
-faster-whisper>=1.1.1,<2.0.0
 opencc-python-reimplemented>=0.1.7,<1.0.0
 json-repair>=0.63.0

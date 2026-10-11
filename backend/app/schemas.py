@@ -143,7 +143,7 @@ class TranscribeContextSettings(BaseModel):
 class TranscriptAsrMeta(BaseModel):
     """本地 ASR 转写元信息。"""
 
-    engine: str = "faster-whisper"
+    engine: str = "sensevoice-small"
     model: str
     device: str
     compute_type: str
@@ -218,23 +218,17 @@ class DownloadRequest(BaseModel):
 
 
 class TranscribeRequest(BaseModel):
-    """ASR 转写请求；未指定引擎时默认使用 SenseVoice。"""
+    """本地 SenseVoice 转写请求。"""
 
     url: str = Field(min_length=1, max_length=2048)
     video_id: str | None = Field(default=None, max_length=200)
     context_settings: TranscribeContextSettings | None = None
-    asr_engine: Literal[
-        "local_whisper",
-        "sensevoice_small",
-    ] = "sensevoice_small"
 
 
 class AsrStatusResponse(BaseModel):
-    """前端选择转写引擎时需要的非敏感能力状态。"""
+    """本地转写与校对的非敏感能力状态。"""
 
     success: bool = True
-    recommended_engine: Literal["local_whisper", "sensevoice_small"] = "sensevoice_small"
-    whisper_model: str = "large-v3-turbo"
     sensevoice_available: bool = False
     sensevoice_model: str = "iic/SenseVoiceSmall"
     sensevoice_message: str | None = None
@@ -563,7 +557,7 @@ class TranscribeResponse(BaseModel):
     source_url: str
     video_id: str | None = None
     transcript: TranscriptPayload
-    transcript_variant_key: str = "local_whisper"
+    transcript_variant_key: str = "sensevoice_small"
     shownotes_context: ShownotesContext | None = None
     message: str
 
@@ -626,8 +620,6 @@ class TaskBatchCreateRequest(BaseModel):
 
     client_request_id: str = Field(min_length=8, max_length=120)
     urls: list[str] = Field(min_length=1)
-    target: Literal["parse_only", "analyze"] = "analyze"
-    asr_engine: Literal["local_whisper", "sensevoice_small"] = "sensevoice_small"
     context_settings: TranscribeContextSettings | None = None
 
     @field_validator("urls")
@@ -683,7 +675,6 @@ class TaskBatchResponse(BaseModel):
     success: bool = True
     batch_id: str
     client_request_id: str
-    target: str
     created_at: str
     stats: TaskBatchStats
     items: list[ProcessingTaskItem]
@@ -693,7 +684,6 @@ class TaskBatchSummary(BaseModel):
     """最近批次列表项。"""
 
     batch_id: str
-    target: str
     created_at: str
     stats: TaskBatchStats
 

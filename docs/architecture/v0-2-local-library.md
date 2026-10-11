@@ -132,7 +132,7 @@ V0.2 采用单表 `library_items`：
 - `video_id`：用于前端打开详情。
 - `title`、`author`、`platform`、`thumbnail`、`duration`、`has_transcript`：列表展示字段。
 - `summary_status`、`summary_model`：区分未总结、AI 生成和本地兜底。
-- `payload_json`：完整 `ParseResponse` JSON；其中 `video.media_type` 和 `video.text_source_type` 是媒体语境判断来源。平台字幕通常写为 `subtitle`，小宇宙 shownotes 写为 `shownotes`，本地 Whisper 写回的 AI 转写稿写为 `asr_transcript`。
+- `payload_json`：完整 `ParseResponse` JSON；其中 `video.media_type` 和 `video.text_source_type` 是媒体语境判断来源。平台字幕通常写为 `subtitle`，小宇宙 shownotes 写为 `shownotes`，本地语音识别写回的 AI 转写稿写为 `asr_transcript`。
 - `created_at`、`updated_at`：最近解析排序。
 
 这个设计故意不拆内容文本段落表、总结表和媒体类型列，优先保证 V0.2 小步闭环。最近解析列表读取时会从 `payload_json` 中解析可选媒体字段；旧记录或异常 JSON 会回退为空字段，由前端按平台做兼容判断。后续做真实 QA 或搜索时，再引入更细的表结构。

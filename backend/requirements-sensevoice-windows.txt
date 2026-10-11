@@ -1,4 +1,4 @@
-# 可选的本地 SenseVoiceSmall 实验依赖。
+# 本地转写唯一模型 SenseVoiceSmall 的运行依赖。
 # 直接安装此文件可使用 CPU；Windows NVIDIA 用户请改用
 # scripts/install-sensevoice-cuda.ps1 安装官方 CUDA 版 PyTorch。
 funasr==1.3.29

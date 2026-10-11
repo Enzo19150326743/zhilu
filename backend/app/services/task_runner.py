@@ -16,7 +16,7 @@ from app.schemas import TranscribeContextSettings
 from app.services.asr_service import (
     PreparedTranscriptionMedia,
     RecognizedTranscription,
-    WhisperTranscriptionResult,
+    AsrTranscriptionResult,
     finalize_transcription,
     prepare_transcription_media,
     recognize_transcription_media,
@@ -119,9 +119,6 @@ class TaskRunner:
                 detail = parse_and_persist(str(task["source_url"]))
             if not self.store.update_running(task_id, token, **task_identity(detail)):
                 return
-            if task["target"] == "parse_only":
-                self.store.finish(task_id, token)
-                return
 
             content_key = task_identity(detail)["content_key"]
             with self._content_lock(content_key):
@@ -181,10 +178,7 @@ class TaskRunner:
                     checkpoint["media_path"] = str(prepared.path)
                     self.store.update_running(task_id, token, stage="recognize", checkpoint_json=checkpoint)
                     with self.recognition_slot:
-                        recognized = recognize_transcription_media(
-                            prepared,
-                            asr_engine=settings.get("asr_engine", "sensevoice_small"),
-                        )
+                        recognized = recognize_transcription_media(prepared)
                     checkpoint["recognition"] = _serialize_recognized(recognized)
                     self.store.update_running(task_id, token, stage="correct", checkpoint_json=checkpoint)
                 checkpoint["ai_inflight"] = "correct"
@@ -201,7 +195,6 @@ class TaskRunner:
                         media_type=detail.video.media_type,
                         context_settings=context_settings,
                         shownotes_plain_text=detail.shownotes_plain_text,
-                        asr_engine=settings.get("asr_engine", "sensevoice_small"),
                     )
                 detail = persist_transcription(detail, response)
                 checkpoint.pop("ai_inflight", None)
@@ -302,13 +295,13 @@ def _deserialize_recognized(payload: dict) -> RecognizedTranscription:
 
     result = payload["result"]
     return RecognizedTranscription(
-        result=WhisperTranscriptionResult(
+        result=AsrTranscriptionResult(
             transcript=TranscriptPayload.model_validate(result["transcript"]),
             model=result["model"],
             device=result["device"],
             compute_type=result["compute_type"],
             language=result.get("language"),
-            engine=result.get("engine", "faster-whisper"),
+            engine=result.get("engine", "sensevoice-small"),
             provider=result.get("provider"),
             chunk_count=result.get("chunk_count"),
             timestamp_source=result.get("timestamp_source"),

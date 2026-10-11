@@ -6,7 +6,6 @@ from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as Futur
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
-from typing import Any
 
 from fastapi import HTTPException
 from yt_dlp import YoutubeDL
@@ -20,14 +19,11 @@ from app.schemas import (
     TranscriptPayload,
     TranscriptSegment,
 )
-from app.services import cuda_runtime
 from app.services.sensevoice_service import (
     SenseVoiceError,
-    release_sensevoice_models,
     transcribe_audio_with_sensevoice,
 )
 from app.services.shownotes_context_service import extract_shownotes_context
-from app.services.text_normalization_service import to_simplified_chinese
 from app.services.transcript_segment_service import (
     SegmentNormalizationConfig,
     normalize_adjacent_segments,
@@ -51,17 +47,6 @@ from app.services.ytdlp_service import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ASR_MODEL = "large-v3-turbo"
-DEFAULT_ASR_FALLBACK_MODEL = "base"
-DEFAULT_ASR_DEVICE = "auto"
-DEFAULT_ASR_COMPUTE_TYPE = "int8"
-DEFAULT_ASR_LANGUAGE = "zh"
-DEFAULT_ASR_BEAM_SIZE = 5
-DEFAULT_ASR_AUTO_FALLBACK = True
-DEFAULT_WHISPER_SEGMENT_NORMALIZATION_ENABLED = True
-DEFAULT_WHISPER_SEGMENT_MAX_SECONDS = 8
-DEFAULT_WHISPER_SEGMENT_MAX_CHARACTERS = 120
-DEFAULT_WHISPER_SEGMENT_SILENCE_GAP_SECONDS = 2
 DEFAULT_SENSEVOICE_SEGMENT_NORMALIZATION_ENABLED = True
 DEFAULT_SENSEVOICE_SEGMENT_MIN_SENTENCE_SECONDS = 4
 DEFAULT_SENSEVOICE_SEGMENT_MAX_SECONDS = 8
@@ -72,25 +57,11 @@ TEMP_SUFFIXES = {".part", ".ytdl", ".tmp", ".temp"}
 SHOWNOTES_CONTEXT_WAIT_TIMEOUT_SECONDS = 30
 AudioDownloader = Callable[[str], Path]
 AudioDownloaderFactory = Callable[[Path], AudioDownloader]
-AudioTranscriber = Callable[[Path], TranscriptPayload]
-
-
-@dataclass(frozen=True)
-class AsrConfig:
-    """当前 ASR 环境配置快照。"""
-
-    model: str
-    fallback_model: str
-    device: str
-    compute_type: str
-    language: str | None
-    beam_size: int
-    auto_fallback: bool
 
 
 @dataclass(frozen=True)
 class AsrPromptContext:
-    """Whisper 和纠错服务可使用的媒体上下文。"""
+    """校对服务使用的媒体上下文。"""
 
     title: str | None = None
     author: str | None = None
@@ -100,16 +71,7 @@ class AsrPromptContext:
 
 
 @dataclass(frozen=True)
-class WhisperModelCandidate:
-    """一次 Whisper 模型加载尝试。"""
-
-    model: str
-    device: str
-    compute_type: str
-
-
-@dataclass(frozen=True)
-class WhisperTranscriptionResult:
+class AsrTranscriptionResult:
     """ASR 原始转写结果和实际使用的运行配置。"""
 
     transcript: TranscriptPayload
@@ -117,10 +79,10 @@ class WhisperTranscriptionResult:
     device: str
     compute_type: str
     language: str | None
-    engine: str = "faster-whisper"
+    engine: str = "sensevoice-small"
     provider: str | None = "local"
     chunk_count: int | None = None
-    timestamp_source: str | None = "whisper-segment"
+    timestamp_source: str | None = "vad-segment"
     raw_transcript: TranscriptPayload | None = None
 
 
@@ -136,7 +98,7 @@ class PreparedTranscriptionMedia:
 class RecognizedTranscription:
     """识别阶段产物；校对可以在释放 GPU 名额后继续。"""
 
-    result: WhisperTranscriptionResult
+    result: AsrTranscriptionResult
     transcription_seconds: float
 
 
@@ -172,51 +134,33 @@ def prepare_transcription_media(
 
 def recognize_transcription_media(
     prepared: PreparedTranscriptionMedia,
-    *,
-    asr_engine: str = "sensevoice_small",
-    transcriber: AudioTranscriber | None = None,
 ) -> RecognizedTranscription:
-    """只执行本地识别，不进行网络校对。"""
+    """使用 SenseVoice 识别本地媒体，校对在后续阶段执行。"""
     started_at = monotonic()
-    asr_config = get_asr_config()
-    if asr_engine == "sensevoice_small":
-        try:
-            sensevoice_result = transcribe_audio_with_sensevoice(
-                prepared.path,
-                output_dir=prepared.path.parent,
-            )
-        except SenseVoiceError as error:
-            raise _build_transcribe_error(
-                error.error_code, error.message, status_code=error.status_code
-            ) from error
-        raw_transcript = _normalize_transcript_plain_text(sensevoice_result.transcript)
-        segments = _normalize_sensevoice_segments(raw_transcript.segments)
-        result = WhisperTranscriptionResult(
-            transcript=TranscriptPayload(segments=segments, plain_text=_join_segment_text(segments)),
-            model=sensevoice_result.model,
-            device=sensevoice_result.device,
-            compute_type=sensevoice_result.compute_type,
-            language=sensevoice_result.language,
-            engine="sensevoice-small",
-            provider="local",
-            timestamp_source=(
-                f"{sensevoice_result.timestamp_source}-normalized"
-                if len(segments) < len(raw_transcript.segments)
-                else sensevoice_result.timestamp_source
-            ),
-            raw_transcript=raw_transcript.model_copy(deep=True),
+    try:
+        sensevoice_result = transcribe_audio_with_sensevoice(
+            prepared.path,
+            output_dir=prepared.path.parent,
         )
-    elif transcriber is None:
-        release_sensevoice_models()
-        result = _transcribe_audio_with_whisper(prepared.path, asr_config=asr_config)
-    else:
-        result = WhisperTranscriptionResult(
-            transcript=transcriber(prepared.path),
-            model=asr_config.model,
-            device=asr_config.device,
-            compute_type=asr_config.compute_type,
-            language=asr_config.language,
-        )
+    except SenseVoiceError as error:
+        raise _build_transcribe_error(
+            error.error_code, error.message, status_code=error.status_code
+        ) from error
+    raw_transcript = _normalize_transcript_plain_text(sensevoice_result.transcript)
+    segments = _normalize_sensevoice_segments(raw_transcript.segments)
+    result = AsrTranscriptionResult(
+        transcript=TranscriptPayload(segments=segments, plain_text=_join_segment_text(segments)),
+        model=sensevoice_result.model,
+        device=sensevoice_result.device,
+        compute_type=sensevoice_result.compute_type,
+        language=sensevoice_result.language,
+        timestamp_source=(
+            f"{sensevoice_result.timestamp_source}-normalized"
+            if len(segments) < len(raw_transcript.segments)
+            else sensevoice_result.timestamp_source
+        ),
+        raw_transcript=raw_transcript.model_copy(deep=True),
+    )
     return RecognizedTranscription(result=result, transcription_seconds=monotonic() - started_at)
 
 
@@ -232,7 +176,6 @@ def finalize_transcription(
     media_type: str | None = None,
     context_settings: TranscribeContextSettings | None = None,
     shownotes_plain_text: str | None = None,
-    asr_engine: str = "sensevoice_small",
 ) -> TranscribeResponse:
     """基于已保存的原始识别结果执行上下文合并和校对。"""
     started_at = monotonic()
@@ -280,13 +223,9 @@ def finalize_transcription(
         source_url=source_url,
         video_id=video_id,
         transcript=transcript,
-        transcript_variant_key=asr_engine,
+        transcript_variant_key=_transcript_variant_key(recognized.result.engine),
         shownotes_context=shownotes_context,
-        message=(
-            "本地 SenseVoiceSmall 已生成 AI 转写稿。"
-            if recognized.result.engine == "sensevoice-small"
-            else "本地 Whisper 已生成 AI 转写稿。"
-        ),
+        message="本地 ASR 已生成 AI 转写稿。",
     )
 
 
@@ -296,7 +235,6 @@ def transcribe_media_audio(
     http_headers: dict[str, str] | None = None,
     audio_downloader: AudioDownloader | None = None,
     audio_downloader_factory: AudioDownloaderFactory | None = None,
-    transcriber: AudioTranscriber | None = None,
     response_source_url: str | None = None,
     media_title: str | None = None,
     media_author: str | None = None,
@@ -304,15 +242,13 @@ def transcribe_media_audio(
     media_type: str | None = None,
     context_settings: TranscribeContextSettings | None = None,
     shownotes_plain_text: str | None = None,
-    asr_engine: str = "sensevoice_small",
 ) -> TranscribeResponse:
     """
-    下载公开视频音频并按用户选择使用本地 Whisper 或 SenseVoice。
+    下载公开视频音频并使用当前本地模型生成转写稿。
 
     NOTE: yt-dlp 只负责拿到公开音频资源，不根据平台名称猜测实际媒体格式。
     """
     total_started_at = monotonic()
-    asr_config = get_asr_config()
     shownotes_context_future: Future[ShownotesContext | None] | None = None
     shownotes_executor: ThreadPoolExecutor | None = None
     extracted_shownotes_context: ShownotesContext | None = None
@@ -347,65 +283,20 @@ def transcribe_media_audio(
             audio_download_seconds,
         )
         try:
-            recognition_started_at = monotonic()
-            if asr_engine == "sensevoice_small":
-                try:
-                    sensevoice_result = transcribe_audio_with_sensevoice(
-                        audio_path,
-                        output_dir=temporary_path,
-                    )
-                except SenseVoiceError as error:
-                    raise _build_transcribe_error(
-                        error.error_code,
-                        error.message,
-                        status_code=error.status_code,
-                    ) from error
-                raw_sensevoice_transcript = _normalize_transcript_plain_text(
-                    sensevoice_result.transcript
+            recognized = recognize_transcription_media(
+                PreparedTranscriptionMedia(
+                    path=audio_path,
+                    audio_download_seconds=audio_download_seconds,
                 )
-                normalized_sensevoice_segments = _normalize_sensevoice_segments(
-                    raw_sensevoice_transcript.segments
-                )
-                transcription_result = WhisperTranscriptionResult(
-                    transcript=TranscriptPayload(
-                        segments=normalized_sensevoice_segments,
-                        plain_text=_join_segment_text(normalized_sensevoice_segments),
-                    ),
-                    model=sensevoice_result.model,
-                    device=sensevoice_result.device,
-                    compute_type=sensevoice_result.compute_type,
-                    language=sensevoice_result.language,
-                    engine="sensevoice-small",
-                    provider="local",
-                    timestamp_source=(
-                        f"{sensevoice_result.timestamp_source}-normalized"
-                        if len(normalized_sensevoice_segments)
-                        < len(raw_sensevoice_transcript.segments)
-                        else sensevoice_result.timestamp_source
-                    ),
-                    raw_transcript=raw_sensevoice_transcript.model_copy(deep=True),
-                )
-            elif transcriber is None:
-                release_sensevoice_models()
-                transcription_result = _transcribe_audio_with_whisper(
-                    audio_path,
-                    asr_config=asr_config,
-                )
-            else:
-                transcription_result = WhisperTranscriptionResult(
-                    transcript=transcriber(audio_path),
-                    model=asr_config.model,
-                    device=asr_config.device,
-                    compute_type=asr_config.compute_type,
-                    language=asr_config.language,
-                )
-            transcription_seconds = monotonic() - recognition_started_at
+            )
+            transcription_result = recognized.result
+            transcription_seconds = recognized.transcription_seconds
             logger.info(
                 (
                     "asr timing: stage=%s elapsed_seconds=%.2f "
                     "engine=%s model=%s device=%s segment_count=%s"
                 ),
-                "sensevoice" if asr_engine == "sensevoice_small" else "whisper",
+                transcription_result.engine,
                 transcription_seconds,
                 transcription_result.engine,
                 transcription_result.model,
@@ -486,14 +377,17 @@ def transcribe_media_audio(
         source_url=response_source_url or video_url,
         video_id=video_id,
         transcript=transcript,
-        transcript_variant_key=asr_engine,
+        transcript_variant_key=_transcript_variant_key(transcription_result.engine),
         shownotes_context=extracted_shownotes_context,
-        message=(
-            "本地 SenseVoiceSmall 已生成 AI 转写稿。"
-            if transcription_result.engine == "sensevoice-small"
-            else "本地 Whisper 已生成 AI 转写稿。"
-        ),
+        message=("本地 SenseVoiceSmall 已生成 AI 转写稿。"
+                 if transcription_result.engine == "sensevoice-small" else "本地 ASR 已生成 AI 转写稿。"),
     )
+
+
+def _transcript_variant_key(engine: str) -> str:
+    if engine == "sensevoice-small":
+        return "sensevoice_small"
+    return "archived_asr"
 
 
 def _download_audio_for_transcription(
@@ -552,13 +446,13 @@ def _raise_audio_download_error(
         )
         raise _build_transcribe_error(
             "ASR_AUDIO_PLATFORM_REJECTED",
-            "音频下载失败：平台拒绝了本地音频流请求。当前已能读取标题封面，但没有拿到可交给 Whisper 的音频文件。",
+            "音频下载失败：平台拒绝了本地音频流请求。当前已能读取标题封面，但没有拿到可用于本地转写 的音频文件。",
         ) from error
 
     logger.warning("asr audio download failed: %s", error.__class__.__name__)
     raise _build_transcribe_error(
         "ASR_AUDIO_DOWNLOAD_FAILED",
-        "音频下载失败，当前没有拿到可交给 Whisper 的媒体音频。",
+        "音频下载失败，当前没有拿到可用于本地转写 的媒体音频。",
     ) from error
 
 
@@ -585,169 +479,9 @@ def _find_downloaded_audio(output_dir: Path) -> Path | None:
     return max(candidates, key=lambda path: path.stat().st_mtime_ns)
 
 
-def get_asr_config() -> AsrConfig:
-    """
-    读取 ASR 配置；格式错误时使用保守默认值，避免配置污染变成空 500。
-    """
-    return AsrConfig(
-        model=_get_env_text("ASR_WHISPER_MODEL", DEFAULT_ASR_MODEL),
-        fallback_model=_get_env_text(
-            "ASR_FALLBACK_WHISPER_MODEL",
-            DEFAULT_ASR_FALLBACK_MODEL,
-        ),
-        device=_get_env_text("ASR_DEVICE", DEFAULT_ASR_DEVICE).lower(),
-        compute_type=_get_env_text("ASR_COMPUTE_TYPE", DEFAULT_ASR_COMPUTE_TYPE),
-        language=_get_optional_env_text("ASR_LANGUAGE", DEFAULT_ASR_LANGUAGE),
-        beam_size=_get_env_int("ASR_BEAM_SIZE", DEFAULT_ASR_BEAM_SIZE, 1, 10),
-        auto_fallback=_get_env_flag(
-            "ASR_AUTO_FALLBACK",
-            DEFAULT_ASR_AUTO_FALLBACK,
-        ),
-    )
-
-
-def _transcribe_audio_with_whisper(
-    audio_path: Path,
-    *,
-    asr_config: AsrConfig | None = None,
-) -> WhisperTranscriptionResult:
-    try:
-        cuda_runtime.activate_cuda_dll_directories()
-    except (OSError, RuntimeError) as error:
-        # CUDA 是可选加速能力，运行库激活失败不能阻断后续 CPU 回退。
-        logger.warning(
-            "project cuda runtime activation failed: error=%s",
-            error.__class__.__name__,
-        )
-
-    try:
-        from faster_whisper import WhisperModel
-    except ImportError as error:
-        raise _build_transcribe_error(
-            "ASR_DEPENDENCY_MISSING",
-            "本地 ASR 依赖未安装，请重启启动器让后端安装 faster-whisper。",
-            status_code=500,
-        ) from error
-
-    config = asr_config or get_asr_config()
-    candidates = _build_whisper_model_candidates(config)
-    last_error: Exception | None = None
-    last_error_code = "ASR_MODEL_FAILED"
-
-    for candidate in candidates:
-        try:
-            model = WhisperModel(
-                candidate.model,
-                device=candidate.device,
-                compute_type=candidate.compute_type,
-            )
-            raw_segments, _ = model.transcribe(
-                str(audio_path),
-                language=config.language,
-                beam_size=config.beam_size,
-                vad_filter=True,
-                **build_whisper_decode_options(),
-            )
-            raw_transcript_segments = _build_transcript_segments(raw_segments)
-            segments = _normalize_whisper_segments(raw_transcript_segments)
-        except ValueError as error:
-            last_error = error
-            last_error_code = "ASR_MODEL_UNAVAILABLE"
-            logger.warning(
-                "asr model configuration invalid: model=%s device=%s",
-                candidate.model,
-                candidate.device,
-            )
-            continue
-        except RuntimeError as error:
-            last_error = error
-            last_error_code = "ASR_MODEL_FAILED"
-            logger.warning(
-                "asr model runtime failed: model=%s device=%s error=%s",
-                candidate.model,
-                candidate.device,
-                error.__class__.__name__,
-            )
-            continue
-        except OSError as error:
-            if error.__class__.__name__ == "LocalEntryNotFoundError":
-                last_error = error
-                last_error_code = "ASR_MODEL_UNAVAILABLE"
-                logger.warning(
-                    "asr model files unavailable: model=%s device=%s",
-                    candidate.model,
-                    candidate.device,
-                )
-                continue
-
-            logger.warning("asr audio read failed: %s", error.__class__.__name__)
-            raise _build_transcribe_error(
-                "ASR_AUDIO_READ_FAILED",
-                "音频文件读取失败，请确认本机音频解码环境可用。",
-                status_code=500,
-            ) from error
-
-        if not segments:
-            raise _build_transcribe_error(
-                "ASR_EMPTY_RESULT",
-                "本地 ASR 未识别到可用文本，可以换一个音频更清晰的公开视频。",
-            )
-
-        return WhisperTranscriptionResult(
-            transcript=TranscriptPayload(
-                segments=segments,
-                plain_text=_join_segment_text(segments),
-            ),
-            model=candidate.model,
-            device=candidate.device,
-            compute_type=candidate.compute_type,
-            language=config.language,
-            timestamp_source=(
-                "whisper-segment-normalized"
-                if len(segments) < len(raw_transcript_segments)
-                else "whisper-segment"
-            ),
-            raw_transcript=TranscriptPayload(
-                segments=[segment.model_copy() for segment in raw_transcript_segments],
-                plain_text=_join_segment_text(raw_transcript_segments),
-            ),
-        )
-
-    if last_error_code == "ASR_MODEL_UNAVAILABLE":
-        raise _build_transcribe_error(
-            "ASR_MODEL_UNAVAILABLE",
-            "本地 Whisper 模型配置不可用，已尝试自动回退但仍未成功。",
-            status_code=500,
-        ) from last_error
-
-    raise _build_transcribe_error(
-        "ASR_MODEL_FAILED",
-        "本地 Whisper 模型加载或转写失败，已尝试自动回退但仍未成功。",
-        status_code=500,
-    ) from last_error
-
-
-def _build_transcript_segments(raw_segments: Any) -> list[TranscriptSegment]:
-    segments: list[TranscriptSegment] = []
-    for segment in raw_segments:
-        normalized_text = _normalize_segment_text(segment.text)
-        if not normalized_text:
-            continue
-
-        segments.append(
-            TranscriptSegment(
-                start=float(segment.start),
-                end=float(segment.end),
-                text=normalized_text,
-            )
-        )
-
-    return segments
-
-
 def _build_final_transcript(
     *,
-    transcription_result: WhisperTranscriptionResult,
+    transcription_result: AsrTranscriptionResult,
     correction_terms: list[str],
     prompt_context: AsrPromptContext,
 ) -> TranscriptPayload:
@@ -815,43 +549,6 @@ def _build_final_transcript(
     )
 
 
-def _normalize_whisper_segments(
-    segments: list[TranscriptSegment],
-) -> list[TranscriptSegment]:
-    """在校对前合并 Whisper 碎片；模型原始片段由调用方另行保留。"""
-    if not _get_env_flag(
-        "ASR_WHISPER_SEGMENT_NORMALIZATION_ENABLED",
-        DEFAULT_WHISPER_SEGMENT_NORMALIZATION_ENABLED,
-    ):
-        return [segment.model_copy() for segment in segments]
-
-    config = SegmentNormalizationConfig(
-        max_seconds=float(
-            _get_env_int(
-                "ASR_WHISPER_SEGMENT_MAX_SECONDS",
-                DEFAULT_WHISPER_SEGMENT_MAX_SECONDS,
-                2,
-                30,
-            )
-        ),
-        max_characters=_get_env_int(
-            "ASR_WHISPER_SEGMENT_MAX_CHARACTERS",
-            DEFAULT_WHISPER_SEGMENT_MAX_CHARACTERS,
-            20,
-            500,
-        ),
-        silence_gap_seconds=float(
-            _get_env_int(
-                "ASR_WHISPER_SEGMENT_SILENCE_GAP_SECONDS",
-                DEFAULT_WHISPER_SEGMENT_SILENCE_GAP_SECONDS,
-                1,
-                10,
-            )
-        ),
-    )
-    return normalize_adjacent_segments(segments, config=config)
-
-
 def _normalize_sensevoice_segments(
     segments: list[TranscriptSegment],
 ) -> list[TranscriptSegment]:
@@ -902,15 +599,6 @@ def _normalize_sensevoice_segments(
     return normalize_adjacent_segments(segments, config=config)
 
 
-def build_whisper_decode_options() -> dict[str, object]:
-    """保持声学解码中性，避免长语义 Prompt 触发重复、漏转和错序。"""
-    return {
-        "initial_prompt": None,
-        "hotwords": None,
-        "condition_on_previous_text": True,
-    }
-
-
 def _normalize_transcript_plain_text(transcript: TranscriptPayload) -> TranscriptPayload:
     if not transcript.segments:
         return transcript
@@ -928,61 +616,6 @@ def _join_segment_text(segments: list[TranscriptSegment]) -> str:
         )
         if formatted_text
     )
-
-
-def _build_whisper_model_candidates(config: AsrConfig) -> list[WhisperModelCandidate]:
-    fallback_model = config.fallback_model or DEFAULT_ASR_FALLBACK_MODEL
-    candidates: list[WhisperModelCandidate] = []
-
-    if config.device == "auto":
-        candidates.append(
-            WhisperModelCandidate(
-                model=config.model,
-                device="cuda",
-                compute_type=config.compute_type,
-            )
-        )
-        candidates.append(
-            WhisperModelCandidate(
-                model=fallback_model if config.auto_fallback else config.model,
-                device="cpu",
-                compute_type=config.compute_type,
-            )
-        )
-    else:
-        candidates.append(
-            WhisperModelCandidate(
-                model=config.model,
-                device=config.device,
-                compute_type=config.compute_type,
-            )
-        )
-        if config.auto_fallback:
-            candidates.append(
-                WhisperModelCandidate(
-                    model=fallback_model,
-                    device="cpu" if config.device == "cuda" else config.device,
-                    compute_type=config.compute_type,
-                )
-            )
-
-    return _dedupe_model_candidates(candidates)
-
-
-def _dedupe_model_candidates(
-    candidates: list[WhisperModelCandidate],
-) -> list[WhisperModelCandidate]:
-    unique_candidates: list[WhisperModelCandidate] = []
-    seen_keys: set[tuple[str, str, str]] = set()
-    for candidate in candidates:
-        key = (candidate.model, candidate.device, candidate.compute_type)
-        if key in seen_keys:
-            continue
-
-        seen_keys.add(key)
-        unique_candidates.append(candidate)
-
-    return unique_candidates
 
 
 def _build_speaker_label_status(
@@ -1009,11 +642,6 @@ def _build_speaker_label_status(
     )
 
 
-def _normalize_segment_text(text: str) -> str:
-    normalized_text = " ".join(text.strip().split())
-    return to_simplified_chinese(normalized_text)
-
-
 def _resolve_shownotes_context_future(
     future: Future[ShownotesContext | None] | None,
 ) -> ShownotesContext | None:
@@ -1031,16 +659,6 @@ def _resolve_shownotes_context_future(
             error.__class__.__name__,
         )
     return None
-
-
-def _get_env_text(name: str, default_value: str) -> str:
-    value = os.getenv(name, default_value).strip()
-    return value or default_value
-
-
-def _get_optional_env_text(name: str, default_value: str | None) -> str | None:
-    raw_value = os.getenv(name, default_value or "").strip()
-    return raw_value or None
 
 
 def _get_env_int(

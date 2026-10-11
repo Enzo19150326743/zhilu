@@ -49,40 +49,29 @@ class SummarizeRequestSchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             QaRequest(question="问题", transcript_plain_text=transcript)
 
-    def test_transcribe_request_defaults_to_sensevoice(self) -> None:
+    def test_transcribe_request_contains_only_content_and_context(self) -> None:
         request = TranscribeRequest(url="https://example.com/video")
+        self.assertEqual(set(request.model_dump()), {"url", "video_id", "context_settings"})
 
-        self.assertEqual(request.asr_engine, "sensevoice_small")
-
-    def test_batch_request_defaults_to_sensevoice(self) -> None:
+    def test_batch_request_contains_only_content_and_context(self) -> None:
         request = TaskBatchCreateRequest(
             client_request_id="default-asr-engine",
             urls=["https://example.com/video"],
         )
+        self.assertEqual(set(request.model_dump()), {"client_request_id", "urls", "context_settings"})
 
-        self.assertEqual(request.asr_engine, "sensevoice_small")
-
-    def test_transcribe_request_accepts_sensevoice_small(self) -> None:
-        request = TranscribeRequest(
-            url="https://example.com/video",
-            asr_engine="sensevoice_small",
-        )
-
-        self.assertEqual(request.asr_engine, "sensevoice_small")
-
-    def test_transcribe_request_rejects_unknown_engine(self) -> None:
-        with self.assertRaises(ValidationError):
-            TranscribeRequest(
-                url="https://example.com/video",
-                asr_engine="unknown",  # type: ignore[arg-type]
-            )
-
-    def test_transcribe_request_rejects_removed_cloud_engine(self) -> None:
-        with self.assertRaises(ValidationError):
-            TranscribeRequest(
-                url="https://example.com/video",
-                asr_engine="fun_asr_flash",  # type: ignore[arg-type]
-            )
+    def test_old_selection_fields_cannot_select_a_different_pipeline(self) -> None:
+        request = TaskBatchCreateRequest.model_validate({
+            "client_request_id": "legacy-pipeline-request",
+            "urls": ["https://example.com/video"],
+            "target": "parse_only",
+            "asr_engine": "removed-engine",
+        })
+        self.assertEqual(request.model_dump(), {
+            "client_request_id": "legacy-pipeline-request",
+            "urls": ["https://example.com/video"],
+            "context_settings": None,
+        })
 
 
 if __name__ == "__main__":

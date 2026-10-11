@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
-type ModalDialogSize = "confirmation" | "compact" | "wide";
+type ModalDialogSize = "confirmation" | "compact" | "form" | "wide";
 type ModalDialogHeaderMode = "hidden" | "close-only" | "standard";
 
 interface ModalDialogProps {
@@ -21,12 +21,14 @@ interface ModalDialogProps {
 const SIZE_CLASS_NAMES: Record<ModalDialogSize, string> = {
   confirmation: "max-w-sm",
   compact: "max-w-lg",
+  form: "max-w-2xl",
   wide: "max-w-4xl"
 };
 
 const SHADOW_CLASS_NAMES: Record<ModalDialogSize, string> = {
   confirmation: "shadow-[4px_4px_0_0_var(--ink)]",
   compact: "shadow-[8px_8px_0_0_var(--ink)]",
+  form: "shadow-[8px_8px_0_0_var(--ink)]",
   wide: "shadow-[8px_8px_0_0_var(--ink)]"
 };
 

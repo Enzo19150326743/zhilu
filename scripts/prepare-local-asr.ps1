@@ -16,7 +16,6 @@ $venvDir = Join-Path $backendDir ".venv"
 $venvPythonPath = Join-Path $venvDir "Scripts\python.exe"
 $baseRequirementsPath = Join-Path $backendDir "requirements.txt"
 $senseVoiceRequirementsPath = Join-Path $backendDir "requirements-sensevoice-windows.txt"
-$gpuRequirementsPath = Join-Path $backendDir "requirements-gpu-windows.txt"
 $prefetchScriptPath = Join-Path $PSScriptRoot "prefetch-asr-models.py"
 $cudaInstallerPath = Join-Path $PSScriptRoot "install-sensevoice-cuda.ps1"
 
@@ -55,7 +54,6 @@ function Invoke-CheckedCommand {
 foreach ($requiredPath in @(
   $baseRequirementsPath,
   $senseVoiceRequirementsPath,
-  $gpuRequirementsPath,
   $prefetchScriptPath,
   $cudaInstallerPath
 )) {
@@ -66,18 +64,18 @@ foreach ($requiredPath in @(
 
 $resolvedMode = Resolve-InstallMode -RequestedMode $Mode
 $modeLabel = if ($resolvedMode -eq "Nvidia") { "Windows NVIDIA (CUDA)" } else { "CPU" }
-$downloadEstimate = if ($resolvedMode -eq "Nvidia") { "about 6-8 GB" } else { "about 3-5 GB" }
-$diskEstimate = if ($resolvedMode -eq "Nvidia") { "reserve 12-15 GB" } else { "reserve 6-10 GB" }
+$downloadEstimate = if ($resolvedMode -eq "Nvidia") { "roughly 3-6 GB" } else { "roughly 1.5-3.5 GB" }
+$diskEstimate = if ($resolvedMode -eq "Nvidia") { "reserve 8-12 GB" } else { "reserve 4-7 GB" }
 
 Write-Host ""
 Write-Host "=========================================="
 Write-Host "  Zhilu: prepare the complete local ASR environment"
 Write-Host "=========================================="
 Write-Host "Mode: $modeLabel"
-Write-Host "Estimated download: $downloadEstimate (upstream versions may change this)"
+Write-Host "Estimated download: $downloadEstimate (planning range, not a measured total)"
 Write-Host "Disk space: $diskEstimate"
-Write-Host "Models: Whisper large-v3-turbo about 1.62 GB"
-Write-Host "        SenseVoiceSmall about 0.94 GB plus a small FSMN-VAD model"
+Write-Host "Models: SenseVoiceSmall about 0.94 GB plus a small FSMN-VAD model"
+Write-Host "These ranges include backend dependencies and models; versions and caches affect totals."
 Write-Host "Scope: project backend/.venv and user model caches only."
 Write-Host "The script does not change the system PATH, GPU driver, or registry."
 Write-Host ""
@@ -108,7 +106,7 @@ if (-not (Test-Path -LiteralPath $venvPythonPath -PathType Leaf)) {
   }
 }
 
-Invoke-CheckedCommand -Description "Installing base backend and Whisper dependencies" -Command {
+Invoke-CheckedCommand -Description "Installing base backend dependencies" -Command {
   & $venvPythonPath -m pip install -r $baseRequirementsPath
 }
 
@@ -116,16 +114,13 @@ if ($resolvedMode -eq "Nvidia") {
   Invoke-CheckedCommand -Description "Installing CUDA PyTorch and SenseVoice dependencies" -Command {
     & $cudaInstallerPath
   }
-  Invoke-CheckedCommand -Description "Installing project-local CUDA runtime packages for Whisper" -Command {
-    & $venvPythonPath -m pip install -r $gpuRequirementsPath
-  }
 } else {
   Invoke-CheckedCommand -Description "Installing SenseVoice CPU dependencies" -Command {
     & $venvPythonPath -m pip install -r $senseVoiceRequirementsPath
   }
 }
 
-Invoke-CheckedCommand -Description "Prefetching Whisper, SenseVoiceSmall, and FSMN-VAD" -Command {
+Invoke-CheckedCommand -Description "Prefetching SenseVoiceSmall and FSMN-VAD" -Command {
   & $venvPythonPath $prefetchScriptPath
 }
 

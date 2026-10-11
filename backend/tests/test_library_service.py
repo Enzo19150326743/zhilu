@@ -38,8 +38,7 @@ class LibraryServiceTests(unittest.TestCase):
             store.create_batch(
                 client_request_id="single-task-lock-regression",
                 urls=[detail.source_url],
-                target="analyze",
-                settings={"asr_engine": "sensevoice_small"},
+                settings={"context_settings": None},
             )
             task = store.claim_next()
             transcript = _build_asr_transcript(
@@ -104,8 +103,7 @@ class LibraryServiceTests(unittest.TestCase):
             store.create_batch(
                 client_request_id="long-transcript-lock-regression",
                 urls=[detail.source_url],
-                target="analyze",
-                settings={"asr_engine": "sensevoice_small"},
+                settings={"context_settings": None},
             )
             transcript = _build_asr_transcript(
                 text="长音频识别正文。" * 6000, engine="sensevoice-small", model="test-model"
@@ -404,7 +402,7 @@ class LibraryServiceTests(unittest.TestCase):
         self.assertEqual(detail.transcript.asr_meta.correction_status, "corrected")
         self.assertTrue(items[0].has_transcript)
 
-    def test_transcript_update_keeps_independent_engine_variants(self) -> None:
+    def test_transcript_update_keeps_archived_variant_when_sensevoice_replaces_current(self) -> None:
         with self._temporary_library():
             parse_response = _build_parse_response(
                 media_type="video",
@@ -414,10 +412,10 @@ class LibraryServiceTests(unittest.TestCase):
             parse_response.transcript = TranscriptPayload(segments=[], plain_text="")
             library_service.upsert_library_item(parse_response)
 
-            whisper_transcript = _build_asr_transcript(
-                text="Whisper 稿件。",
-                engine="faster-whisper",
-                model="large-v3-turbo",
+            archived_transcript = _build_asr_transcript(
+                text="历史稿件。",
+                engine="archived-local",
+                model="archived-model",
             )
             sensevoice_transcript = _build_asr_transcript(
                 text="SenseVoice 稿件。",
@@ -426,8 +424,8 @@ class LibraryServiceTests(unittest.TestCase):
             )
             library_service.update_transcript_for_source_url(
                 "https://example.com/podcast",
-                whisper_transcript,
-                "local_whisper",
+                archived_transcript,
+                "archived_local",
             )
             library_service.update_transcript_for_source_url(
                 "https://example.com/podcast",
@@ -441,12 +439,12 @@ class LibraryServiceTests(unittest.TestCase):
         self.assertEqual(detail.active_transcript_variant, "sensevoice_small")
         self.assertEqual(
             set(detail.transcript_variants),
-            {"local_whisper", "sensevoice_small"},
+            {"archived_local", "sensevoice_small"},
         )
         self.assertEqual(detail.transcript.plain_text, "SenseVoice 稿件。")
         self.assertEqual(
-            detail.transcript_variants["local_whisper"].plain_text,
-            "Whisper 稿件。",
+            detail.transcript_variants["archived_local"].plain_text,
+            "历史稿件。",
         )
 
     def test_transcript_update_persists_speaker_and_context_meta(self) -> None:

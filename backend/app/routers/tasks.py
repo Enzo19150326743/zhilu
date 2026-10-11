@@ -30,9 +30,7 @@ def create_task_batch(request: Request, batch_request: TaskBatchCreateRequest) -
         batch_id = get_task_store().create_batch(
             client_request_id=batch_request.client_request_id,
             urls=normalized,
-            target=batch_request.target,
             settings={
-                "asr_engine": batch_request.asr_engine,
                 "context_settings": batch_request.context_settings.model_dump(mode="json") if batch_request.context_settings else None,
                 "client_key": request.client.host if request.client else "local",
             },

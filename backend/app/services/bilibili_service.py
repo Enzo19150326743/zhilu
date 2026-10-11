@@ -255,7 +255,7 @@ def get_bilibili_auth_status() -> BilibiliAuthStatusResponse:
 
 def parse_bilibili_video(source_url: str) -> ParseResponse:
     """
-    解析 B 站公开视频元数据，并取出可供 Whisper 使用的 DASH audio URL。
+    解析 B 站公开视频元数据，并取出可供 SenseVoice 使用的 DASH audio URL。
     """
     video = _extract_bilibili_video(source_url)
     return ParseResponse(
@@ -1476,7 +1476,7 @@ def _build_summary_placeholder(video: BilibiliVideo) -> dict[str, Any]:
         "tldr": "已通过 B 站专用接口获取公开元数据、DASH 音频和可下载格式。",
         "key_points": [
             "已读取 BVID、CID、标题、作者、时长和封面。",
-            "已拿到 DASH audio URL，可用于本地 Whisper 生成 AI 转写稿。",
+            "已拿到 DASH audio URL，可用于本地 SenseVoice 生成 AI 转写稿。",
             "已整理公开视频 DASH video / audio 候选，下载时可用 ffmpeg 合并音视频。",
             "当前阶段不处理 DRM、付费、私密、会员专属或无授权内容。",
         ],

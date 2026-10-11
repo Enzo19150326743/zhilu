@@ -313,11 +313,9 @@ def _get_transcript_variant_key(transcript: TranscriptPayload) -> str:
         if transcript.asr_meta and transcript.asr_meta.engine
         else ""
     )
-    if engine in {"faster-whisper", "whisper", "local_whisper"}:
-        return "local_whisper"
     if engine in {"sensevoice", "sensevoice-small", "sensevoice_small"}:
         return "sensevoice_small"
-    return engine or "local_whisper"
+    return engine or "sensevoice_small"
 
 
 def update_note_draft_for_source_url(

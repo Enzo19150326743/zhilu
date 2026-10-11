@@ -67,7 +67,6 @@ def has_complete_summary(detail: ParseResponse) -> bool:
 def transcribe_and_persist(
     detail: ParseResponse,
     *,
-    asr_engine: str,
     context_settings: TranscribeContextSettings | None,
 ):
     source_url = detail.source_url
@@ -97,7 +96,6 @@ def transcribe_and_persist(
         media_type=detail.video.media_type,
         context_settings=context_settings,
         shownotes_plain_text=detail.shownotes_plain_text,
-        asr_engine=asr_engine,
     )
     update_transcript_for_source_url(
         source_url,
