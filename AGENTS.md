@@ -7,7 +7,7 @@
 1. 先读 `docs/code-map.md`，按“常见任务定位”找到模块入口。
 2. 再读与任务相关的 `docs/architecture/*.md`，不要先遍历整个仓库。
 3. 涉及提交、验证或公开数据时，同时读 `CONTRIBUTING.md` 和 `SECURITY.md`。
-4. `docs/project-context.md`、`docs/plans/`、`docs/handoffs/` 属于可能只在本地存在的辅助资料；找不到时以已跟踪文档和代码为准，不要据此阻塞任务。
+4. 当前产品与实现以已跟踪文档和代码为准，不依赖旧计划、会话记录或交接快照；本机路径配置见 `docs/configuration.md`。
 
 ## 快速搜索默认排除
 

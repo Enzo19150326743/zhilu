@@ -23,13 +23,11 @@
 - 平台适配：[B 站](./architecture/bilibili-service.md)、[抖音](./architecture/douyin-adapter.md)、[小红书](./architecture/xiaohongshu-public-video.md)。
 - [AI 校对术语种子](./asr-glossary.md)：只用于术语库首次初始化。
 
-当前架构按业务职责命名；历史版本资料只用于追溯，不作为当前实现依据。
+当前架构按业务职责命名；旧版本实现可通过 Git 历史追溯，不在文档目录另留阶段快照。
 
 ## 维护资料
 
 - [贡献与验证](../CONTRIBUTING.md)、[安全与数据边界](../SECURITY.md)、[致谢与来源](../CREDITS.md)。
 - [用户研究材料](./research/README.md)：问卷、访谈和观察记录模板。
-- [2026-10-05 体验升级记录](./archive/2026-10-05-experience-upgrade.md)：阶段实现与当时的验证结果。
-- [初版 Web MVP 架构存档](./archive/v0-1-web-mvp.md)：仅用于了解项目早期设计。
 
-本地计划、交接、运行数据与模型缓存不属于公开文档入口，也不随仓库分发。
+过期计划、交接和工具会话可以清理；真实运行数据、模型缓存与评测证据保留在本机，不随仓库分发。

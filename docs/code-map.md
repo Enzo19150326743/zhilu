@@ -17,7 +17,7 @@
 1. `docs/code-map.md`：当前这份快速定位地图。
 2. `docs/README.md` 与相关 `docs/architecture/*.md`：公开文档导航和模块架构；留意文档中标明的历史设计。
 3. 前后端具体代码与相关测试：核实当前实现。
-4. `docs/project-context.md`、`docs/handoffs/*.md`（本地存在时）：本机说明与历史阶段交接，仅按需补充；公开仓库不依赖这些文件。
+4. 本机配置按需阅读 `docs/configuration.md`；旧版本通过 Git 历史追溯。
 
 ## 常用快速搜索命令
 
@@ -74,7 +74,7 @@ rg "关键词" backend `
 <仓库根目录>/
 ├── frontend/   Next.js + React + TypeScript + Tailwind 前端
 ├── backend/    FastAPI + Pydantic 后端
-├── docs/       使用指南、架构、示例与历史存档（导航见 docs/README.md）
+├── docs/       当前产品说明、使用指南、架构、示例与研究模板
 ├── assets/     README 插图与当前版本截图
 ├── .github/    GitHub Actions、Issue 与 PR 模板
 ├── scripts/    Windows 启动、配置、模型准备与发布检查
@@ -181,7 +181,7 @@ rg "关键词" backend `
 - 改 B 站：先读 `docs/architecture/bilibili-service.md`，再读 `backend/app/services/bilibili_service.py`、`backend/app/services/transcript_service.py`。
 - 改抖音：先读 `docs/architecture/douyin-adapter.md`，再读 `backend/app/services/douyin_service.py`。
 - 改小红书：先读 `docs/architecture/xiaohongshu-public-video.md`，再读 `backend/app/services/xiaohongshu_service.py`、`backend/app/services/media_source_service.py`、`frontend/components/TranscribeRequiredState.tsx` 和 `frontend/lib/platform-display.ts`。
-- 改小宇宙：先读 `backend/app/services/xiaoyuzhou_service.py` 和 `backend/tests/test_xiaoyuzhou_service.py`；本地计划仅作补充。
+- 改小宇宙：先读 `backend/app/services/xiaoyuzhou_service.py` 和 `backend/tests/test_xiaoyuzhou_service.py`。
 - 改总结 / 导图：先读 `frontend/components/SummaryTab.tsx`、`frontend/components/MindmapTab.tsx`、`backend/app/services/summarize_service.py`。
 - 改 QA：先读 `frontend/components/QaTab.tsx`、`backend/app/services/qa_service.py`。
 - 改 AI 转写稿：先读 `frontend/components/TranscriptTab.tsx`、`frontend/components/TranscribeSettingsPanel.tsx`、`frontend/components/TranscribeTaskToasts.tsx`、`frontend/lib/transcribe-settings.ts`、`backend/app/services/asr_service.py`、`backend/app/services/sensevoice_service.py`、`backend/app/services/transcribe_context_service.py`、`backend/app/services/transcript_correction_service.py`。
