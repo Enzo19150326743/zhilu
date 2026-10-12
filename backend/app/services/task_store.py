@@ -11,7 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator
 
-from app.services.library_service import DATABASE_PATH
+from app.database import connect_database
+from app.paths import DATABASE_PATH
 
 ACTIVE_STATUSES = ("queued", "running", "waiting_retry")
 TERMINAL_STATUSES = ("succeeded", "failed", "cancelled")
@@ -52,20 +53,12 @@ class TaskStore:
 
     @contextmanager
     def connect(self, *, immediate: bool = False) -> Iterator[sqlite3.Connection]:
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.database_path, timeout=5, isolation_level=None)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout = 5000")
-        connection.execute("PRAGMA foreign_keys = ON")
-        try:
-            connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
+        with connect_database(
+            self.database_path,
+            transaction="immediate" if immediate else "deferred",
+            foreign_keys=True,
+        ) as connection:
             yield connection
-            connection.commit()
-        except Exception:
-            connection.rollback()
-            raise
-        finally:
-            connection.close()
 
     def initialize(self) -> None:
         with self.connect(immediate=True) as connection:

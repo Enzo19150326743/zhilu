@@ -1,12 +1,13 @@
 import json
 import logging
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
+
+from app.paths import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "demo_seed.json"
+DATA_PATH = DATA_DIR / "demo_seed.json"
 
 
 @lru_cache(maxsize=1)

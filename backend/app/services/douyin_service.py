@@ -13,6 +13,7 @@ from urllib.parse import urljoin, urlparse
 
 from fastapi import HTTPException
 
+from app.paths import DATA_DIR, PROJECT_DIR
 from app.schemas import DownloadResponse, ParseResponse
 from app.services.douyin_adapter import (
     DouyinMediaInfo,
@@ -39,7 +40,7 @@ DOUYIN_BROWSER_MAX_ATTEMPTS = 3
 DOUYIN_BROWSER_RETRY_DELAYS_SECONDS = (2, 5)
 DOWNLOAD_TEMP_SUFFIX = ".part"
 DOUYIN_BROWSER_SCRIPT = (
-    Path(__file__).resolve().parents[3] / "scripts" / "extract-douyin-media.mjs"
+    PROJECT_DIR / "scripts" / "extract-douyin-media.mjs"
 )
 MOBILE_USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
@@ -497,7 +498,7 @@ def _get_download_dir() -> Path:
     download_dir = (
         Path(configured_dir).expanduser()
         if configured_dir
-        else Path(__file__).resolve().parents[2] / "data" / "downloads"
+        else DATA_DIR / "downloads"
     )
     download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir.resolve()

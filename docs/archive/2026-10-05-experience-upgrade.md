@@ -19,7 +19,7 @@
 - 我的整理与导出：`frontend/hooks/use-transcript-note-workflow.ts`、`frontend/components/AiTabs.tsx`、`TranscriptNoteWorkflow.tsx`、`backend/app/services/obsidian_export_service.py`。
 - 单条／批量任务：`frontend/hooks/use-task-workspace.ts`、`use-workbench-controller.ts`、`frontend/components/BatchAddDialog.tsx`、`BatchWorkspace.tsx`。
 - 页面与视觉：`frontend/components/WorkspaceViews.tsx`、`LandingHero.tsx`、`UrlInput.tsx`、`frontend/app/globals.css`。
-- 架构现状：`docs/architecture/universal-knowledge-draft.md`、`obsidian-note-workflow.md`、`batch-processing.md`、`v0-3-ai-workbench.md`、`docs/code-map.md`。
+- 架构现状：`docs/architecture/universal-knowledge-draft.md`、`obsidian-note-workflow.md`、`batch-processing.md`、`ai-workbench.md`、`docs/code-map.md`。
 
 ## 3. 已执行检查
 

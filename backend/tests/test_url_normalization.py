@@ -1,6 +1,6 @@
 import unittest
 
-from app.main import normalize_public_video_url
+from app.services.url_normalization_service import normalize_public_video_url
 
 
 class UrlNormalizationTests(unittest.TestCase):

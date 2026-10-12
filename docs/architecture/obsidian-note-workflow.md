@@ -12,7 +12,7 @@
 
 ```text
 backend/app/
-├── main.py
+├── routers/library.py
 ├── schemas.py
 └── services/
     ├── summarize_service.py

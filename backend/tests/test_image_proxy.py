@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from app.main import proxy_public_image
+from app.routers.status import proxy_public_image
 
 
 class ImageProxyTests(unittest.TestCase):

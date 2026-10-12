@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from app.main import APP_VERSION
+from app.config import APP_VERSION
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

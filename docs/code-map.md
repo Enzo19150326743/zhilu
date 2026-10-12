@@ -4,21 +4,20 @@
 
 ## 代码根目录
 
-本项目业务代码都在：
+本文件以 Git 仓库根目录为起点，所有命令也从仓库根目录执行。本机的仓库文件夹名是 `ai-video-insight-workspace`，从 GitHub 克隆后可以叫 `zhilu`，不依赖固定文件夹名。
 
 ```text
-ai-video-insight-workspace/
+<仓库根目录>/
 ```
 
-上级目录里的 `private/` 不是业务代码入口；通常不要搜索它。
+日常开发直接打开 Git 仓库根目录。本机工具、凭据和浏览器资料集中在被忽略的 `.local/`，源码与默认运行路径不依赖仓库上级目录。
 
 ## 先读顺序
 
 1. `docs/code-map.md`：当前这份快速定位地图。
-2. `docs/project-context.md`（本地存在时）：项目级稳定事实、技术栈、红线和文档索引；公开仓库不依赖该文件。
-3. 相关 `docs/architecture/*.md`：模块架构。
-4. 相关 `docs/handoffs/*.md`（本地存在时）：近期开发收口和下一步。
-5. 最后再读前后端具体代码。
+2. `docs/README.md` 与相关 `docs/architecture/*.md`：公开文档导航和模块架构；留意文档中标明的历史设计。
+3. 前后端具体代码与相关测试：核实当前实现。
+4. `docs/project-context.md`、`docs/handoffs/*.md`（本地存在时）：本机说明与历史阶段交接，仅按需补充；公开仓库不依赖这些文件。
 
 ## 常用快速搜索命令
 
@@ -33,7 +32,7 @@ chcp 65001 | Out-Null
 列出业务文件：
 
 ```powershell
-rg --files ai-video-insight-workspace `
+rg --files . `
   -g '!**/node_modules/**' `
   -g '!**/data/**' `
   -g '!**/__pycache__/**' `
@@ -44,7 +43,7 @@ rg --files ai-video-insight-workspace `
 搜索代码关键词：
 
 ```powershell
-rg "关键词" ai-video-insight-workspace `
+rg "关键词" . `
   -g '!**/node_modules/**' `
   -g '!**/data/**' `
   -g '!**/__pycache__/**' `
@@ -55,7 +54,7 @@ rg "关键词" ai-video-insight-workspace `
 只搜前端：
 
 ```powershell
-rg "关键词" ai-video-insight-workspace/frontend `
+rg "关键词" frontend `
   -g '!**/node_modules/**' `
   -g '!*.tsbuildinfo'
 ```
@@ -63,7 +62,7 @@ rg "关键词" ai-video-insight-workspace/frontend `
 只搜后端：
 
 ```powershell
-rg "关键词" ai-video-insight-workspace/backend `
+rg "关键词" backend `
   -g '!**/data/**' `
   -g '!**/__pycache__/**' `
   -g '!*.log'
@@ -72,19 +71,24 @@ rg "关键词" ai-video-insight-workspace/backend `
 ## 顶层目录职责
 
 ```text
-ai-video-insight-workspace/
+<仓库根目录>/
 ├── frontend/   Next.js + React + TypeScript + Tailwind 前端
 ├── backend/    FastAPI + Pydantic 后端
 ├── docs/       使用指南、架构、示例与历史存档（导航见 docs/README.md）
 ├── assets/     README 插图与当前版本截图
 ├── .github/    GitHub Actions、Issue 与 PR 模板
 ├── scripts/    Windows 启动、配置、模型准备与发布检查
+├── evaluation/ 本地历史评测证据，不随 Git 分发
+├── .local/     本机工具、凭据、浏览器资料，不随 Git 分发
+├── output/     可再生成的调试输出，不随 Git 分发
 └── 启动网站.bat
 ```
 
 ## 前端入口
 
-- `frontend/app/page.tsx`：前端主状态入口；控制首页、解析任务、历史记录、总结、转写、工作台状态。
+- `frontend/app/page.tsx`：页面组装入口，按当前状态展示首页、任务页或工作台及弹窗。
+- `frontend/hooks/use-workbench-controller.ts`：组合内容库、持久任务、总结和转写流程，管理当前详情、导航与结果同步。
+- `frontend/components/WorkspaceViews.tsx`：首页与详情工作台的布局组合。
 - `frontend/app/layout.tsx`：Next.js 根布局。
 - `frontend/app/globals.css`：全局样式。
 - `frontend/lib/api.ts`：前端请求后端 API 的封装。
@@ -117,13 +121,20 @@ ai-video-insight-workspace/
 - `frontend/components/BatchWorkspace.tsx`：批次统计、最近批次、任务筛选、单项取消/重试与结果回看。
 - `frontend/components/Header.tsx`：顶部导航和品牌区。
 - `frontend/hooks/use-library-processing-workflows.ts`：转写与自动总结期间的统一“处理中”标记、当前标签页刷新恢复和会话清理。
-- `frontend/hooks/use-task-workspace.ts`：批次提交、服务端快照轮询、URL 恢复和单项操作。
+- `frontend/hooks/use-task-workspace.ts`：批次提交、任务状态、URL 恢复和单项操作。
+- `frontend/hooks/use-batch-polling.ts`：单条与批量共用的快照轮询与退出清理。
+- `frontend/hooks/use-task-result-sync.ts`：只同步当前正在阅读的任务结果，丢弃失效响应。
+- `frontend/hooks/use-processing-recovery.ts`：刷新后恢复显式转写与总结工作流。
 - `frontend/hooks/use-workbench-controller.ts`：首页、详情和任务的主控制器；单条提炼提交持久任务后在后台执行，仅同步用户当前查看的内容，不自动切换详情。
 - `frontend/hooks/use-transcript-note-workflow.ts`：我的整理的单一前端状态、自动保存、立即导出一致性和 Markdown 下载。
 
 ## 后端入口
 
-- `backend/app/main.py`：FastAPI 应用入口；注册所有 API 路由、错误处理、CORS、URL 规范化和接口编排。
+- `backend/app/main.py`：FastAPI 组装入口；仅负责生命周期、路由注册、统一错误处理与 CORS。
+- `backend/app/routers/`：按媒体解析下载、分析、内容库、术语、服务状态与任务划分 HTTP 接口。
+- `backend/app/config.py`：加载后端环境文件与应用配置。
+- `backend/app/paths.py`：仓库、数据目录与数据库路径的唯一来源。
+- `backend/app/database.py`：SQLite 连接与事务管理；各业务服务保留表结构。
 - `backend/app/schemas.py`：Pydantic 请求 / 响应模型。
 - `backend/app/demo_data.py`：Demo 数据读取。
 - `backend/requirements.txt`：Python 依赖。
@@ -159,16 +170,16 @@ ai-video-insight-workspace/
 - `backend/app/services/text_normalization_service.py`：文本清理和规范化。
 - `backend/app/services/task_store.py`：批次、任务、关联、幂等、容量和检查点的 SQLite 存储。
 - `backend/app/services/task_runner.py`：单进程有界调度、阶段恢复、取消和资源编排。
-- `backend/app/services/processing_service.py`：批量任务复用的解析、转写、总结和严格写回服务。
+- `backend/app/services/processing_service.py`：持久任务的处理阶段，以及与兼容 API 共用的元数据合并和转写源选择。
 - `backend/app/routers/tasks.py`：批量任务 HTTP API。
 - `docs/architecture/batch-processing.md`：多视频批量处理的状态、资源和恢复合同。
 
 ## 常见任务定位
 
 - 改首页 UI：先读 `frontend/app/page.tsx`、`frontend/components/LandingHero.tsx`、`frontend/components/RecentLibrary.tsx`。
-- 改解析流程：先读 `backend/app/main.py` 的 `POST /api/parse`，再读 `backend/app/services/media_source_service.py`。
+- 改解析流程：先读 `backend/app/routers/media.py` 的 `POST /api/parse`，再读 `backend/app/services/media_source_service.py`。
 - 改 B 站：先读 `docs/architecture/bilibili-service.md`，再读 `backend/app/services/bilibili_service.py`、`backend/app/services/transcript_service.py`。
-- 改抖音：先读 `docs/architecture/v0-4-douyin-adapter.md`，再读 `backend/app/services/douyin_service.py`。
+- 改抖音：先读 `docs/architecture/douyin-adapter.md`，再读 `backend/app/services/douyin_service.py`。
 - 改小红书：先读 `docs/architecture/xiaohongshu-public-video.md`，再读 `backend/app/services/xiaohongshu_service.py`、`backend/app/services/media_source_service.py`、`frontend/components/TranscribeRequiredState.tsx` 和 `frontend/lib/platform-display.ts`。
 - 改小宇宙：先读 `backend/app/services/xiaoyuzhou_service.py` 和 `backend/tests/test_xiaoyuzhou_service.py`；本地计划仅作补充。
 - 改总结 / 导图：先读 `frontend/components/SummaryTab.tsx`、`frontend/components/MindmapTab.tsx`、`backend/app/services/summarize_service.py`。
@@ -178,10 +189,19 @@ ai-video-insight-workspace/
 - 改本地历史：先读 `frontend/components/RecentLibrary.tsx`、`backend/app/services/library_service.py`。
 - 改批量处理：先读 `docs/architecture/batch-processing.md`，再读 `backend/app/services/task_store.py`、`task_runner.py`、`frontend/hooks/use-task-workspace.ts` 和 `frontend/components/BatchWorkspace.tsx`。
 - 改 Obsidian 导出：先读 `docs/architecture/obsidian-note-workflow.md`、`backend/app/services/obsidian_export_service.py`。
-- 改启动器：先读 `启动网站.bat`、`scripts/launch-site.ps1`、`scripts/wait-for-url.ps1`。
+- 改启动器：先读 `启动网站.bat`、`scripts/launch-site.ps1`。
 - 改公开安装说明：先读 `README.md`、`docs/installation.md`、`docs/configuration.md`、`docs/troubleshooting.md`。
 - 改 Obsidian 兼容说明：先读 `docs/obsidian-export.md`、`backend/app/services/obsidian_export_service.py`。
 - 改开源发布检查：先读 `SECURITY.md`、`CONTRIBUTING.md`、`.github/workflows/ci.yml`、`scripts/check-public-release.ps1`。
+
+## 测试地图
+
+- `backend/tests/`：按业务服务和 API 行为组织的隔离回归测试。
+- `frontend/lib/*.test.ts`：无副作用的转换、筛选和恢复辅助逻辑。
+- `frontend/e2e/support.ts`：共享合成数据、API mock 和浏览器错误捕获。
+- `frontend/e2e/{library,task-submission,task-workflows,transcription,workbench}.spec.ts`：内容库、任务提交、处理恢复、转写与阅读整理场景。
+
+E2E 使用模拟 API，不证明真实平台或付费 AI 服务可用。
 
 ## 不要优先搜索的内容
 
@@ -190,4 +210,6 @@ ai-video-insight-workspace/
 - `backend/**/__pycache__/`：Python 缓存。
 - `*.log`：运行日志。
 - `*.tsbuildinfo`：TypeScript 增量编译缓存。
-- 上级目录 `private/`：本地工具、Cookie、缓存，不是业务代码。
+- `.local/`：本机工具、凭据与浏览器资料。
+- `output/`、`.playwright-cli/`：调试产物。
+- `evaluation/`：历史评测资料，只有评测任务需要读取。

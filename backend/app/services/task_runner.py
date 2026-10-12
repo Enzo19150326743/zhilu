@@ -12,6 +12,7 @@ from contextlib import contextmanager
 
 from fastapi import HTTPException
 
+from app.paths import DATA_DIR
 from app.schemas import TranscribeContextSettings
 from app.services.asr_service import (
     PreparedTranscriptionMedia,
@@ -55,7 +56,7 @@ class TaskRunner:
         self.store = store
         self.worker_count = worker_count
         self.poll_seconds = poll_seconds
-        self.task_root = task_root or (Path(__file__).resolve().parents[2] / "data" / "tasks")
+        self.task_root = task_root or (DATA_DIR / "tasks")
         self.parse_slots = threading.BoundedSemaphore(2)
         self.download_slots = DOWNLOAD_SLOTS
         self.recognition_slot = RECOGNITION_SLOT
@@ -67,7 +68,7 @@ class TaskRunner:
         self._content_locks: dict[str, threading.Lock] = {}
         self._content_locks_guard = threading.Lock()
         self._execution_lock = ExecutionLock(
-            Path(__file__).resolve().parents[2] / "data" / "processing-runner.lock"
+            DATA_DIR / "processing-runner.lock"
         )
 
     def start(self) -> None:
@@ -166,7 +167,7 @@ class TaskRunner:
                     free_bytes = shutil.disk_usage(task_dir.parent).free
                     if free_bytes < 512 * 1024 * 1024:
                         raise RuntimeError("磁盘可用空间不足 512 MB，无法准备转写媒体。")
-                    transcription_url, headers, factory = resolve_transcription_media(detail)
+                    transcription_url, headers, factory = resolve_transcription_media(detail.source_url)
                     with self.download_slots:
                         prepared = prepare_transcription_media(
                             transcription_url,

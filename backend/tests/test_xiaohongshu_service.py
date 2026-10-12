@@ -3,7 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app import main
+from app.services import processing_service
+from tests.factories import build_parse_response
 from app.services import xiaohongshu_service
 
 
@@ -206,8 +207,8 @@ class XiaohongshuServiceTests(unittest.TestCase):
             transcription_source_url="https://video.example/refreshed.mp4"
         )
 
-        with patch("app.main.parse_media_source", return_value=parse_response):
-            media_url, headers = main._resolve_transcription_source(source_url)
+        with patch("app.services.processing_service.parse_media_source", return_value=parse_response):
+            media_url, headers, _ = processing_service.resolve_transcription_media(source_url, allow_source_fallback=True)
 
         self.assertEqual(media_url, "https://video.example/refreshed.mp4")
         self.assertIsNone(headers)
@@ -215,7 +216,7 @@ class XiaohongshuServiceTests(unittest.TestCase):
     def test_transcription_resolver_keeps_douyin_share_url_for_browser_download(self) -> None:
         source_url = "https://v.douyin.com/example/"
 
-        media_url, headers = main._resolve_transcription_source(source_url)
+        media_url, headers, _ = processing_service.resolve_transcription_media(source_url, allow_source_fallback=True)
 
         self.assertEqual(media_url, source_url)
         self.assertIsNone(headers)
@@ -225,7 +226,7 @@ class XiaohongshuServiceTests(unittest.TestCase):
             "https://www.xiaohongshu.com/explore/"
             "6a2761520000000008032277"
         )
-        cached_detail = main.build_placeholder_parse_result(source_url)
+        cached_detail = build_parse_response(source_url)
         cached_detail.video = cached_detail.video.model_copy(
             update={
                 "author": "已有作者",
@@ -241,7 +242,7 @@ class XiaohongshuServiceTests(unittest.TestCase):
         cached_detail.mindmap_markdown = "# 已生成导图"
         cached_detail.library_summary_status = "ai_generated"
 
-        refreshed_detail = main.build_placeholder_parse_result(source_url)
+        refreshed_detail = build_parse_response(source_url)
         refreshed_detail.video = refreshed_detail.video.model_copy(
             update={
                 "author": "刷新作者",
@@ -253,7 +254,7 @@ class XiaohongshuServiceTests(unittest.TestCase):
             "https://video.example/refreshed.mp4"
         )
 
-        merged_detail = main._merge_refreshed_xiaohongshu_detail(
+        merged_detail = processing_service.merge_refreshed_xiaohongshu_detail(
             cached_detail,
             refreshed_detail,
         )

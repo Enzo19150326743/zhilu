@@ -8,6 +8,7 @@ $gitIgnorePath = Join-Path $projectDir ".gitignore"
 $gitIgnoreLines = @(Get-Content -LiteralPath $gitIgnorePath -Encoding UTF8)
 foreach ($requiredRule in @(
   ".env",
+  ".local/",
   "!.env.example",
   "backend/data/*",
   "evaluation/",
@@ -34,7 +35,7 @@ function Test-ProhibitedPath {
   param([string]$RelativePath)
   $isPrivateEnv = $RelativePath -match '(^|/)\.env($|\.(?!example$))'
   return $isPrivateEnv -or
-    $RelativePath -match '(^|/)(evaluation/|docs/(plans|handoffs)/|docs/project-context\.md$)' -or
+    $RelativePath -match '(^|/)(\.local/|output/|\.playwright-cli/|evaluation/|docs/(plans|handoffs)/|docs/project-context\.md$)' -or
     $RelativePath -match '\.(log|sqlite3?|db|whl|onnx|safetensors|pt|pth)$' -or
     $RelativePath -match '(^|/)(cookies?[^/]*\.txt|[^/]*cookie[^/]*\.json)$'
 }
@@ -61,7 +62,7 @@ if (Test-Path -LiteralPath $gitDir) {
 } else {
   $excludedSegments = @(
     "/.git/", "/node_modules/", "/.next/", "/.venv/", "/__pycache__/",
-    "/evaluation/", "/docs/plans/", "/docs/handoffs/", "/backend/data/"
+    "/.local/", "/output/", "/.playwright-cli/", "/evaluation/", "/docs/plans/", "/docs/handoffs/", "/backend/data/"
   )
   $relativeFiles = @(
     Get-ChildItem -LiteralPath $projectDir -Recurse -File | ForEach-Object {

@@ -1,13 +1,14 @@
-import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+import sqlite3
 
+from app.database import connect_database
+from app.paths import DATABASE_PATH
 from app.schemas import RateLimitItem
 
-DATABASE_PATH = Path(__file__).resolve().parents[2] / "data" / "local_library.sqlite3"
+
 RATE_LIMIT_WINDOW_SECONDS = 3600
 
 
@@ -142,19 +143,8 @@ def get_rate_limit_items(
 
 @contextmanager
 def _connect() -> Iterator[sqlite3.Connection]:
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH, timeout=5, isolation_level=None)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA busy_timeout = 5000")
-    try:
-        connection.execute("BEGIN IMMEDIATE")
+    with connect_database(DATABASE_PATH, transaction="immediate") as connection:
         yield connection
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
 
 
 def _ensure_schema(connection: sqlite3.Connection) -> None:

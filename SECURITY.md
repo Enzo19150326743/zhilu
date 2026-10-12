@@ -12,6 +12,7 @@
 
 - API Key、Cookie、Token 或浏览器登录信息；
 - `backend/.env`、Cookie 文件、SQLite 数据库或 Obsidian 仓库内容；
+- `.local/` 中的浏览器资料、凭据和本机工具，以及 `output/`、`.playwright-cli/` 中的调试输出；
 - 含用户名的绝对路径、私人媒体链接、完整转写稿或知识稿；
 - 能直接访问你本机服务的地址或日志原文。
 

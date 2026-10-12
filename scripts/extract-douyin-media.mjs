@@ -16,7 +16,7 @@ const { chromium } = frontendRequire("playwright");
 // 使用独立于用户日常浏览器资料的 Edge profile。抖音会给新会话分配状态，
 // 每次都从 Playwright 临时 profile 启动会显著增加详情接口偶发缺失的概率。
 const browserProfileDirectory = process.env.DOUYIN_BROWSER_PROFILE_DIR?.trim()
-  || join(scriptDirectory, "../../private/douyin-edge-profile");
+  || join(scriptDirectory, "../.local/browser/douyin");
 
 function resolveBrowserExecutable() {
   const configuredPath = process.env.DOUYIN_BROWSER_EXECUTABLE?.trim();

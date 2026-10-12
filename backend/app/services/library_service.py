@@ -1,31 +1,32 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from typing import Any, Literal
+from urllib.parse import parse_qs, urlparse
 import json
 import logging
 import re
 import sqlite3
-from collections.abc import Iterator
-from contextlib import contextmanager
-from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any, Literal
-from urllib.parse import parse_qs, urlparse
 
+from app.database import connect_database
+from app.paths import DATABASE_PATH
 from app.schemas import (
     LibraryItem,
     LibraryStatsResponse,
     NoteDraft,
     ParseResponse,
-    SummaryHighlight,
     ShownotesContext,
     SummarizeResponse,
-    TranscriptSegment,
+    SummaryHighlight,
     TranscriptPayload,
+    TranscriptSegment,
 )
 from app.services.text_normalization_service import simplify_text_payload
 from app.services.transcript_identity_service import build_transcript_fingerprint
 
+
 logger = logging.getLogger(__name__)
 
-DATABASE_PATH = Path(__file__).resolve().parents[2] / "data" / "local_library.sqlite3"
 DEFAULT_LIBRARY_LIMIT = 8
 MAX_LIBRARY_LIMIT = 50
 BILIBILI_BVID_PATTERN = re.compile(r"(BV[a-zA-Z0-9]+)")
@@ -637,20 +638,8 @@ def clear_library_items() -> int:
 
 @contextmanager
 def _connect(*, immediate: bool = False) -> Iterator[sqlite3.Connection]:
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH, timeout=5, isolation_level=None)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA busy_timeout = 5000")
-    try:
-        # 读后写操作必须提前取得写入权限；读锁升级遇到另一写事务时不会等待 busy_timeout。
-        connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
+    with connect_database(DATABASE_PATH, transaction="immediate" if immediate else "deferred") as connection:
         yield connection
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
 
 
 def _ensure_schema(connection: sqlite3.Connection) -> None:

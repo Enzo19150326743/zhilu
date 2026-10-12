@@ -1,6 +1,6 @@
-# V0.3 AI 工作台架构说明
+# AI 工作台架构说明
 
-> **最后更新**：2026-10-10
+> **最后更新**：2026-10-12
 
 ## 一、版本定位
 
@@ -20,6 +20,7 @@ V0.3 的主线是把“知录”从可解析、可总结的媒体工作台推进
 ```text
 backend/app/
 ├── main.py
+├── routers/analysis.py
 ├── schemas.py
 └── services/
     ├── qa_service.py
@@ -111,7 +112,7 @@ TranscriptTab / SummaryTab / QaTab 点击生成 AI 转写稿
 
 ```text
 POST /api/parse
-→ main.normalize_public_video_url 清理公开 URL；B 站视频链接去除 spm_id_from / vd_source 等跟踪参数
+→ url_normalization_service.normalize_public_video_url 清理公开 URL；B 站视频链接去除 spm_id_from / vd_source 等跟踪参数
 → ytdlp_service 获取媒体元数据；B 站解析带浏览器 User-Agent / Referer / Accept-Language 请求头
 → transcript_service 对 B 站优先读取平台公开字幕接口，失败后回落 yt-dlp VTT/SRT
 → 普通视频平台字幕写入 video.text_source_type = "subtitle"
@@ -145,7 +146,7 @@ POST /api/parse 返回的 placeholder summary / mindmap 只作为兼容数据
 - 默认提炼任务在没有完整字幕时自动补齐本地转写稿，转写后继续总结；普通 `/api/parse` 仍只解析媒体与平台已有文本。
 - 文本来源通过 `video.text_source_type` 区分：`subtitle` 表示平台字幕，`shownotes` 表示公开 shownotes / 内容简介，`asr_transcript` 表示本地语音识别生成的 AI 转写稿；旧历史里的 `transcript` 仍兼容为字幕 / 逐字稿语境。
 - 本地识别固定使用 SenseVoiceSmall，不提供其他引擎或模型兜底；未安装依赖时返回明确错误。`SENSEVOICE_DEVICE=auto` 选择可用 CUDA，必要时使用同一模型的 CPU 设备，实际设备记录在转写元数据中。
-- `backend/.env` 必须在业务服务导入前加载；当前由 `main.py` 按绝对路径读取。修改 `FFMPEG_LOCATION`、`SENSEVOICE_MODEL`、`SENSEVOICE_DEVICE`、DeepSeek 等配置后要重启后端，否则运行中的进程仍可能使用旧环境。
+- `backend/.env` 必须在业务服务导入前加载；当前由 `config.py` 按项目路径读取。修改 `FFMPEG_LOCATION`、`SENSEVOICE_MODEL`、`SENSEVOICE_DEVICE`、DeepSeek 等配置后要重启后端，否则运行中的进程仍可能使用旧环境。
 - Windows NVIDIA 加速通过 `scripts/install-sensevoice-cuda.ps1` 安装官方 CUDA 版 PyTorch，其运行库包含在 wheel 内；`cuda_runtime.py` 只注册当前环境的 PyTorch DLL 目录，不修改 Windows 全局配置。不得把 NVIDIA DLL 或 `.venv` 提交到仓库。
 - 模型或依赖不可用时，后端应返回对应的安全业务错误；前端请求层应区分后端不可达、请求中断和后端业务错误，不要把所有 `fetch` 异常都显示成后端未启动。
 - AI 校对术语由独立 SQLite 术语库维护；`docs/asr-glossary.md` 只在术语表首次创建时作为一次性种子。每期只有用户明确选择的术语进入 DeepSeek 校对，默认不选择历史术语，也不存在运行时隐藏名单。

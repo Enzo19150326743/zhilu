@@ -14,15 +14,16 @@
 
 ## 开发与架构
 
+- [产品说明](./product.md)：当前目标、功能规则、数据边界和非目标。
 - [代码地图](./code-map.md)：目录职责、模块入口与按任务定位。
 - [批量处理](./architecture/batch-processing.md)：持久任务、资源限制、恢复与取消。
-- [本地内容库](./architecture/v0-2-local-library.md)：SQLite 历史与保存合同。
-- [AI 工作台](./architecture/v0-3-ai-workbench.md)：总结、问答、导图与本地转写。
+- [本地内容库](./architecture/local-library.md)：SQLite 历史与保存合同。
+- [AI 工作台](./architecture/ai-workbench.md)：总结、问答、导图与本地转写。
 - [通用知识稿](./architecture/universal-knowledge-draft.md)与[我的整理工作流](./architecture/obsidian-note-workflow.md)：内容结构、原文依据和导出一致性。
-- 平台适配：[B 站](./architecture/bilibili-service.md)、[抖音](./architecture/v0-4-douyin-adapter.md)、[小红书](./architecture/xiaohongshu-public-video.md)。
+- 平台适配：[B 站](./architecture/bilibili-service.md)、[抖音](./architecture/douyin-adapter.md)、[小红书](./architecture/xiaohongshu-public-video.md)。
 - [AI 校对术语种子](./asr-glossary.md)：只用于术语库首次初始化。
 
-架构文档文件名中的 `v0-*` 表示模块最初引入阶段，不等同于当前应用版本。当前行为以文档正文、代码和测试为准。
+当前架构按业务职责命名；历史版本资料只用于追溯，不作为当前实现依据。
 
 ## 维护资料
 

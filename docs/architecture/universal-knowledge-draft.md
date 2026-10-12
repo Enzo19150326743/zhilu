@@ -17,7 +17,7 @@
 - `backend/app/services/transcript_identity_service.py`：当前有效稿指纹、稳定片段标识和证据片段构造。
 - `backend/app/services/obsidian_export_service.py`：版本化 YAML 与通用 Markdown 模板。
 - `backend/app/schemas.py`：`VideoSummary` 通用合同及旧字段兼容层。
-- `backend/app/main.py`：旧总结可读、新版缓存识别和重新生成入口。
+- `backend/app/routers/analysis.py`：旧总结可读、新版缓存识别和重新生成入口。
 - `backend/app/services/library_service.py`：沿用 SQLite `payload_json` 保存完整工作台数据。
 - `frontend/lib/types.ts`：前端可选字段类型兼容。
 - `frontend/components/SummaryTab.tsx`：观点原文预览、固定核对面板和就地追问入口。

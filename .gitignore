@@ -1,4 +1,5 @@
 # 本地密钥与账号凭据
+.local/
 .env
 .env.*
 !.env.example
@@ -29,6 +30,7 @@ coverage/
 .ruff_cache/
 **/.playwright-cli/
 **/output/playwright/
+output/
 
 # 本地数据、下载、模型与二进制缓存
 backend/data/*

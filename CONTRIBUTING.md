@@ -13,6 +13,8 @@
 
 ## 开发环境
 
+直接打开 Git 仓库根目录开发。当前产品边界见 [产品说明](./docs/product.md)，模块入口见 [代码地图](./docs/code-map.md)。本机辅助工具、凭据和浏览器资料放在 `.local/`，业务运行数据留在 `backend/data/`；这些内容不进入 Git。
+
 建议使用 Windows 10/11、Python 3.10+、Node.js 20+ 和 FFmpeg。完整步骤见 [安装说明](./docs/installation.md)，环境变量见 [配置说明](./docs/configuration.md)。
 
 ```powershell
@@ -51,6 +53,8 @@ npm run build
 cd ..
 .\scripts\check-public-release.ps1
 ```
+
+页面状态、任务同步或交互改动还需要在 `frontend/` 执行 `npm run test:e2e`。场景文件按内容库、任务提交、处理恢复、转写与工作台分组，共用 `e2e/support.ts`；保留已有断言与浏览器错误捕获。E2E 使用合成 API，不验证真实平台或付费服务。
 
 ## 数据与隐私要求
 

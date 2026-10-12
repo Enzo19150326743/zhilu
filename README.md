@@ -210,7 +210,7 @@ npm run test:helpers
 npm run build
 ```
 
-项目入口见 [代码地图](./docs/code-map.md)，贡献方式见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+当前目标与功能边界见 [产品说明](./docs/product.md)，项目入口见 [代码地图](./docs/code-map.md)，贡献方式见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ```text
 frontend/       页面、组件、状态与浏览器测试
@@ -218,6 +218,9 @@ backend/        API、媒体适配、本地转写、任务与存储
 assets/readme/  README 插图与当前版本截图
 docs/           使用指南、架构、示例与研究资料
 scripts/        启动、配置、模型准备与发布检查
+.local/         本机工具、凭据与浏览器资料（不进入 Git）
+evaluation/     本地历史评测证据（不进入 Git）
+output/         调试输出（不进入 Git）
 ```
 
 截图素材与复现方式见 [README 素材说明](./assets/readme/README.md)。

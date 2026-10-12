@@ -45,8 +45,8 @@ npm run build
 ## 稳定合同与修改要求
 
 - `backend/app/schemas.py` 定义后端 API 模型，`frontend/lib/types.ts` 手动镜像前端使用的字段。修改公共字段时保持向后兼容，并同步两端及相关调用方；不要无意删除、改名或收窄已有字段。
-- `backend/app/main.py` 的 URL 规范化和统一错误响应是已有稳定行为。任务确有需要时可以修改，但必须保留公开 URL 校验、B 站播放定位参数以及前端可读取的 `error_code` / `message` 合同，并运行对应检查。
-- `frontend/e2e/desktop.spec.ts` 的 `installApiMocks` 和 `watchBrowserErrors` 是共享测试基础设施。接口或页面流程变化时允许同步更新，但要保持 mock 可复现，并继续捕获浏览器控制台错误和页面异常。
+- `backend/app/services/url_normalization_service.py` 的 URL 规范化和 `backend/app/main.py` 的统一错误响应是已有稳定行为。任务确有需要时可以修改，但必须保留公开 URL 校验、B 站播放定位参数以及前端可读取的 `error_code` / `message` 合同，并运行对应检查。
+- `frontend/e2e/support.ts` 的 `installApiMocks` 和 `watchBrowserErrors` 是共享测试基础设施，场景按 `*.spec.ts` 分组。接口或页面流程变化时允许同步更新，但要保持 mock 可复现，并继续捕获浏览器控制台错误和页面异常。
 - 密钥、Cookie、Token、数据库、下载文件、本地知识稿、私人链接和含本机用户名的绝对路径不得进入公开候选文件。不要处理 DRM、付费、私密、登录受限或无授权内容。
 
 ## 修改平台适配器时

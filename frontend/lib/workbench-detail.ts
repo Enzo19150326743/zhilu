@@ -3,6 +3,7 @@ import { getTextSourceType } from "./media";
 import type {
   DemoDetail,
   ParseResponse,
+  ProcessingTaskItem,
   SummarizeResponse,
   SummaryGenerationMeta,
   TranscriptPayload,
@@ -13,6 +14,27 @@ export function isParseResponse(
   detail: DemoDetail | ParseResponse
 ): detail is ParseResponse {
   return "source_url" in detail;
+}
+
+export function getLatestTaskForDetail(
+  detail: DemoDetail | ParseResponse | null,
+  tasks: (ProcessingTaskItem | null)[]
+): ProcessingTaskItem | null {
+  if (!detail) return null;
+  const activeStatuses = new Set(["queued", "running", "waiting_retry"]);
+  return tasks.reduce<ProcessingTaskItem | null>((latest, task) => {
+    if (!task || !(
+      task.video_id === detail.video.video_id ||
+      (isParseResponse(detail) && task.source_url === detail.source_url)
+    )) return latest;
+    if (!latest) return task;
+    const time = Date.parse(task.updated_at) || 0;
+    const latestTime = Date.parse(latest.updated_at) || 0;
+    if (time > latestTime) return task;
+    // 同毫秒内重试可能沿用时间戳，活跃快照优先于已停止轮询的旧终态。
+    return time === latestTime && activeStatuses.has(task.status) && !activeStatuses.has(latest.status)
+      ? task : latest;
+  }, null);
 }
 
 export function shouldAutoSummarizeDetail(

@@ -299,7 +299,7 @@ class TaskRunnerTests(unittest.TestCase):
                 patch("app.services.task_runner.parse_and_persist", side_effect=lambda url: build_detail(url)),
                 patch("app.services.task_runner.get_library_detail_by_source_url", return_value=None),
                 patch("app.services.task_runner.get_library_detail", return_value=None),
-                patch("app.services.task_runner.resolve_transcription_media", side_effect=lambda detail: (detail.source_url, None, None)),
+                patch("app.services.task_runner.resolve_transcription_media", side_effect=lambda source_url: (source_url, None, None)),
                 patch("app.services.task_runner.prepare_transcription_media", side_effect=timed("download", 0.03, prepared)),
                 patch("app.services.task_runner.recognize_transcription_media", side_effect=timed("recognize", 0.05, recognized)),
                 patch("app.services.task_runner.finalize_transcription", return_value=SimpleNamespace()),

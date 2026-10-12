@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api";
 import type { TaskBatchResponse, TaskBatchSummary, TranscribeContextSettings } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 2000;
+import { TASK_POLL_INTERVAL_MS, useBatchPolling } from "@/hooks/use-batch-polling";
 
 function createRequestId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `batch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -51,71 +51,26 @@ export function useTaskWorkspace() {
     })();
   }, [openBatch, refreshList]);
 
-  useEffect(() => {
-    if (!activeBatch || activeBatch.stats.active === 0) return;
-    let cancelled = false;
-    let timer: number | undefined;
-    const poll = async () => {
-      try {
-        const response = await apiClient.getTaskBatch(activeBatch.batch_id);
-        if (cancelled) return;
-        setErrorMessage(null);
-        setActiveBatch(response);
-        await refreshList();
-        if (!cancelled && response.stats.active > 0) {
-          timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : "任务状态刷新失败，正在等待重连。");
-          timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-        }
-      }
-    };
-    timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [activeBatch?.batch_id, activeBatch?.stats.active, refreshList]);
-
-  useEffect(() => {
-    if (!activeSingleBatch || activeSingleBatch.stats.active === 0) return;
-    let cancelled = false;
-    let timer: number | undefined;
-    const poll = async () => {
-      try {
-        const response = await apiClient.getTaskBatch(activeSingleBatch.batch_id);
-        if (cancelled) return;
-        setErrorMessage(null);
-        setActiveSingleBatch(response);
-        await refreshList();
-        if (!cancelled && response.stats.active > 0) {
-          timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "单条任务状态刷新失败，正在等待重连。"
-          );
-          timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-        }
-      }
-    };
-    timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [activeSingleBatch?.batch_id, activeSingleBatch?.stats.active, refreshList]);
+  useBatchPolling({
+    batch: activeBatch,
+    onSnapshot: setActiveBatch,
+    refreshList,
+    setErrorMessage,
+    failureMessage: "任务状态刷新失败，正在等待重连。"
+  });
+  useBatchPolling({
+    batch: activeSingleBatch,
+    onSnapshot: setActiveSingleBatch,
+    refreshList,
+    setErrorMessage,
+    failureMessage: "单条任务状态刷新失败，正在等待重连。"
+  });
 
   useEffect(() => {
     if (activeTaskCount === 0 || isWorkspaceOpen) return;
     const timer = window.setInterval(() => {
       void refreshList().catch(() => undefined);
-    }, POLL_INTERVAL_MS);
+    }, TASK_POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [activeTaskCount, isWorkspaceOpen, refreshList]);
 

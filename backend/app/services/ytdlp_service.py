@@ -17,6 +17,7 @@ from fastapi import HTTPException
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError, ExtractorError
 
+from app.paths import DATA_DIR
 from app.schemas import DownloadResponse, FormatDiagnostics, ParseResponse
 from app.services.http_fetch_service import DEFAULT_USER_AGENT
 from app.services.transcript_service import extract_transcript_payload
@@ -228,7 +229,7 @@ def _get_download_dir() -> Path:
     if configured_dir:
         download_dir = Path(configured_dir).expanduser()
     else:
-        download_dir = Path(__file__).resolve().parents[2] / "data" / "downloads"
+        download_dir = DATA_DIR / "downloads"
 
     download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir.resolve()

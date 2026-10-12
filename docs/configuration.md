@@ -12,6 +12,17 @@ Copy-Item backend\.env.example backend\.env
 
 修改 `.env` 后必须重启后端。
 
+## 本机文件分区
+
+- `backend/data/`：SQLite、下载和任务检查点。
+- `.local/tools/`：本机安装的辅助工具，例如 FFmpeg。
+- `.local/cookies/`：显式配置的本机凭据文件。
+- `.local/browser/douyin/`：抖音取流脚本默认使用的独立浏览器资料。
+
+这些目录均不随 Git 分发。工具和凭据路径仍通过下面的环境变量明确配置，不依赖仓库上级的目录名。需要自定义抖音浏览器资料位置时可设置已有的 `DOUYIN_BROWSER_PROFILE_DIR`；迁移前关闭使用该资料的浏览器实例。
+
+抖音取流脚本使用 `frontend/package.json` 显式声明的 Playwright 运行依赖，以及本机 Edge 或 Chrome；浏览器测试另外使用 `@playwright/test`。`.playwright-cli/` 和 `output/` 仅保存调试产物，不是安装目录或业务数据。
+
 ## AI 接口
 
 知录支持 DeepSeek 和其他 OpenAI-compatible Chat Completions 服务。

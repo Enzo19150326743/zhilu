@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 from fastapi import HTTPException
 
+from app.paths import DATA_DIR
 from app.schemas import (
     BilibiliAuthStatusResponse,
     DownloadResponse,
@@ -1230,7 +1231,7 @@ def _get_download_dir() -> Path:
     if configured_dir:
         download_dir = Path(configured_dir).expanduser()
     else:
-        download_dir = Path(__file__).resolve().parents[2] / "data" / "downloads"
+        download_dir = DATA_DIR / "downloads"
 
     download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir.resolve()

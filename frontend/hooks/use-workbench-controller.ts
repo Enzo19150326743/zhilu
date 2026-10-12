@@ -8,11 +8,9 @@ import { useSummaryWorkflow } from "@/hooks/use-summary-workflow";
 import { useTaskWorkspace } from "@/hooks/use-task-workspace";
 import { useTranscribeWorkflow } from "@/hooks/use-transcribe-workflow";
 import { apiClient } from "@/lib/api";
-import { LIBRARY_PROCESSING_TIMEOUT_MS } from "@/lib/library-processing";
 import { getMediaType, getTextSourceType } from "@/lib/media";
 import { parseBatchInput } from "@/lib/batch-input";
-import { pollForRecoveredValue } from "@/lib/transcribe-recovery";
-import { getSummaryMetaFromDetail, isParseResponse } from "@/lib/workbench-detail";
+import { getLatestTaskForDetail, getSummaryMetaFromDetail, isParseResponse } from "@/lib/workbench-detail";
 import type {
   AppStatus,
   DemoDetail,
@@ -22,17 +20,10 @@ import type {
   SummaryDisplayState
 } from "@/lib/types";
 
-type TabKey = "summary" | "mindmap" | "qa" | "transcript";
+import { useProcessingRecovery } from "@/hooks/use-processing-recovery";
+import { useTaskResultSync } from "@/hooks/use-task-result-sync";
 
-const RESTORED_WORKFLOW_POLL_INTERVAL_MS = 5000;
-function hasPersistedSummary(detail: ParseResponse): boolean {
-  return Boolean(
-    detail.video.has_transcript &&
-      getTextSourceType(detail.video) !== "shownotes" &&
-      (detail.library_summary_status === "ai_generated" ||
-        detail.library_summary_status === "local_fallback")
-  );
-}
+type TabKey = "summary" | "mindmap" | "qa" | "transcript";
 
 export function useWorkbenchController() {
   const taskWorkspace = useTaskWorkspace();
@@ -82,10 +73,6 @@ export function useWorkbenchController() {
     () => new Set()
   );
   const activeSourceUrlRef = useRef<string | null>(null);
-  const isControllerMountedRef = useRef(true);
-  const restoredRecoveryVideoIdsRef = useRef<Set<string>>(new Set());
-  const batchTaskSyncKeyRef = useRef("");
-  const singleTaskSyncKeyRef = useRef("");
   const submissionInFlightRef = useRef(false);
 
   const activeDetail =
@@ -150,216 +137,41 @@ export function useWorkbenchController() {
     setSummaryErrorMessage,
     setSummaryGenerationMeta
   });
-  const runSummaryForDetailRef = useRef(runSummaryForDetail);
-
-  useEffect(() => {
-    runSummaryForDetailRef.current = runSummaryForDetail;
-  }, [runSummaryForDetail]);
-
-  useEffect(() => {
-    isControllerMountedRef.current = true;
-    return () => {
-      isControllerMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isProcessingWorkflowHydrated) {
-      return;
-    }
-
-    for (const workflow of restoredWorkflows) {
-      if (restoredRecoveryVideoIdsRef.current.has(workflow.videoId)) {
-        continue;
-      }
-      restoredRecoveryVideoIdsRef.current.add(workflow.videoId);
-
-      const remainingTimeoutMs = Math.max(
-        0,
-        LIBRARY_PROCESSING_TIMEOUT_MS - (Date.now() - workflow.startedAt)
-      );
-      if (remainingTimeoutMs === 0) {
-        finishProcessingWorkflow(workflow.videoId);
-        continue;
-      }
-
-      void (async () => {
-        const recoveredDetail = await pollForRecoveredValue({
-          fetchValue: () => apiClient.getLibraryDetail(workflow.videoId),
-          intervalMs: RESTORED_WORKFLOW_POLL_INTERVAL_MS,
-          isRecovered: (candidateDetail) =>
-            hasPersistedSummary(candidateDetail) ||
-            Boolean(
-              candidateDetail.video.has_transcript &&
-                getTextSourceType(candidateDetail.video) !== "shownotes" &&
-                candidateDetail.transcript?.plain_text.trim()
-            ),
-          timeoutMs: remainingTimeoutMs
-        });
-
-        if (!isControllerMountedRef.current) {
-          return;
-        }
-        if (!recoveredDetail) {
-          finishProcessingWorkflow(workflow.videoId);
-          return;
-        }
-        if (hasPersistedSummary(recoveredDetail)) {
-          await refreshLibraryItems();
-          finishProcessingWorkflow(workflow.videoId);
-          return;
-        }
-
-        await runSummaryForDetailRef.current(recoveredDetail);
-      })();
-    }
-  }, [
+  useProcessingRecovery({
+    isHydrated: isProcessingWorkflowHydrated,
+    restoredWorkflows,
     finishProcessingWorkflow,
-    isProcessingWorkflowHydrated,
     refreshLibraryItems,
-    restoredWorkflows
-  ]);
+    runSummaryForDetail
+  });
   const {
     asrStatus,
     isOpen: isTranscribeSettingsOpen,
     pendingTranscribeSettings
   } = transcribeSettingsDialogState;
   useEffect(() => {
-    if (!activeSingleTask) {
-      return;
-    }
-
-    const syncKey = [
-      activeSingleTask.task_id,
-      activeSingleTask.video_id ?? "",
-      activeSingleTask.stage,
-      activeSingleTask.status,
-      activeSingleTask.updated_at
-    ].join("|");
-    if (singleTaskSyncKeyRef.current === syncKey) {
-      return;
-    }
-    singleTaskSyncKeyRef.current = syncKey;
-
+    if (!activeSingleTask) return;
     void refreshLibraryItems();
-    const isTaskRelevant = () => activeSourceUrlRef.current === activeSingleTask.source_url;
-    if (!isTaskRelevant()) {
-      return;
-    }
-
+    if (activeSourceUrlRef.current !== activeSingleTask.source_url) return;
     if (activeSingleTask.status === "failed") {
       setErrorMessage(activeSingleTask.error_message ?? "这条内容提炼失败，可以在任务中重试。");
-      return;
-    }
-    if (activeSingleTask.status === "cancelled") {
+    } else if (activeSingleTask.status === "cancelled") {
       setErrorMessage("这条内容的提炼任务已取消，已完成的结果仍会保留。");
-      return;
     }
-    if (!activeSingleTask.video_id) {
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await apiClient.getLibraryDetail(activeSingleTask.video_id!);
-        if (cancelled || !isControllerMountedRef.current || !isTaskRelevant()) {
-          return;
-        }
-        // 后台结果只刷新用户正在查看的同一篇内容，不承担页面导航。
-        setDetail((currentDetail) =>
-          currentDetail?.video.video_id === activeSingleTask.video_id ? response : currentDetail
-        );
-        setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
-        if (activeSingleTask.status === "succeeded") {
-          setErrorMessage(null);
-        }
-      } catch (error) {
-        if (!cancelled && isTaskRelevant() && activeSingleTask.status === "succeeded") {
-          setErrorMessage(
-            error instanceof Error ? error.message : "任务已完成，但结果暂时无法打开。"
-          );
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeSingleTask?.error_message,
-    activeSingleTask?.stage,
-    activeSingleTask?.status,
-    activeSingleTask?.task_id,
-    activeSingleTask?.updated_at,
-    activeSingleTask?.video_id,
-    refreshLibraryItems,
-    setSummaryGenerationMeta
+  }, [activeSingleTask?.updated_at, activeSingleTask?.task_id, activeSingleTask?.status,
+      activeSingleTask?.source_url, activeSingleTask?.error_message, refreshLibraryItems]);
+  const activePersistentDetailTask = getLatestTaskForDetail(activeDetail, [
+    activeSingleTask,
+    ...(taskWorkspace.activeBatch?.items ?? [])
   ]);
-  const taskMatchesDetail = (task: typeof activeSingleTask): boolean =>
-    Boolean(
-      task &&
-        activeDetail &&
-        (task.video_id === activeDetail.video.video_id ||
-          (isParseResponse(activeDetail) && task.source_url === activeDetail.source_url))
-    );
-  const activeBatchDetailTask =
-    taskWorkspace.activeBatch?.items.find((task) => taskMatchesDetail(task)) ?? null;
-  const activePersistentDetailTask = taskMatchesDetail(activeSingleTask)
-    ? activeSingleTask
-    : activeBatchDetailTask;
-  useEffect(() => {
-    if (!activeBatchDetailTask?.video_id) return;
-
-    const syncKey = [
-      activeBatchDetailTask.task_id,
-      activeBatchDetailTask.stage,
-      activeBatchDetailTask.status,
-      activeBatchDetailTask.updated_at
-    ].join("|");
-    if (batchTaskSyncKeyRef.current === syncKey) return;
-    batchTaskSyncKeyRef.current = syncKey;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await apiClient.getLibraryDetail(activeBatchDetailTask.video_id!);
-        if (
-          cancelled ||
-          !isControllerMountedRef.current ||
-          activeSourceUrlRef.current !== response.source_url
-        ) return;
-        setDetail((currentDetail) =>
-          currentDetail?.video.video_id === activeBatchDetailTask.video_id ? response : currentDetail
-        );
-        setSummaryGenerationMeta(getSummaryMetaFromDetail(response));
-        if (activeBatchDetailTask.status === "succeeded") {
-          setErrorMessage(null);
-          await refreshLibraryItems();
-        }
-      } catch (error) {
-        if (
-          !cancelled &&
-          activeSourceUrlRef.current === activeBatchDetailTask.source_url &&
-          activeBatchDetailTask.status === "succeeded"
-        ) {
-          setErrorMessage(
-            error instanceof Error ? error.message : "任务已完成，但最新结果暂时无法打开。"
-          );
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeBatchDetailTask?.stage,
-    activeBatchDetailTask?.status,
-    activeBatchDetailTask?.task_id,
-    activeBatchDetailTask?.updated_at,
-    activeBatchDetailTask?.video_id,
-    refreshLibraryItems,
-    setSummaryGenerationMeta
-  ]);
+  useTaskResultSync({
+    task: activePersistentDetailTask,
+    activeSourceUrl,
+    setDetail,
+    setSummaryGenerationMeta,
+    setErrorMessage,
+    refreshLibraryItems
+  });
   const isPersistentDetailTaskActive = Boolean(
     activePersistentDetailTask &&
       ["queued", "running", "waiting_retry"].includes(activePersistentDetailTask.status)

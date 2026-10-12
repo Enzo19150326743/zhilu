@@ -6,7 +6,7 @@
 >
 > **最后更新**：2026-05-10
 >
-> **当前补充**：项目已进入 V0.2，本文件保留 V0.1 主干说明；V0.2 本地内容库详见 `docs/architecture/v0-2-local-library.md`。
+> **当前补充**：项目已进入 V0.2，本文件保留 V0.1 主干说明；V0.2 本地内容库详见 `docs/architecture/local-library.md`。
 
 ---
 

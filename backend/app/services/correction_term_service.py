@@ -1,19 +1,20 @@
-import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
+import sqlite3
 
+from app.database import connect_database
+from app.paths import DATABASE_PATH, PROJECT_DIR
 from app.schemas import (
     CorrectionTermFolder,
     CorrectionTermItem,
     CorrectionTermLibraryResponse,
-    MAX_CORRECTION_TERM_LENGTH,
     MAX_CORRECTION_TERMS,
+    MAX_CORRECTION_TERM_LENGTH,
 )
 
-DATABASE_PATH = Path(__file__).resolve().parents[2] / "data" / "local_library.sqlite3"
-LEGACY_GLOSSARY_PATH = Path(__file__).resolve().parents[3] / "docs" / "asr-glossary.md"
+
+LEGACY_GLOSSARY_PATH = PROJECT_DIR / "docs" / "asr-glossary.md"
 DEFAULT_FOLDER_NAME = "系统默认"
 
 
@@ -241,18 +242,8 @@ def record_term_usage(terms: list[str]) -> None:
 
 @contextmanager
 def _connect() -> Iterator[sqlite3.Connection]:
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    try:
+    with connect_database(DATABASE_PATH, transaction="implicit", foreign_keys=True) as connection:
         yield connection
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
 
 
 def _ensure_schema(connection: sqlite3.Connection) -> None:
